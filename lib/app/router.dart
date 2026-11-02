@@ -1,0 +1,263 @@
+import 'dart:async';
+
+import 'package:alisten/app/app_version.dart';
+import 'package:alisten/app/deep_link_controller.dart';
+import 'package:alisten/app/feedback.dart';
+import 'package:alisten/app/mini_player.dart';
+import 'package:alisten/app/room/room_mode.dart';
+import 'package:alisten/app/room/room_screen.dart';
+import 'package:alisten/app/room_route_gate.dart';
+import 'package:alisten/core/protocol/protocol.gen.dart' show protocolVersion;
+import 'package:alisten/domain/room/room_route.dart';
+import 'package:alisten/domain/track/track.dart';
+import 'package:alisten/features/admin/index.dart';
+import 'package:alisten/features/history/index.dart';
+import 'package:alisten/features/lobby/index.dart';
+import 'package:alisten/features/room/index.dart';
+import 'package:alisten/features/search/index.dart';
+import 'package:alisten/features/server/index.dart';
+import 'package:alisten/features/settings/index.dart';
+import 'package:alisten/shared/ui/alisten_scaffold.dart';
+import 'package:alisten/shared/ui/empty_state.dart';
+import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/toast.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+const _pages = {
+  '/',
+  '/history',
+  '/settings',
+  '/settings/licenses',
+  '/settings/servers',
+  '/settings/admin',
+};
+
+const invalidLinkText = '链接无效，已回到大厅';
+
+// 房间路由之下的相对路径片段，不是完整位置。
+const songSearchSegment = 'search';
+const playlistSegment = 'playlists/netease/:id';
+
+final routerProvider = Provider<GoRouter>((ref) {
+  final rootNavigator = GlobalKey<NavigatorState>(debugLabel: 'root');
+  final toasts = ref.read(toastControllerProvider);
+  void reportPick(MutationResult<Object?> result, String success) {
+    reportMutation(toasts, result, success: (_) => success);
+  }
+
+  void notice(String text) => toasts.show(ToastKind.warning, text);
+  void failed(String text) => toasts.show(ToastKind.failure, text);
+  // 撤销提示可能比播放历史页存活更久，由这里持有，清空历史时收回。
+  ToastMessage? undoOffer;
+  final router = GoRouter(
+    navigatorKey: rootNavigator,
+    redirect: (context, state) {
+      final uri = state.uri;
+      if (_pages.contains(uri.path) ||
+          roomRoute(
+                uri.pathSegments,
+                sections: DeepLinkController.appSections,
+              ) !=
+              null) {
+        return null;
+      }
+      // 重定向可能在路由构建期间执行，不能在这时显示提示。
+      scheduleMicrotask(() => toasts.show(ToastKind.warning, invalidLinkText));
+      return '/';
+    },
+    errorBuilder: (context, state) => const _LostPage(),
+    routes: [
+      ShellRoute(
+        builder: (context, state, child) =>
+            MiniPlayerHost(location: state.uri, child: child),
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => LobbyScreen(
+              onOpenRoom: (roomRef) => context.go('/r/$roomRef'),
+              onOpenHistory: () => context.go('/history'),
+              onOpenSettings: () => context.go('/settings'),
+              onNotice: toasts.show,
+            ),
+            routes: [
+              GoRoute(
+                path: 'history',
+                builder: (context, state) => HistoryScreen(
+                  onResult: reportPick,
+                  onDeleted: (message, undo) => undoOffer = toasts.show(
+                    ToastKind.info,
+                    message,
+                    action: ToastAction(label: '撤销', onPressed: undo),
+                  ),
+                  onCleared: () {
+                    if (undoOffer case final offer?) toasts.withdraw(offer);
+                  },
+                  onNotice: failed,
+                ),
+              ),
+              GoRoute(
+                path: 'settings',
+                builder: (context, state) => SettingsScreen(
+                  appVersion: appVersion,
+                  protocolVersion: protocolVersion,
+                  onProfileResult: (result) =>
+                      reportMutation(toasts, result, success: (_) => '资料已保存'),
+                  onNotice: toasts.show,
+                  onOpenLicenses: () => context.go('/settings/licenses'),
+                  onOpenServers: () => context.go('/settings/servers'),
+                  onOpenAdmin: () => context.go('/settings/admin'),
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'licenses',
+                    builder: (context, state) => const LicensesScreen(),
+                  ),
+                  GoRoute(
+                    path: 'servers',
+                    builder: (context, state) => ServerScreen(
+                      onSwitched: () => context.go('/'),
+                      onNotice: toasts.show,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'admin',
+                    parentNavigatorKey: rootNavigator,
+                    // 管理 token 只在后台页面存续期间有效。
+                    onExit: (context, state) {
+                      ref.read(adminSessionProvider.notifier).end();
+                      return true;
+                    },
+                    builder: (context, state) => AdminScreen(
+                      onNotice: toasts.show,
+                      onExit: () => context.go('/settings'),
+                      onOpenRoom: (roomRef) => context.go('/r/$roomRef'),
+                    ),
+                  ),
+                ],
+              ),
+              for (final mode in RoomMode.values)
+                GoRoute(
+                  path: _roomPath(mode),
+                  parentNavigatorKey: rootNavigator,
+                  pageBuilder: (context, state) =>
+                      _roomPage(state.pathParameters['ref']!, mode),
+                  routes: [
+                    if (mode == RoomMode.player) ...[
+                      GoRoute(
+                        path: songSearchSegment,
+                        parentNavigatorKey: rootNavigator,
+                        builder: (context, state) {
+                          final roomRef = state.pathParameters['ref']!;
+                          return RoomRouteGate(
+                            roomRef: roomRef,
+                            child: SearchScreen(
+                              onResult: reportPick,
+                              onNotice: notice,
+                              // 歌单页叠在点歌页之上，返回时点歌页保持原样。
+                              onOpenPlaylist: (playlist) => unawaited(
+                                context.push<void>(
+                                  '/r/$roomRef/playlists/'
+                                  '${playlist.source.name}/${playlist.id}',
+                                ),
+                              ),
+                              onShowQueue: () =>
+                                  context.go(RoomMode.queue.routeIn(roomRef)),
+                              onOpenRoom: context.go,
+                            ),
+                          );
+                        },
+                      ),
+                      GoRoute(
+                        path: playlistSegment,
+                        parentNavigatorKey: rootNavigator,
+                        builder: (context, state) => RoomRouteGate(
+                          roomRef: state.pathParameters['ref']!,
+                          child: PlaylistScreen(
+                            source: TrackSource.netease,
+                            id: state.pathParameters['id']!,
+                            onResult: reportPick,
+                            onNotice: notice,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+            ],
+          ),
+        ],
+      ),
+    ],
+  );
+  final stopReleasingFocus = _releaseFocusWhenLeaving(router);
+  ref.onDispose(() {
+    stopReleasingFocus();
+    router.dispose();
+  });
+  return router;
+});
+
+// 被盖住或替换的页面重新露出时，框架会把焦点还给它最后聚焦的输入框并弹出键盘。
+// 因此无论跳转由谁发起，离开页面前都先让输入框失去焦点；按钮和卡片的焦点保留，
+// 键盘用户返回后仍停在原处。
+VoidCallback _releaseFocusWhenLeaving(GoRouter router) {
+  final delegate = router.routerDelegate;
+  var page = _pageOf(delegate.currentConfiguration);
+  void changed() {
+    final next = _pageOf(delegate.currentConfiguration);
+    if (next == page) return;
+    page = next;
+    final focus = FocusManager.instance.primaryFocus;
+    final typing =
+        focus?.context?.findAncestorStateOfType<EditableTextState>() != null;
+    if (typing) focus!.unfocus();
+  }
+
+  delegate.addListener(changed);
+  return () => delegate.removeListener(changed);
+}
+
+// 房间的各个模式是同一个页面，切换模式不算离开。
+Object? _pageOf(RouteMatchList matches) {
+  if (matches.isEmpty) return null;
+  final last = matches.last;
+  return _roomPaths.contains(last.route.path)
+      ? _roomPageKey
+      : last.matchedLocation;
+}
+
+String _roomPath(RoomMode mode) =>
+    mode.path == null ? 'r/:ref' : 'r/:ref/${mode.path}';
+
+final _roomPaths = {for (final mode in RoomMode.values) _roomPath(mode)};
+
+// 所有房间路由共用一个 key，切换模式或 ref 时原地更新页面，而不是替换。
+const _roomPageKey = ValueKey('room');
+
+Page<void> _roomPage(String roomRef, RoomMode mode) {
+  return MaterialPage(
+    key: _roomPageKey,
+    child: RoomRouteGate(
+      roomRef: roomRef,
+      child: RoomScreen(roomRef: roomRef, mode: mode),
+    ),
+  );
+}
+
+class _LostPage extends StatelessWidget {
+  const _LostPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlistenScaffold(
+      body: EmptyState(
+        icon: Icons.link_off_rounded,
+        title: '找不到这个页面',
+        message: '链接可能有误或已过期。',
+        action: PillButton(label: '返回大厅', onPressed: () => context.go('/')),
+      ),
+    );
+  }
+}

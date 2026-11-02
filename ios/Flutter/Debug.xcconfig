@@ -1,0 +1,6 @@
+#include "Generated.xcconfig"
+INFOPLIST_FILE=Runner/Debug-Info.plist
+CODE_SIGN_ENTITLEMENTS=Runner/Runner.entitlements
+// Universal Links 主机名，替换进 Runner.entitlements。xcconfig 无法解码
+// DART_DEFINES，构建使用其他链接主机时须在此手动改成相同的主机名。
+ALISTEN_LINK_HOST=livehouse.dihe.moe

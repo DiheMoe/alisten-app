@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 允许调试构建连接明文开发后端；应用层仍须显式设置 ALISTEN_ALLOW_CLEARTEXT。 -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

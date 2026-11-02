@@ -1,0 +1,62 @@
+# 杂项
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Flutter、Dart、Pub
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# 符号化文件
+app.*.symbols
+
+# 混淆映射
+app.*.map.json
+
+# Android Studio 的构建产物
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Widget 预览
+.widget_preview/
+
+# 本机开发工具
+.fvm/
+.codegraph/
+.claude/settings.local.json
+.playwright-mcp/
+
+# 本机凭据和签名材料
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.p12
+*.mobileprovision
+*.jks
+*.keystore
+key.properties
+ios/Flutter/Signing.xcconfig
