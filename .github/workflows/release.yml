@@ -1,0 +1,162 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_CERT_SHA256: 60a8c967ced85bacd55db1cefc1c3ffcb6515dc1a1701a10147747e8b0df6894
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: version
+        name: Check tag matches pubspec version
+        run: |
+          version="$(yq '.version' pubspec.yaml)"
+          version="${version%%+*}"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match pubspec version $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  android:
+    needs: [version, checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: release
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      APK: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: .fvmrc
+          cache: true
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle*
+            android/gradle/wrapper/gradle-wrapper.properties
+      - run: flutter pub get --enforce-lockfile
+      - name: Build signed APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          keystore="$RUNNER_TEMP/release.jks"
+          trap 'rm -f "$keystore" android/key.properties' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          {
+            echo "storeFile=$keystore"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+          flutter build apk --release --split-per-abi --target-platform android-arm64 \
+            --split-debug-info=build/symbols
+      - name: Check APK certificate
+        run: |
+          latest_build_tools="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)"
+          apksigner="${latest_build_tools}apksigner"
+          digests="$("$apksigner" verify --print-certs "$APK" \
+            | sed -n 's/^.*Signer.* certificate SHA-256 digest: //p' | sort -u)"
+          if [ "$digests" != "$RELEASE_CERT_SHA256" ]; then
+            echo "APK is not signed with the release certificate only" >&2
+            exit 1
+          fi
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist/symbols
+          cp "$APK" "dist/Alisten-$VERSION-arm64-v8a.apk"
+          cp build/symbols/app.android-arm64.symbols dist/symbols/
+          cp build/app/outputs/mapping/release/mapping.txt dist/symbols/android-mapping.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android
+          path: dist/
+          if-no-files-found: error
+          retention-days: 3
+
+  ios:
+    needs: [version, checks]
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: .fvmrc
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build ios --release --no-codesign --split-debug-info=build/symbols
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p dist/symbols "$RUNNER_TEMP/ipa/Payload"
+          cp -R build/ios/iphoneos/Runner.app "$RUNNER_TEMP/ipa/Payload/"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/dist/Alisten-$VERSION-ios-unsigned.ipa" Payload)
+          cp build/symbols/app.ios-arm64.symbols dist/symbols/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios
+          path: dist/
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    needs: [version, android, ios]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create draft release
+        working-directory: dist
+        run: |
+          (cd symbols && zip -qr "../Alisten-$VERSION-symbols.zip" .)
+          rm -r symbols
+          cert="$(printf '%s' "$RELEASE_CERT_SHA256" | sed 's/../&:/g; s/:$//' | tr a-f A-F)"
+          cat > "$RUNNER_TEMP/notes.md" <<EOF
+          - \`Alisten-$VERSION-arm64-v8a.apk\`：Android 安装包，正式签名，证书 SHA-256 \`$cert\`。
+          - \`Alisten-$VERSION-ios-unsigned.ipa\`：iOS 安装包，未签名，需要用 AltStore、SideStore 或 Sideloadly 以自己的 Apple ID 重签后安装。
+          - \`Alisten-$VERSION-symbols.zip\`：本次构建的调试符号和 Android R8 映射，用于还原崩溃堆栈，普通用户不需要下载。
+          EOF
+          prerelease=""
+          case "$VERSION" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag $prerelease \
+            --title "Alisten $VERSION" --notes-file "$RUNNER_TEMP/notes.md" \
+            Alisten-*
