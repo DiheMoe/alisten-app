@@ -7,6 +7,8 @@ import 'package:alisten/app/invite_confirm_sheet.dart';
 import 'package:alisten/app/router.dart';
 import 'package:alisten/app/share_confirm_sheet.dart';
 import 'package:alisten/core/api/api_error.dart';
+import 'package:alisten/core/avatar/avatar_image.dart';
+import 'package:alisten/core/avatar/avatar_loader.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/history/index.dart';
@@ -18,6 +20,7 @@ import 'package:alisten/features/search/index.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/index.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/avatar_images.dart';
 import 'package:alisten/shared/ui/cover_images.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +31,13 @@ const _logSource = 'app';
 
 final reminderNotifierProvider = Provider<ReminderNotifier>((ref) {
   throw UnimplementedError('reminderNotifier 未注入');
+});
+
+final avatarImageSourceProvider = Provider<ImageProvider Function(String url)>((
+  ref,
+) {
+  final loader = ref.watch(avatarLoaderProvider);
+  return (url) => AvatarImage(url, loader);
 });
 
 final class AlistenApp extends ConsumerStatefulWidget {
@@ -164,30 +174,34 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
     final router = ref.watch(routerProvider);
     final toasts = ref.watch(toastControllerProvider);
     final covers = ref.watch(coverImageSourceProvider);
+    final avatars = ref.watch(avatarImageSourceProvider);
     return _ForegroundTickerMode(
       child: CoverImages(
         resolve: covers,
-        // 在 MaterialApp 之上读取 MediaQuery，主题动画才能遵循系统的
-        // 减少动态效果设置。
-        child: MediaQuery.fromView(
-          view: View.of(context),
-          child: Builder(
-            builder: (context) => MaterialApp.router(
-              title: 'Alisten',
-              theme: themes.light,
-              darkTheme: themes.dark,
-              themeMode: themes.mode,
-              themeAnimationDuration: AlistenDurations.of(
-                context,
-                AlistenDurations.theme,
+        child: AvatarImages(
+          resolve: avatars,
+          // 在 MaterialApp 之上读取 MediaQuery，主题动画才能遵循系统的
+          // 减少动态效果设置。
+          child: MediaQuery.fromView(
+            view: View.of(context),
+            child: Builder(
+              builder: (context) => MaterialApp.router(
+                title: 'Alisten',
+                theme: themes.light,
+                darkTheme: themes.dark,
+                themeMode: themes.mode,
+                themeAnimationDuration: AlistenDurations.of(
+                  context,
+                  AlistenDurations.theme,
+                ),
+                themeAnimationCurve: AlistenCurves.standard,
+                locale: _locale,
+                supportedLocales: const [_locale],
+                localizationsDelegates: GlobalMaterialLocalizations.delegates,
+                routerConfig: router,
+                builder: (context, child) =>
+                    ToastHost(controller: toasts, child: child!),
               ),
-              themeAnimationCurve: AlistenCurves.standard,
-              locale: _locale,
-              supportedLocales: const [_locale],
-              localizationsDelegates: GlobalMaterialLocalizations.delegates,
-              routerConfig: router,
-              builder: (context, child) =>
-                  ToastHost(controller: toasts, child: child!),
             ),
           ),
         ),

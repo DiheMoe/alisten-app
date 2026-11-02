@@ -18,6 +18,7 @@ final class Member {
   String? avatarUrl(double size) {
     if (avatarHash.isEmpty) return null;
     final pixels = (size * 2).round().clamp(1, _gravatarMaxSize);
-    return 'https://www.gravatar.com/avatar/$avatarHash?d=identicon&s=$pixels';
+    // 没设头像时要 404 而不是生成的图案：各镜像生成的图案不同，界面改显示首字。
+    return 'https://www.gravatar.com/avatar/$avatarHash?d=404&s=$pixels';
   }
 }

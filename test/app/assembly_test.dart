@@ -9,6 +9,7 @@ import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/api/credential_store.dart';
+import 'package:alisten/core/avatar/avatar_loader.dart';
 import 'package:alisten/core/cache/cached_cover_image.dart';
 import 'package:alisten/core/cache/cover_cache.dart';
 import 'package:alisten/core/cache/disk_cover_cache.dart';
@@ -82,6 +83,7 @@ void main() {
       isA<WebSocketRoomTransport>(),
     );
     expect(container.read(coverCacheProvider), isA<DiskCoverCache>());
+    expect(container.read(avatarLoaderProvider), isA<AvatarLoader>());
     expect(
       container.read(historyExporterProvider),
       isA<ShareHistoryExporter>(),

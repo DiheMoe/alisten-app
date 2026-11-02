@@ -6,6 +6,8 @@ import 'package:alisten/app/deep_link_controller.dart';
 import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/api/credential_store.dart';
+import 'package:alisten/core/avatar/avatar_image.dart';
+import 'package:alisten/core/avatar/avatar_loader.dart';
 import 'package:alisten/core/cache/cached_cover_image.dart';
 import 'package:alisten/core/cache/cover_cache.dart';
 import 'package:alisten/core/cache/disk_cover_cache.dart';
@@ -30,6 +32,7 @@ import 'package:alisten/features/settings/data/local_settings_store.dart';
 import 'package:alisten/features/settings/data/platform_system_settings.dart';
 import 'package:alisten/features/settings/index.dart';
 import 'package:alisten/main.dart' as entrypoint;
+import 'package:alisten/shared/ui/avatar_images.dart';
 import 'package:alisten/shared/ui/cover_images.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -192,6 +195,13 @@ void main() {
     expect(
       tester.widget<CoverImages>(find.byType(CoverImages)).resolve('https://c'),
       CachedCoverImage('https://c', covers),
+    );
+    // 每个头像都经同一个下载器，它记住的可用站点才对所有头像生效。
+    expect(
+      tester
+          .widget<AvatarImages>(find.byType(AvatarImages))
+          .resolve('https://a'),
+      AvatarImage('https://a', container.read(avatarLoaderProvider)),
     );
     // 内置字体和 gal 带入的 commons-imaging 的许可证须随应用列出。
     final licenses = await tester.runAsync(

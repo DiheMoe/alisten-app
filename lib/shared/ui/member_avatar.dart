@@ -1,5 +1,6 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/avatar_images.dart';
 import 'package:flutter/material.dart';
 
 /// 头像通常紧挨着成员名字，所以没有 [semanticLabel] 时读屏跳过它。
@@ -61,11 +62,13 @@ class MemberAvatar extends StatelessWidget {
         children: [
           avatar,
           ClipOval(
-            child: Image.network(
-              imageUrl,
+            child: Image(
+              image: ResizeImage.resizeIfNeeded(
+                (size * MediaQuery.devicePixelRatioOf(context)).round(),
+                null,
+                AvatarImages.of(context, imageUrl),
+              ),
               fit: BoxFit.cover,
-              cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
-                  .round(),
               excludeFromSemantics: true,
               gaplessPlayback: true,
               frameBuilder: (context, child, frame, synchronous) =>

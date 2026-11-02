@@ -7,6 +7,7 @@ import 'package:alisten/app/router.dart';
 import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/api/credential_store.dart';
+import 'package:alisten/core/avatar/avatar_loader.dart';
 import 'package:alisten/core/cache/cover_cache.dart';
 import 'package:alisten/core/realtime/connectivity.dart';
 import 'package:alisten/domain/room/room.dart';
@@ -101,6 +102,9 @@ Future<List<Override>> alistenAppOverrides({
       DioLinkResolver(Dio()..httpClientAdapter = FakeUrlHttpAdapter()),
     ),
     coverCacheProvider.overrideWithValue(coverCache ?? FakeCoverCache()),
+    avatarLoaderProvider.overrideWithValue(
+      AvatarLoader(Dio()..httpClientAdapter = FakeUrlHttpAdapter()),
+    ),
     historyExporterProvider.overrideWithValue(
       exporter ?? FakeHistoryExporter(),
     ),

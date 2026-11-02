@@ -4,6 +4,7 @@ import 'package:alisten/app/third_party_http.dart';
 import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/api/credential_store.dart';
+import 'package:alisten/core/avatar/avatar_loader.dart';
 import 'package:alisten/core/cache/cover_cache.dart';
 import 'package:alisten/core/cache/disk_cover_cache.dart';
 import 'package:alisten/core/realtime/connectivity.dart';
@@ -257,6 +258,11 @@ List<Override> platformAdapters({
       final dio = newThirdPartyDio();
       ref.onDispose(() => dio.close(force: true));
       return DiskCoverCache(dio);
+    }),
+    avatarLoaderProvider.overrideWith((ref) {
+      final dio = newThirdPartyDio();
+      ref.onDispose(() => dio.close(force: true));
+      return AvatarLoader(dio);
     }),
   ];
 }

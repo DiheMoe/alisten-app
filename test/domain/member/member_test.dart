@@ -9,7 +9,7 @@ void main() {
 
     expect(
       member.avatarUrl(40),
-      'https://www.gravatar.com/avatar/abc123?d=identicon&s=80',
+      'https://www.gravatar.com/avatar/abc123?d=404&s=80',
     );
     expect(member.avatarUrl(17.6), endsWith('&s=35'));
     expect(anonymous.avatarUrl(40), isNull);
