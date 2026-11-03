@@ -180,6 +180,42 @@ void main() {
     expect(text.didExceedMaxLines, isFalse);
   });
 
+  for (final (pill, scale) in [(false, 1.0), (true, 1.0), (true, 2.0)]) {
+    testWidgets('one line of text and its hint sit in the middle of the '
+        '${pill ? 'pill' : 'plain'} field at ${scale}x text', (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
+          home: MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Center(
+                child: AlistenTextField(
+                  controller: controller,
+                  hint: '搜歌名、歌手',
+                  icon: Icons.search_rounded,
+                  pill: pill,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      final middle = tester.getCenter(find.byType(AlistenTextField)).dy;
+
+      expect(tester.getCenter(find.text('搜歌名、歌手')).dy, closeTo(middle, 0.5));
+      await tester.enterText(find.byType(EditableText), 'Song');
+      await tester.pump();
+      expect(
+        tester.getCenter(find.byType(EditableText)).dy,
+        closeTo(middle, 0.5),
+      );
+    });
+  }
+
   testWidgets('an ordinary field leaves the keyboard as it is', (tester) async {
     await pump(tester, sensitive: false);
 

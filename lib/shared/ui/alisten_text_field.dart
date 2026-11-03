@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
@@ -130,6 +132,17 @@ class _AlistenTextFieldState extends State<AlistenTextField> {
         ? AlistenSizes.largeTouchTarget
         : AlistenSizes.minTouchTarget;
     final lines = widget.obscureText ? 1 : widget.maxLines;
+    // InputDecoration.constraints 撑出的高度全部留在文字下方，垂直居中不分配
+    // 它，文字因此偏上。改由内边距把一行时的自然高度补足到最小高度。
+    final padding = math.max(
+      AlistenSpacing.sm,
+      (minHeight -
+              AlistenTypography.lineHeight(
+                style,
+                MediaQuery.textScalerOf(context),
+              )) /
+          2,
+    );
     final field = TextField(
       controller: widget.controller,
       focusNode: _focus,
@@ -156,7 +169,7 @@ class _AlistenTextFieldState extends State<AlistenTextField> {
       // 上下留白放在输入框内部，点按留白也能聚焦，读屏的触控区域与整个框等高。
       decoration: InputDecoration(
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(vertical: AlistenSpacing.sm),
+        contentPadding: EdgeInsets.symmetric(vertical: padding),
         constraints: BoxConstraints(minHeight: minHeight),
         border: InputBorder.none,
         hintFadeDuration: Duration.zero,
