@@ -1,9 +1,36 @@
+import 'package:alisten/domain/track/track.dart';
+import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_text_field.dart';
+import 'package:alisten/shared/ui/segmented_pills.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../search_test_doubles.dart';
 
 void main() {
+  for (final (name, size) in [
+    ('phone', Size(360, 780)),
+    ('tablet', Size(1024, 1366)),
+  ]) {
+    testWidgets(
+      'on a $name the source choice keeps clear of the search field',
+      (tester) async {
+        final page = await SearchPage.open(tester);
+        tester.view.physicalSize = size * tester.view.devicePixelRatio;
+        await page.settle();
+
+        final field = tester.getRect(find.byType(AlistenTextField));
+        final sources = tester.getRect(
+          find.byType(SegmentedPills<TrackSource>),
+        );
+        expect(
+          sources.top - field.bottom,
+          greaterThanOrEqualTo(AlistenSpacing.sm),
+        );
+      },
+    );
+  }
+
   testWidgets('a song found is sent once, says it was picked and is counted', (
     tester,
   ) async {

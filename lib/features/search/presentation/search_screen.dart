@@ -713,7 +713,10 @@ class _Filters extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: AlistenSpacing.xxs),
+          padding: const EdgeInsets.only(
+            top: AlistenSpacing.sm,
+            bottom: AlistenSpacing.xxs,
+          ),
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: width),
             child: Semantics(
