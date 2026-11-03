@@ -4,13 +4,16 @@ import 'dart:math' as math;
 import 'package:alisten/app/deep_link_controller.dart';
 import 'package:alisten/app/room/room_mode_bar.dart';
 import 'package:alisten/app/room/room_screen.dart';
+import 'package:alisten/core/protocol/protocol.gen.dart' show RoomRequestTypes;
 import 'package:alisten/core/realtime/room_transport.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/chat/index.dart';
+import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/room/index.dart';
+import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
@@ -19,13 +22,19 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../domain/room/room_fixtures.dart';
 import '../../features/playback/playback_test_doubles.dart'
     show FakeAudioEngine;
 import '../app_test_harness.dart';
 
-NowPlaying _track(String id, String title, {required int startedAtMs}) {
+NowPlaying _track(
+  String id,
+  String title, {
+  required int startedAtMs,
+  String lyric = '',
+}) {
   return NowPlaying(
     entry: QueueEntry(
       id: id,
@@ -47,7 +56,7 @@ NowPlaying _track(String id, String title, {required int startedAtMs}) {
     startedAtMs: startedAtMs,
     durationMs: 240000,
     gain: 1,
-    lyric: '',
+    lyric: lyric,
   );
 }
 
@@ -688,7 +697,536 @@ void main() {
     await tester.pump();
     expect(await tabReachesModeBar(), isTrue, reason: 'shown');
   });
+
+  testWidgets('swiping left on the lyrics turns to the queue and its route, '
+      'and swiping right on the chat turns back to the queue', (tester) async {
+    final (rooms: _, :router, :settle) = await enterRoom(
+      tester,
+      nowPlaying: _sung,
+    );
+    router.go('/r/listen/lyrics');
+    await settle();
+
+    await tester.drag(_inRoom(find.text('第一行')), const Offset(-250, 0));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/queue');
+    expect(_inRoom(find.byType(QueueView)), findsOneWidget);
+    expect(_inRoom(find.byType(LyricsView)), findsNothing);
+    expect(_scrolledPages(tester), 1);
+
+    router.go('/r/listen/chat');
+    await settle();
+    await tester.drag(_inRoom(find.byType(ChatView)), const Offset(250, 0));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/queue');
+    expect(_inRoom(find.byType(QueueView)), findsOneWidget);
+    expect(_inRoom(find.byType(ChatView)), findsNothing);
+  });
+
+  testWidgets('the lyrics do not move right of the first page, nor the chat '
+      'left of the last', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    for (final (location, type, offset) in [
+      ('/r/listen/lyrics', LyricsView, const Offset(120, 0)),
+      ('/r/listen/chat', ChatView, const Offset(-120, 0)),
+    ]) {
+      router.go(location);
+      await settle();
+      final page = _inRoom(find.byType(type));
+      final before = tester.getRect(page);
+
+      final gesture = await tester.startGesture(tester.getCenter(page));
+      await gesture.moveBy(offset);
+      await tester.pump();
+      await gesture.moveBy(offset);
+      await tester.pump();
+      expect(tester.getRect(page), before, reason: location);
+
+      await gesture.up();
+      await settle();
+      expect(router.state.uri.path, location);
+      expect(tester.getRect(page), before, reason: location);
+    }
+  });
+
+  testWidgets('tapping 聊天 on the lyrics slides the content past the queue to '
+      'the chat without turning back or routing to the queue', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+    final routes = _routesOf(router);
+
+    await tester.tap(find.text('聊天'));
+    final shown = <double>[];
+    for (var frame = 0; frame < 30; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      shown.add(_scrolledPages(tester)!);
+    }
+
+    expect(
+      shown.any((page) => page > 0.5 && page < 1.5),
+      isTrue,
+      reason: '$shown',
+    );
+    for (var frame = 1; frame < shown.length; frame++) {
+      expect(shown[frame], greaterThanOrEqualTo(shown[frame - 1]));
+    }
+    expect(shown.last, 2);
+    expect(routes, isNot(contains('/r/listen/queue')));
+    expect(router.state.uri.path, '/r/listen/chat');
+  });
+
+  testWidgets('with reduced motion tapping 聊天 on the lyrics shows the chat in '
+      'the next frame, with nothing in between', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(
+      tester,
+      system: const MediaQueryData(disableAnimations: true),
+    );
+    router.go('/r/listen/lyrics');
+    await settle();
+    final routes = _routesOf(router);
+
+    await tester.tap(find.text('聊天'));
+    for (var frame = 0; frame < 10; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(_scrolledPages(tester), 2, reason: 'frame $frame');
+      expect(_inRoom(find.byType(QueueView)), findsNothing);
+      expect(_inRoom(find.byType(LyricsView)), findsNothing);
+    }
+    expect(routes, isNot(contains('/r/listen/queue')));
+    expect(router.state.uri.path, '/r/listen/chat');
+  });
+
+  testWidgets('a route from elsewhere, or a tab chosen on the player, shows '
+      'its page at once without sliding past others', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+
+    // 每一帧要么还是原来的画面，要么已是目标页。
+    Future<void> expectStraight({
+      required double? from,
+      required double to,
+      required String reason,
+    }) async {
+      for (var frame = 0; frame < 30; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(_inRoom(find.byType(QueueView)), findsNothing, reason: reason);
+        expect(_scrolledPages(tester), anyOf(from, to), reason: reason);
+      }
+      expect(_scrolledPages(tester), to, reason: reason);
+    }
+
+    router.go('/r/listen/chat');
+    await expectStraight(from: 0, to: 2, reason: 'route');
+
+    await tester.tap(find.text('聊天'));
+    await settle();
+    expect(router.state.uri.path, '/r/listen');
+    await tester.tap(find.text('歌词'));
+    await settle();
+    await tester.tap(find.text('歌词'));
+    await settle();
+    expect(router.state.uri.path, '/r/listen');
+
+    await tester.tap(find.text('聊天'));
+    await expectStraight(from: null, to: 2, reason: 'from the player');
+    expect(router.state.uri.path, '/r/listen/chat');
+  });
+
+  testWidgets('halfway through a swipe the thumb of the mode bar sits between '
+      'two tabs', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+    final thumb = _thumb(tester);
+    final lyrics = _tab(tester, '歌词');
+    final queue = _tab(tester, '队列');
+    expect(tester.getRect(thumb).left, moreOrLessEquals(lyrics.left));
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(_inRoom(find.byType(LyricsView))),
+    );
+    await gesture.moveBy(const Offset(-30, 0));
+    await tester.pump();
+    await gesture.moveBy(const Offset(-120, 0));
+    await tester.pump();
+
+    final halfway = tester.getRect(thumb).left;
+    final step = queue.left - lyrics.left;
+    expect(halfway, greaterThan(lyrics.left + step / 4));
+    expect(halfway, lessThan(queue.left - step / 4));
+    await gesture.up();
+    await settle();
+  });
+
+  testWidgets('a sideways drag that starts on a chat message turns the page, '
+      'while dragging it down scrolls the chat and a long press selects it', (
+    tester,
+  ) async {
+    final (:rooms, :router, :settle) = await _enterRoom(tester);
+    for (var seq = 2; seq < 32; seq++) {
+      rooms.last.emit(
+        RoomEventReceived(
+          ChatMessageEvent(
+            term: 1,
+            seq: seq,
+            member: testMember,
+            content: '消息 $seq',
+            sentAtMs: 1000000 + seq,
+          ),
+        ),
+      );
+    }
+    router.go('/r/listen/chat');
+    await settle();
+    final latest = find.text('消息 31');
+
+    await tester.drag(latest, const Offset(250, 0));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/queue');
+
+    router.go('/r/listen/chat');
+    await settle();
+    final older = find.text('消息 25');
+    final before = tester.getRect(older).top;
+    await tester.drag(older, const Offset(0, 150));
+    await tester.pump();
+    expect(tester.getRect(older).top, greaterThan(before + 100));
+    expect(router.state.uri.path, '/r/listen/chat');
+    await settle();
+
+    await tester.longPress(older);
+    await settle();
+    expect(find.text('全选'), findsOneWidget);
+    expect(router.state.uri.path, '/r/listen/chat');
+  });
+
+  testWidgets('lyrics scrolling to their line leave a swipe where the finger '
+      'holds it', (tester) async {
+    final (:rooms, :router, :settle) = await enterRoom(
+      tester,
+      nowPlaying: _sung,
+    );
+    router.go('/r/listen/lyrics');
+    await settle();
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(_inRoom(find.text('第一行'))),
+    );
+    await gesture.moveBy(const Offset(-30, 0));
+    await tester.pump();
+    await gesture.moveBy(const Offset(-90, 0));
+    await tester.pump();
+    final held = _scrolledPages(tester)!;
+    expect(held, greaterThan(0.1));
+
+    rooms.last.emit(
+      RoomEventReceived(
+        PlaybackUpdatedEvent(
+          term: 1,
+          seq: 2,
+          nowPlaying: _track(
+            'entry-b',
+            '孤勇者',
+            startedAtMs: 1240000,
+            lyric: '[00:00.00]另一首的第一行\n[00:04.00]另一首的第二行',
+          ),
+        ),
+      ),
+    );
+    for (var frame = 0; frame < 10; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    expect(find.text('另一首的第一行'), findsOneWidget);
+    expect(_scrolledPages(tester), moreOrLessEquals(held));
+    await gesture.up();
+    await settle();
+  });
+
+  testWidgets('leaving the room, going back or opening the player while a '
+      'swipe still springs to its page is not undone by the page', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final leave = _leaving.currentValue!;
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+
+    await tester.drag(_inRoom(find.byType(LyricsView)), const Offset(-250, 0));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(router.state.uri.path, '/r/listen/lyrics', reason: 'springing');
+    switch (leave) {
+      case _Leave.collapse:
+        await tester.tap(find.bySemanticsLabel('收起房间'));
+      case _Leave.back:
+        await tester.binding.handlePopRoute();
+      case _Leave.player:
+        await tester.tap(find.bySemanticsLabel('返回播放器'));
+    }
+    await settle();
+    await settle();
+
+    expect(router.state.uri.path, leave == _Leave.player ? '/r/listen' : '/');
+    semantics.dispose();
+  }, variant: _leaving);
+
+  testWidgets('a sideways drag in the focused chat input moves its cursor, '
+      'keeps the keyboard and does not turn the page', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/chat');
+    await settle();
+    final field = find.byType(EditableText);
+    await tester.enterText(field, '一二三四五六七八九十');
+    await settle();
+    final text = tester.widget<EditableText>(field).controller
+      ..selection = const TextSelection.collapsed(offset: 2);
+    await settle();
+
+    final rect = tester.getRect(field);
+    final gesture = await tester.startGesture(
+      Offset(rect.left + 4, rect.center.dy),
+    );
+    for (var step = 0; step < 10; step++) {
+      await gesture.moveBy(const Offset(25, 0));
+      await tester.pump();
+    }
+    await gesture.up();
+    await settle();
+
+    expect(router.state.uri.path, '/r/listen/chat');
+    expect(text.selection.baseOffset, greaterThan(2));
+    expect(tester.testTextInput.isVisible, isTrue);
+  });
+
+  testWidgets('a route from elsewhere while a finger holds the lyrics at '
+      'their edge is shown and kept', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(_inRoom(find.byType(LyricsView))),
+    );
+    await gesture.moveBy(const Offset(40, 0));
+    await tester.pump();
+    await gesture.moveBy(const Offset(40, 0));
+    await tester.pump();
+    router.go('/r/listen/chat');
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(router.state.uri.path, '/r/listen/chat');
+    expect(_scrolledPages(tester), 2);
+    await gesture.up();
+    await settle();
+    expect(router.state.uri.path, '/r/listen/chat');
+    expect(_scrolledPages(tester), 2);
+  });
+
+  testWidgets('tapping 聊天 and then 歌词 in the next frame ends on the '
+      'lyrics', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+
+    await tester.tap(find.text('聊天'));
+    await tester.pump();
+    await tester.tap(find.text('歌词'));
+    await settle();
+
+    expect(router.state.uri.path, '/r/listen/lyrics');
+    expect(_scrolledPages(tester), 0);
+  });
+
+  testWidgets('a tab chosen while the content still folds away under the '
+      'player shows its page directly', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+    await tester.tap(find.text('歌词'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(router.state.uri.path, '/r/listen');
+    expect(_inRoom(find.byType(LyricsView)), findsOneWidget, reason: 'fading');
+
+    await tester.tap(find.text('聊天'));
+    for (var frame = 0; frame < 30; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(_inRoom(find.byType(QueueView)), findsNothing);
+      expect(_scrolledPages(tester), anyOf(0, 2));
+    }
+    expect(_scrolledPages(tester), 2);
+    expect(router.state.uri.path, '/r/listen/chat');
+  });
+
+  testWidgets('a finger put down on the content sliding to a tab, and lifted '
+      'again, leaves content and route on the same page', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+
+    await tester.tap(find.text('聊天'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    final caught = _scrolledPages(tester)!;
+    expect(caught, inExclusiveRange(0, 2));
+    final gesture = await tester.startGesture(
+      tester.getCenter(_inRoom(find.byType(PageView))),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(_scrolledPages(tester), moreOrLessEquals(caught), reason: 'held');
+    await gesture.up();
+    await settle();
+
+    final page = _scrolledPages(tester)!;
+    expect(page, page.roundToDouble());
+    expect(
+      router.state.uri.path,
+      const ['/r/listen/lyrics', '/r/listen/queue', '/r/listen/chat'][page
+          .round()],
+    );
+  });
+
+  testWidgets('a sideways drag on the track row turns no page', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+
+    await tester.drag(find.text('夜曲'), const Offset(-250, 0));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/lyrics');
+    expect(_scrolledPages(tester), 0);
+  });
+
+  testWidgets('a swipe rebuilds neither the room page, the player nor the '
+      'mode bar', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+    final rebuilt = <Type>{};
+    debugOnRebuildDirtyWidget = (element, _) =>
+        rebuilt.add(element.widget.runtimeType);
+    addTearDown(() => debugOnRebuildDirtyWidget = null);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(_inRoom(find.byType(LyricsView))),
+    );
+    await gesture.moveBy(const Offset(-30, 0));
+    await tester.pump();
+    for (var step = 0; step < 6; step++) {
+      await gesture.moveBy(const Offset(-20, 0));
+      await tester.pump();
+    }
+    debugOnRebuildDirtyWidget = null;
+    expect(_scrolledPages(tester), greaterThan(0.2));
+    expect(rebuilt, isNot(contains(RoomScreen)));
+    expect(rebuilt, isNot(contains(NowPlayingHeader)));
+    expect(rebuilt, isNot(contains(RoomModeBar)));
+    await gesture.up();
+    await settle();
+  });
+
+  testWidgets('a page swiped away is not kept, so a focused chat input lets '
+      'the keyboard go', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/chat');
+    await settle();
+    await tester.tap(find.byType(EditableText));
+    await settle();
+    expect(tester.testTextInput.isVisible, isTrue);
+
+    await tester.drag(_inRoom(find.text('还没有消息')), const Offset(250, 0));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/queue');
+    expect(find.byType(ChatView, skipOffstage: false), findsNothing);
+    expect(tester.testTextInput.isVisible, isFalse);
+  });
+
+  testWidgets('a sideways drag that starts on a queue row turns the page, and '
+      'the play mode choices still take a tap', (tester) async {
+    final (:rooms, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/queue');
+    await settle();
+
+    await tester.tap(find.text('随机'));
+    await settle();
+    expect(
+      rooms.last.requests.where(
+        (request) => request['type'] == RoomRequestTypes.settingsSetPlayMode,
+      ),
+      hasLength(1),
+    );
+    expect(router.state.uri.path, '/r/listen/queue');
+
+    await tester.drag(_inRoom(find.text('歌曲')), const Offset(-250, 0));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/chat');
+  });
 }
+
+final _sung = _track(
+  'entry-a',
+  '夜曲',
+  startedAtMs: 1000000,
+  lyric: '[00:00.00]第一行\n[00:04.00]第二行\n[00:08.00]第三行',
+);
+
+enum _Leave { collapse, back, player }
+
+final _leaving = ValueVariant(_Leave.values.toSet());
+
+Finder _inRoom(Finder finder) =>
+    find.descendant(of: find.byType(RoomScreen), matching: finder);
+
+/// 模式内容滚过的页数，歌词、队列、聊天依次为 0、1、2；没有模式内容时为 null。
+/// 手机布局下每页与屏幕同宽。
+double? _scrolledPages(WidgetTester tester) {
+  for (final (index, type) in const [LyricsView, QueueView, ChatView].indexed) {
+    final page = _inRoom(find.byType(type));
+    if (page.evaluate().isEmpty) continue;
+    final rect = tester.getRect(page);
+    return index - rect.left / rect.width;
+  }
+  return null;
+}
+
+List<String> _routesOf(GoRouter router) {
+  final routes = <String>[];
+  void record() => routes.add(router.state.uri.path);
+  router.routerDelegate.addListener(record);
+  addTearDown(() => router.routerDelegate.removeListener(record));
+  return routes;
+}
+
+Finder _thumb(WidgetTester tester) {
+  final fill = AlistenColors.of(tester.element(find.byType(RoomModeBar)))
+      .selectedFill;
+  return find.descendant(
+    of: find.byType(RoomModeBar),
+    matching: find.byWidgetPredicate(
+      (widget) =>
+          widget is DecoratedBox &&
+          widget.decoration is BoxDecoration &&
+          (widget.decoration as BoxDecoration).color == fill,
+    ),
+  );
+}
+
+Rect _tab(WidgetTester tester, String label) => tester.getRect(
+  find
+      .ancestor(
+        of: find.descendant(
+          of: find.byType(RoomModeBar),
+          matching: find.text(label),
+        ),
+        matching: find.byType(Pressable),
+      )
+      .first,
+);
 
 /// 只统计播放器控件取缩放字号的次数，它每次排版文字或估算文字高度都会取一次。
 /// 其他组件本来就会随键盘重建，不计入。

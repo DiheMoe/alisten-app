@@ -1,4 +1,6 @@
+import 'package:alisten/app/room/room_mode.dart';
 import 'package:alisten/app/router.dart';
+import 'package:alisten/shared/ui/segmented_pills.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -53,6 +55,46 @@ void main() {
     expect(queue, findsNothing);
     expect(play, findsOneWidget);
     await _expectAccessible(tester);
+    semantics.dispose();
+  });
+
+  testWidgets('on a tablet the queue and the chat swipe into each other, and '
+      'the switch follows once the page settles', (tester) async {
+    final (rooms: _, :router, :settle) = await enterRoom(tester, size: _tablet);
+    final play = find.bySemanticsLabel('暂停本机播放');
+    final before = tester.getRect(play);
+    RoomMode switched() => tester
+        .widget<SegmentedPills<RoomMode>>(find.byType(SegmentedPills<RoomMode>))
+        .selected;
+
+    await tester.drag(find.text('等待中 1 首'), const Offset(-300, 0));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/chat');
+    expect(find.bySemanticsLabel('说点什么…'), findsOneWidget);
+    expect(find.text('等待中 1 首'), findsNothing);
+    expect(switched(), RoomMode.chat);
+    expect(tester.getRect(play), before, reason: 'the player stays');
+
+    await tester.drag(find.text('还没有消息'), const Offset(300, 0));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/queue');
+    expect(find.text('等待中 1 首'), findsOneWidget);
+    expect(switched(), RoomMode.queue);
+  });
+
+  testWidgets('on a tablet leaving the room while the queue still springs to '
+      'the chat is not undone', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final (rooms: _, :router, :settle) = await enterRoom(tester, size: _tablet);
+
+    await tester.drag(find.text('等待中 1 首'), const Offset(-300, 0));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(router.state.uri.path, '/r/listen', reason: 'springing');
+    await tester.tap(find.bySemanticsLabel('收起房间'));
+    await settle();
+    await settle();
+
+    expect(router.state.uri.path, '/');
     semantics.dispose();
   });
 

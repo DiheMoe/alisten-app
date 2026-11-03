@@ -3,18 +3,27 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// 播放器没有标签：再次点选当前模式时，以 [RoomMode.player] 回调 [onSelect]。
 class RoomModeBar extends StatelessWidget {
   const RoomModeBar({
     required this.mode,
+    required this.position,
     required this.onSelect,
     required this.onAddSong,
     super.key,
   });
 
+  static final modes = List<RoomMode>.unmodifiable([
+    for (final (mode, _, _) in _tabs) mode,
+  ]);
+
   final RoomMode mode;
+
+  /// 滑块的位置，以 [modes] 中的序号计，可为小数。只在绘制时读取。
+  final ValueListenable<double> position;
   final ValueChanged<RoomMode> onSelect;
   final VoidCallback onAddSong;
 
@@ -32,6 +41,7 @@ class RoomModeBar extends StatelessWidget {
           Expanded(
             child: _ModeTabs(
               mode: mode,
+              position: position,
               onSelect: (chosen) =>
                   onSelect(chosen == mode ? RoomMode.player : chosen),
             ),
@@ -62,30 +72,16 @@ const _tabPadding = AlistenSpacing.xs;
 
 const _stroke = 1.0;
 
-class _ModeTabs extends StatefulWidget {
-  const _ModeTabs({required this.mode, required this.onSelect});
+class _ModeTabs extends StatelessWidget {
+  const _ModeTabs({
+    required this.mode,
+    required this.position,
+    required this.onSelect,
+  });
 
   final RoomMode mode;
+  final ValueListenable<double> position;
   final ValueChanged<RoomMode> onSelect;
-
-  @override
-  State<_ModeTabs> createState() => _ModeTabsState();
-}
-
-class _ModeTabsState extends State<_ModeTabs> {
-  // 切到播放器时滑块留在原位淡出。
-  late int _thumb = _indexOf(widget.mode) ?? 0;
-
-  static int? _indexOf(RoomMode mode) {
-    final index = _tabs.indexWhere((tab) => tab.$1 == mode);
-    return index < 0 ? null : index;
-  }
-
-  @override
-  void didUpdateWidget(_ModeTabs oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _thumb = _indexOf(widget.mode) ?? _thumb;
-  }
 
   _TabContent _fit(BuildContext context, double tabWidth) {
     final painter = TextPainter(
@@ -120,7 +116,7 @@ class _ModeTabsState extends State<_ModeTabs> {
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     final pill = BorderRadius.circular(AlistenRadii.pill);
-    final chosen = _indexOf(widget.mode);
+    final chosen = RoomModeBar.modes.indexOf(mode);
     final motion = AlistenDurations.of(context, AlistenDurations.medium);
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -141,27 +137,21 @@ class _ModeTabsState extends State<_ModeTabs> {
             child: Stack(
               children: [
                 Positioned.fill(
+                  // 切到播放器时滑块留在原位淡出。
                   child: AnimatedOpacity(
-                    opacity: chosen == null ? 0 : 1,
+                    opacity: chosen < 0 ? 0 : 1,
                     duration: motion,
                     curve: AlistenCurves.standard,
-                    child: AnimatedAlign(
-                      alignment: Alignment(
-                        -1 + 2 * _thumb / (_tabs.length - 1),
-                        0,
-                      ),
-                      duration: motion,
-                      curve: AlistenCurves.emphasized,
-                      child: FractionallySizedBox(
-                        widthFactor: 1 / _tabs.length,
-                        heightFactor: 1,
-                        child: DecoratedBox(
+                    child: Flow(
+                      delegate: _ThumbFlow(position),
+                      children: [
+                        DecoratedBox(
                           decoration: BoxDecoration(
                             color: colors.selectedFill,
                             borderRadius: pill,
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
@@ -174,7 +164,7 @@ class _ModeTabsState extends State<_ModeTabs> {
                           label: label,
                           content: content,
                           selected: index == chosen,
-                          onPressed: () => widget.onSelect(mode),
+                          onPressed: () => onSelect(mode),
                         ),
                       ),
                   ],
@@ -186,6 +176,36 @@ class _ModeTabsState extends State<_ModeTabs> {
       },
     );
   }
+}
+
+// 位置可能在构建和布局期间改变（如内容随路由跳页），只能在绘制时移动滑块。
+// 拖动途中也因此只重绘滑块，不重建模式条。
+class _ThumbFlow extends FlowDelegate {
+  _ThumbFlow(this.position) : super(repaint: position);
+
+  final ValueListenable<double> position;
+
+  @override
+  BoxConstraints getConstraintsForChild(int i, BoxConstraints constraints) {
+    return BoxConstraints.tightFor(
+      width: constraints.maxWidth / _tabs.length,
+      height: constraints.maxHeight,
+    );
+  }
+
+  @override
+  void paintChildren(FlowPaintingContext context) {
+    final at = position.value.clamp(0.0, _tabs.length - 1.0);
+    final step = context.size.width / _tabs.length;
+    context.paintChild(
+      0,
+      transform: Matrix4.translationValues(at * step, 0, 0),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ThumbFlow oldDelegate) =>
+      position != oldDelegate.position;
 }
 
 class _Tab extends StatelessWidget {
@@ -233,7 +253,7 @@ class _Tab extends StatelessWidget {
                         context,
                         AlistenDurations.short,
                       ),
-                      style: _ModeTabsState._labelStyle(selected: selected)
+                      style: _ModeTabs._labelStyle(selected: selected)
                           .copyWith(color: ink),
                       child: Text(
                         label,

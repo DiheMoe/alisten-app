@@ -7,6 +7,7 @@ import 'package:alisten/app/feedback.dart';
 import 'package:alisten/app/layout.dart';
 import 'package:alisten/app/room/room_mode.dart';
 import 'package:alisten/app/room/room_mode_bar.dart';
+import 'package:alisten/app/room/room_pager.dart';
 import 'package:alisten/app/room/room_top_bar.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/chat/index.dart';
@@ -82,6 +83,10 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
 
   final _page = GlobalKey();
 
+  final _phonePages = GlobalKey<RoomPagerState>();
+  final _sidePages = GlobalKey<RoomPagerState>();
+  final _phonePosition = ValueNotifier(0.0);
+
   ui.Image? _still;
 
   static RoomMode _paneFor(RoomMode mode, RoomMode previous) =>
@@ -99,11 +104,39 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
 
   @override
   void dispose() {
+    _phonePosition.dispose();
     _still?.dispose();
     super.dispose();
   }
 
   void _show(RoomMode mode) => context.go(mode.routeIn(widget.roomRef));
+
+  // 从播放器选标签时直接显示该页，不从正在淡出的上一个模式滑过去。
+  void _choosePhone(RoomMode mode) {
+    if (widget.mode != RoomMode.player) {
+      _phonePages.currentState?.glideTo(mode);
+    }
+    _show(mode);
+  }
+
+  void _chooseSide(RoomMode mode) {
+    _sidePages.currentState?.glideTo(mode);
+    _show(mode);
+  }
+
+  // 回弹停稳之前用户可能已经收起房间、返回或去了别处，停稳的页不能把路由改回来。
+  bool get _routeUnchanged =>
+      GoRouter.of(context).state.uri.path ==
+      widget.mode.routeIn(widget.roomRef);
+
+  void _settlePhone(RoomMode mode) {
+    // 展开播放器后，内容随之淡出。
+    if (widget.mode != RoomMode.player && _routeUnchanged) _show(mode);
+  }
+
+  void _settleSide(RoomMode mode) {
+    if (_routeUnchanged) _show(mode);
+  }
 
   void _addSong() =>
       unawaited(context.push<void>('/r/${widget.roomRef}/search'));
@@ -172,6 +205,11 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
     final toasts = ref.read(toastControllerProvider);
     void reportQueue(MutationResult<Object?> result, String success) =>
         reportMutation(toasts, result, success: (_) => success);
+    Widget content(RoomMode page) => switch (page) {
+      RoomMode.lyrics || RoomMode.player => const LyricsView(),
+      RoomMode.queue => QueueView(onAddSong: _addSong, onResult: reportQueue),
+      RoomMode.chat => const ChatView(),
+    };
     final background = CoverBackdrop(
       url: nowPlaying?.entry.meta.coverUrl,
       child: const AuroraBackground(),
@@ -201,10 +239,13 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
       onExpand: () => _show(RoomMode.player),
       body: twoPanes
           ? null
-          : _ModeBody(
-              mode: _pane,
-              onAddSong: _addSong,
-              onQueueResult: reportQueue,
+          : RoomPager(
+              key: _phonePages,
+              pages: RoomModeBar.modes,
+              page: _pane,
+              position: _phonePosition,
+              onSettled: _settlePhone,
+              builder: content,
             ),
     );
     return RepaintBoundary(
@@ -222,15 +263,25 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
                 player: player,
                 side: _SidePanel(
                   mode: _side,
-                  onSelect: _show,
-                  onAddSong: _addSong,
-                  onQueueResult: reportQueue,
+                  onSelect: _chooseSide,
+                  pages: RoomPager(
+                    key: _sidePages,
+                    pages: [for (final side in _sideModes) side.value],
+                    page: _side,
+                    onSettled: _settleSide,
+                    builder: content,
+                  ),
                 ),
               )
             : player,
         bottomBar: twoPanes
             ? null
-            : RoomModeBar(mode: mode, onSelect: _show, onAddSong: _addSong),
+            : RoomModeBar(
+                mode: mode,
+                position: _phonePosition,
+                onSelect: _choosePhone,
+                onAddSong: _addSong,
+              ),
       ),
     );
   }
@@ -296,19 +347,26 @@ class _TwoPanes extends StatelessWidget {
   }
 }
 
+const _sideModes = [
+  PillSegment(
+    value: RoomMode.queue,
+    label: '队列',
+    icon: Icons.queue_music_rounded,
+  ),
+  PillSegment(value: RoomMode.chat, label: '聊天', icon: Icons.forum_rounded),
+];
+
 class _SidePanel extends StatelessWidget {
   const _SidePanel({
     required this.mode,
     required this.onSelect,
-    required this.onAddSong,
-    required this.onQueueResult,
+    required this.pages,
   });
 
   // 只会是 [RoomMode.queue] 或 [RoomMode.chat]。
   final RoomMode mode;
   final ValueChanged<RoomMode> onSelect;
-  final VoidCallback onAddSong;
-  final QueueResultCallback onQueueResult;
+  final Widget pages;
 
   @override
   Widget build(BuildContext context) {
@@ -316,18 +374,7 @@ class _SidePanel extends StatelessWidget {
       key: const ValueKey('switch'),
       padding: const EdgeInsets.all(AlistenSpacing.sm),
       child: SegmentedPills(
-        segments: const [
-          PillSegment(
-            value: RoomMode.queue,
-            label: '队列',
-            icon: Icons.queue_music_rounded,
-          ),
-          PillSegment(
-            value: RoomMode.chat,
-            label: '聊天',
-            icon: Icons.forum_rounded,
-          ),
-        ],
+        segments: _sideModes,
         selected: mode,
         onChanged: onSelect,
       ),
@@ -345,50 +392,9 @@ class _SidePanel extends StatelessWidget {
             // 队列或聊天（如正在使用的输入框）仍至少有切换行那么高时才显示它。
             if (constraints.maxHeight >= 2 * switcherHeight) switcher,
             // 切换行出现或消失时聊天保留状态，输入框不失去焦点。
-            Expanded(
-              key: const ValueKey('body'),
-              child: _ModeBody(
-                mode: mode,
-                onAddSong: onAddSong,
-                onQueueResult: onQueueResult,
-              ),
-            ),
+            Expanded(key: const ValueKey('body'), child: pages),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ModeBody extends StatelessWidget {
-  const _ModeBody({
-    required this.mode,
-    required this.onAddSong,
-    required this.onQueueResult,
-  });
-
-  final RoomMode mode;
-  final VoidCallback onAddSong;
-  final QueueResultCallback onQueueResult;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: AlistenDurations.of(context, AlistenDurations.medium),
-      switchInCurve: AlistenCurves.standard,
-      switchOutCurve: AlistenCurves.exit,
-      layoutBuilder: (current, previous) =>
-          Stack(fit: StackFit.expand, children: [...previous, ?current]),
-      child: KeyedSubtree(
-        key: ValueKey(mode),
-        child: switch (mode) {
-          RoomMode.lyrics || RoomMode.player => const LyricsView(),
-          RoomMode.queue => QueueView(
-            onAddSong: onAddSong,
-            onResult: onQueueResult,
-          ),
-          RoomMode.chat => const ChatView(),
-        },
       ),
     );
   }

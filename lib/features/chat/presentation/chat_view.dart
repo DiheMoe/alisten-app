@@ -14,6 +14,7 @@ import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
+import 'package:alisten/shared/ui/outer_horizontal_drag.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/section_header.dart';
@@ -341,7 +342,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
               behavior: HitTestBehavior.translucent,
               excludeFromSemantics: true,
               onTap: () => FocusScope.of(context).unfocus(),
-              child: timeline,
+              // 房间页外层有左右切换模式的分页，横拖不能被消息的文字选择吞掉。
+              child: OuterHorizontalDrag(child: timeline),
             ),
           ),
           // 聊天区比输入栏还矮时（如大字号横屏手机），消息让出全部高度，输入栏

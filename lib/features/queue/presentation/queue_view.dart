@@ -128,7 +128,8 @@ class QueueView extends ConsumerWidget {
         top: _topFade,
         bottom: AlistenSpacing.xxl,
         child: CustomScrollView(
-          // 模式交叉淡入淡出时，primary 控制器属于歌词或聊天的滚动视图。
+          // 可能与歌词或聊天同时显示（如滑动切换途中、两栏布局），不能共用
+          // primary 控制器。
           primary: false,
           slivers: [
             _faded(

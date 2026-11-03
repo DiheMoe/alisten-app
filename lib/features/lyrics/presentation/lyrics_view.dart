@@ -115,10 +115,11 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
     // 首行开唱前停在中央等待。
     final line = _keys[math.max(_index, 0)].currentContext;
     if (line == null) return;
-    // 减少动态效果时时长为零，即直接跳转。
+    // 只滚动歌词自己。`Scrollable.ensureVisible` 会连外层左右切换模式的分页
+    // 一起滚动，把正在滑走的内容拉回歌词。减少动态效果时时长为零，即直接跳转。
     unawaited(
-      Scrollable.ensureVisible(
-        line,
+      Scrollable.of(line).position.ensureVisible(
+        line.findRenderObject()!,
         alignment: 0.5,
         duration: jump ? Duration.zero : _scrollDuration,
         curve: AlistenCurves.standard,
@@ -148,7 +149,8 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
             builder: (context, constraints) => SingleChildScrollView(
               // 每次播放用新的滚动视图，从顶部开始而非停在上一首的位置。
               key: ValueKey(playback),
-              // primary 控制器属于另一个滚动视图，如交叉淡入淡出中的队列。
+              // 可能与队列或聊天同时显示（如滑动切换途中、两栏布局），不能
+              // 共用 primary 控制器。
               primary: false,
               // 上下各留半个视口，首行和末行也能滚到中央（仅限高度有界时）。
               padding: EdgeInsets.symmetric(
