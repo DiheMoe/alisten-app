@@ -1,15 +1,18 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:alisten/app/router.dart';
 import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/credential_store.dart';
 import 'package:alisten/core/logging/app_log.dart';
+import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/lobby/index.dart';
 import 'package:alisten/features/lobby/presentation/join_room_sheet.dart';
 import 'package:alisten/features/room/index.dart';
+import 'package:alisten/features/settings/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/tokens.dart';
@@ -30,6 +33,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../app/app_test_harness.dart';
+import '../../../core/avatar/avatar_test_doubles.dart';
 import '../../../domain/room/room_fixtures.dart';
 import '../../room/room_test_doubles.dart';
 import '../lobby_test_doubles.dart';
@@ -933,4 +937,206 @@ void main() {
     expect(lobby.opened, isEmpty);
     expect(lobby.notices.map((notice) => notice.$1), [ToastKind.warning]);
   });
+
+  group('the settings button', () {
+    const listener = Member(id: 'member-id', name: '听众', avatarHash: 'abc123');
+    final avatarUrl = listener.avatarUrl(AlistenSizes.iconButton)!;
+
+    setUp(() {
+      imageCache
+        ..clear()
+        ..clearLiveImages();
+    });
+
+    Finder inSettings(Finder finder) =>
+        find.descendant(of: _settingsButton, matching: finder);
+
+    Finder gear() => inSettings(find.byIcon(Icons.settings_rounded));
+
+    Future<void> openAs(
+      WidgetTester tester,
+      Member? member, {
+      FakeAvatarCache? avatars,
+    }) async {
+      tester.view
+        ..physicalSize = const Size(360, 780) * 3
+        ..devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      final api = FakeAlistenApi()..rooms = [roomListing()];
+      if (member != null) {
+        api.getMeResult = Completer<Member>()..complete(member);
+      }
+      await pumpAlistenApp(
+        tester,
+        api: api,
+        credentials: member == null
+            ? null
+            : (FakeCredentialStore()..memberToken = 'member-token'),
+        avatarCache: avatars,
+      );
+    }
+
+    testWidgets('without a member shows the gear', (tester) async {
+      await openAs(tester, null);
+      await _finishLoading(tester);
+
+      expect(gear(), findsOneWidget);
+      expect(inSettings(find.byType(RawImage)), findsNothing);
+    });
+
+    testWidgets('for a member without an avatar address shows the gear', (
+      tester,
+    ) async {
+      await openAs(
+        tester,
+        const Member(id: 'member-id', name: '听众', avatarHash: ''),
+      );
+      await _finishLoading(tester);
+
+      expect(gear(), findsOneWidget);
+      expect(inSettings(find.byType(RawImage)), findsNothing);
+    });
+
+    testWidgets('turns into the avatar once the member gives an avatar '
+        'email', (tester) async {
+      final png = (await tester.runAsync(_png))!;
+      const withAvatar = Member(id: 'member-id', name: '听众', avatarHash: 'x');
+      final api = FakeAlistenApi()..rooms = [roomListing()];
+      api
+        ..getMeResult = (Completer<Member>()
+          ..complete(const Member(id: 'member-id', name: '听众', avatarHash: '')))
+        ..updateMeHandler = (_, _) => withAvatar;
+      tester.view
+        ..physicalSize = const Size(360, 780) * 3
+        ..devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await pumpAlistenApp(
+        tester,
+        api: api,
+        credentials: FakeCredentialStore()..memberToken = 'member-token',
+        avatarCache: FakeAvatarCache(
+          avatars: {withAvatar.avatarUrl(AlistenSizes.iconButton)!: png},
+        ),
+      );
+      await _finishLoading(tester);
+      expect(gear(), findsOneWidget);
+
+      final saved = await appContainer(tester)
+          .read(identityControllerProvider.notifier)
+          .saveProfile(email: 'a@b.c');
+      expect(saved, isA<MutationSucceeded<Member>>());
+      expect(
+        appContainer(tester).read(identityControllerProvider).member,
+        withAvatar,
+      );
+      await tester.pump();
+      await _finishLoading(tester);
+      await tester.pumpAndSettle();
+
+      expect(gear(), findsNothing);
+      expect(inSettings(find.byType(RawImage)), findsOneWidget);
+    });
+
+    testWidgets('shows the avatar once it is loaded, still reads as the '
+        'settings, and opens them', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final png = (await tester.runAsync(_png))!;
+      await openAs(
+        tester,
+        listener,
+        avatars: FakeAvatarCache(avatars: {avatarUrl: png}),
+      );
+      await _finishLoading(tester);
+      await tester.pumpAndSettle();
+
+      expect(gear(), findsNothing);
+      expect(
+        tester.widget<RawImage>(inSettings(find.byType(RawImage))).image,
+        isNotNull,
+      );
+      final node = tester.getSemantics(find.bySemanticsLabel('设置'));
+      expect(node.label, '设置');
+      expect(node.childrenCount, 0);
+
+      await tester.tap(_settingsButton);
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('shows the gear when the member has no avatar', (tester) async {
+      await openAs(tester, listener, avatars: FakeAvatarCache());
+      await _finishLoading(tester);
+      await tester.pumpAndSettle();
+
+      expect(gear(), findsOneWidget);
+      expect(inSettings(find.byType(RawImage)), findsNothing);
+    });
+
+    testWidgets('shows the gear when the avatar cannot be loaded', (
+      tester,
+    ) async {
+      await openAs(
+        tester,
+        listener,
+        avatars: FakeAvatarCache()..unreachable = true,
+      );
+      await _finishLoading(tester);
+      await tester.pumpAndSettle();
+
+      expect(gear(), findsOneWidget);
+      expect(inSettings(find.byType(RawImage)), findsNothing);
+    });
+
+    testWidgets('keeps its size while the gear turns into the avatar', (
+      tester,
+    ) async {
+      final png = (await tester.runAsync(_png))!;
+      final loading = Completer<void>();
+      await openAs(
+        tester,
+        listener,
+        avatars: FakeAvatarCache(avatars: {avatarUrl: png})..loading = loading,
+      );
+      expect(gear(), findsOneWidget);
+      final shown = tester.getRect(_settingsButton);
+
+      loading.complete();
+      await _finishLoading(tester);
+      expect(inSettings(find.byType(RawImage)), findsOneWidget);
+      expect(tester.getRect(_settingsButton), shown);
+
+      await tester.pumpAndSettle();
+      expect(gear(), findsNothing);
+      expect(tester.getRect(_settingsButton), shown);
+      expect(
+        tester.getSize(inSettings(find.byType(RawImage))),
+        const Size.square(AlistenSizes.iconButton),
+      );
+    });
+  });
+}
+
+Finder get _settingsButton => find.byWidgetPredicate(
+  (widget) => widget is IconCircleButton && widget.semanticLabel == '设置',
+);
+
+// 解码在引擎中真实异步进行：让出真实时间，直到没有加载中的图片，最多等 5 秒。
+Future<void> _finishLoading(WidgetTester tester) async {
+  final waited = Stopwatch()..start();
+  while (imageCache.pendingImageCount > 0 &&
+      waited.elapsed < const Duration(seconds: 5)) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 5)),
+    );
+    await tester.pump();
+  }
+  await tester.pump();
+}
+
+Future<Uint8List> _png() async {
+  final image = await createTestImage(width: 8, height: 8, cache: false);
+  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  return bytes!.buffer.asUint8List();
 }

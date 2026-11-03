@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/lobby/application/lobby_controller.dart';
 import 'package:alisten/features/lobby/presentation/create_room_sheet.dart';
 import 'package:alisten/features/lobby/presentation/join_room_sheet.dart';
@@ -9,6 +10,7 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
+import 'package:alisten/shared/ui/avatar_images.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/collapsible.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
@@ -171,6 +173,11 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
   @override
   Widget build(BuildContext context) {
     final lobby = ref.watch(lobbyControllerProvider);
+    final avatarUrl = ref.watch(
+      identityControllerProvider.select(
+        (state) => state.member?.avatarUrl(AlistenSizes.iconButton),
+      ),
+    );
     // 必须在 scaffold 之外读取：scaffold 会从页面中去掉键盘高度。
     final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
     final listError = lobby.listError;
@@ -206,6 +213,9 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                           icon: Icons.settings_rounded,
                           semanticLabel: '设置',
                           style: IconCircleButtonStyle.plain,
+                          image: avatarUrl == null
+                              ? null
+                              : AvatarImages.of(context, avatarUrl),
                           onPressed: widget.onOpenSettings,
                         ),
                       ],

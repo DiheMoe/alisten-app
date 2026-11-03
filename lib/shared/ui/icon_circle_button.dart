@@ -22,6 +22,7 @@ class IconCircleButton extends StatelessWidget {
     this.diameter = AlistenSizes.iconButton,
     this.iconSize = AlistenSizes.icon,
     this.expanded,
+    this.image,
     super.key,
   });
 
@@ -32,6 +33,10 @@ class IconCircleButton extends StatelessWidget {
   final double diameter;
   final double iconSize;
   final bool? expanded;
+
+  /// 加载成功后淡入并取代 [icon]，加载中和失败时显示 [icon]。读屏只读
+  /// [semanticLabel]。
+  final ImageProvider? image;
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +65,8 @@ class IconCircleButton extends StatelessWidget {
     final target = diameter < AlistenSizes.minTouchTarget
         ? AlistenSizes.minTouchTarget
         : diameter;
+    final glyph = Icon(icon, size: iconSize, color: ink);
+    final image = this.image;
     return Pressable(
       onPressed: onPressed,
       semanticLabel: semanticLabel,
@@ -86,7 +93,36 @@ class IconCircleButton extends StatelessWidget {
                     ]
                   : null,
             ),
-            child: Icon(icon, size: iconSize, color: ink),
+            child: image == null
+                ? glyph
+                : Image(
+                    image: ResizeImage.resizeIfNeeded(
+                      (diameter * MediaQuery.devicePixelRatioOf(context))
+                          .round(),
+                      null,
+                      image,
+                    ),
+                    width: diameter,
+                    height: diameter,
+                    fit: BoxFit.cover,
+                    excludeFromSemantics: true,
+                    gaplessPlayback: true,
+                    frameBuilder: (context, child, frame, synchronous) {
+                      final loaded = synchronous || frame != null;
+                      return AnimatedSwitcher(
+                        duration: AlistenDurations.of(
+                          context,
+                          AlistenDurations.short,
+                        ),
+                        // 前后两个子组件的键必须不同，否则图标立即消失，不会淡出。
+                        child: KeyedSubtree(
+                          key: ValueKey(loaded),
+                          child: loaded ? ClipOval(child: child) : glyph,
+                        ),
+                      );
+                    },
+                    errorBuilder: (_, _, _) => glyph,
+                  ),
           ),
         ),
       ),

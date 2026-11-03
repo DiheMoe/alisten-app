@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:alisten/core/avatar/avatar_cache.dart';
+import 'package:alisten/core/avatar/avatar_loader.dart';
 import 'package:dio/dio.dart';
 
 const gravatar = 'www.gravatar.com';
@@ -48,16 +49,25 @@ final class AvatarServer implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// 不在 [avatars] 里的地址按没设头像应答。
 final class FakeAvatarCache implements AvatarCache {
-  FakeAvatarCache({this.bytes = 0});
+  FakeAvatarCache({Map<String, Uint8List>? avatars, this.bytes = 0})
+    : avatars = avatars ?? {};
 
+  final Map<String, Uint8List> avatars;
   int bytes;
   int clears = 0;
+  bool unreachable = false;
+  Completer<void>? loading;
 
   Exception? clearError;
 
   @override
-  Future<Uint8List?> load(String url) async => null;
+  Future<Uint8List?> load(String url) async {
+    await loading?.future;
+    if (unreachable) throw const AvatarUnavailable();
+    return avatars[url];
+  }
 
   @override
   Future<void> discard(String url) async {}
