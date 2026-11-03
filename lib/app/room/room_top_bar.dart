@@ -96,29 +96,32 @@ class _RoomTopBarState extends State<RoomTopBar> {
                 childAnchor: Alignment.bottomRight,
                 contentAnchor: Alignment.topRight,
                 offset: const Offset(0, AlistenSpacing.xxs),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _MenuItem(
-                      icon: Icons.person_add_alt_1_rounded,
-                      label: '复制邀请链接',
-                      ink: colors.onGlass,
-                      onPressed: () {
-                        _closeMenu();
-                        widget.onInvite();
-                      },
-                    ),
-                    _MenuItem(
-                      icon: Icons.logout_rounded,
-                      label: '退出房间',
-                      ink: colors.danger,
-                      onPressed: () {
-                        _closeMenu();
-                        widget.onLeave();
-                      },
-                    ),
-                  ],
+                // 菜单与最长的一项同宽，各项整行可点。
+                content: IntrinsicWidth(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _MenuItem(
+                        icon: Icons.person_add_alt_1_rounded,
+                        label: '复制邀请链接',
+                        ink: colors.onGlass,
+                        onPressed: () {
+                          _closeMenu();
+                          widget.onInvite();
+                        },
+                      ),
+                      _MenuItem(
+                        icon: Icons.logout_rounded,
+                        label: '退出房间',
+                        ink: colors.danger,
+                        onPressed: () {
+                          _closeMenu();
+                          widget.onLeave();
+                        },
+                      ),
+                    ],
+                  ),
                 ),
                 child: IconCircleButton(
                   icon: Icons.more_horiz_rounded,

@@ -14,6 +14,7 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
+import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -179,18 +180,23 @@ void main() {
     expect(find.text('复制邀请链接'), findsNothing, reason: 'the menu closes');
   });
 
-  testWidgets('inviting lives in the more menu, above leaving the room', (
-    tester,
-  ) async {
+  testWidgets('inviting lives in the more menu, above leaving the room, in '
+      'a menu as wide as its longest item', (tester) async {
     final (rooms: _, router: _, :settle) = await _enterRoom(tester);
     expect(find.bySemanticsLabel('邀请'), findsNothing);
 
     await tester.tap(find.bySemanticsLabel('更多'));
     await settle();
 
-    final invite = tester.getRect(find.text('复制邀请链接'));
-    final leave = tester.getRect(find.text('退出房间'));
+    Rect item(String label) => tester.getRect(
+      find.ancestor(of: find.text(label), matching: find.byType(Pressable)),
+    );
+    final invite = item('复制邀请链接');
+    final leave = item('退出房间');
     expect(invite.bottom, lessThanOrEqualTo(leave.top));
+    expect(leave.width, invite.width);
+    final text = tester.getRect(find.text('复制邀请链接'));
+    expect(invite.width, lessThan(text.width * 2));
   });
 
   testWidgets('the room fits a phone at twice the text size', (tester) async {
