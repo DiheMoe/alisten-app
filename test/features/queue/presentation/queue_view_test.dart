@@ -9,7 +9,9 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
+import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
+import 'package:alisten/shared/ui/segmented_pills.dart';
 import 'package:alisten/shared/ui/track_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -205,6 +207,26 @@ void main() {
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -150));
     await tester.pump();
     expectFadedByRow(tester, find.byType(QueueView), top: true, bottom: true);
+  });
+
+  testWidgets('at rest the play mode row sits wholly below the top fade, '
+      'so it does not look cut off by the progress above', (tester) async {
+    await _pumpQueue(
+      tester,
+      _snapshot(
+        playing: _entry('a'),
+        items: [for (var index = 0; index < 12; index++) _entry('w$index')],
+      ),
+    );
+    final fade = find.descendant(
+      of: find.byType(QueueView),
+      matching: find.byType(EdgeFade),
+    );
+    final band = tester.getRect(fade).top + tester.widget<EdgeFade>(fade).top;
+
+    final choices = find.byType(SegmentedPills<RoomPlayMode>);
+    expect(tester.getRect(choices).top, greaterThanOrEqualTo(band));
+    expect(tester.getRect(find.text('播放模式')).top, greaterThanOrEqualTo(band));
   });
 
   testWidgets('a room without songs invites to add one', (tester) async {

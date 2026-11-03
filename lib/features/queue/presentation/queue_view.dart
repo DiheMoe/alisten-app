@@ -51,6 +51,10 @@ const _modes = [
 
 const _bounceScale = 1.4;
 
+// 播放模式一行静止时要完整落在这条渐隐带之下，否则顶边被淡化，看起来像被上方
+// 的进度条挡住一截。
+const _topFade = AlistenSpacing.md;
+
 Widget _faded(Widget child) {
   return SliverToBoxAdapter(child: EdgeFadeItem(child: child));
 }
@@ -120,9 +124,8 @@ class QueueView extends ConsumerWidget {
         waiting[index].id: index,
     };
     return RepaintBoundary(
-      // 播放模式一行静止时位于顶部渐隐带内，渐隐带须窄，它才不显得被淡化。
       child: EdgeFade(
-        top: AlistenSpacing.md,
+        top: _topFade,
         bottom: AlistenSpacing.xxl,
         child: CustomScrollView(
           // 模式交叉淡入淡出时，primary 控制器属于歌词或聊天的滚动视图。
@@ -304,7 +307,7 @@ class _PlayModeRow extends StatelessWidget {
       // 右边缘与下方的面板对齐。
       padding: const EdgeInsets.fromLTRB(
         AlistenSpacing.page,
-        AlistenSpacing.xxs,
+        _topFade,
         AlistenSpacing.sm,
         0,
       ),
