@@ -30,7 +30,7 @@ void main() {
       options: Options(responseType: ResponseType.bytes),
     );
 
-    expect(agents, ['Alisten/1.0.0']);
+    expect(agents, [appUserAgent]);
   });
 
   test('audio streamed through it still names the app after the redirect '
@@ -61,7 +61,7 @@ void main() {
         .request(0);
     await response.stream.drain<void>();
 
-    expect(agents, {'/media': 'Alisten/1.0.0', '/cdn.mp3': 'Alisten/1.0.0'});
+    expect(agents, {'/media': appUserAgent, '/cdn.mp3': appUserAgent});
   });
 
   test('the user agent carries the version without the build number', () {
