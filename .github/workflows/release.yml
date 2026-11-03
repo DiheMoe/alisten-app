@@ -43,7 +43,8 @@ jobs:
     environment: release
     env:
       VERSION: ${{ needs.version.outputs.version }}
-      APK: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+      APK_ARM64: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+      APK_ARMV7: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -76,22 +77,27 @@ jobs:
             echo "keyAlias=$KEY_ALIAS"
             echo "keyPassword=$KEY_PASSWORD"
           } > android/key.properties
-          flutter build apk --release --split-per-abi --target-platform android-arm64 \
+          flutter build apk --release --split-per-abi \
+            --target-platform android-arm,android-arm64 \
             --split-debug-info=build/symbols
       - name: Check APK certificate
         run: |
           latest_build_tools="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)"
           apksigner="${latest_build_tools}apksigner"
-          digests="$("$apksigner" verify --print-certs "$APK" \
-            | sed -n 's/^.*Signer.* certificate SHA-256 digest: //p' | sort -u)"
-          if [ "$digests" != "$RELEASE_CERT_SHA256" ]; then
-            echo "APK is not signed with the release certificate only" >&2
-            exit 1
-          fi
+          for apk in "$APK_ARM64" "$APK_ARMV7"; do
+            digests="$("$apksigner" verify --print-certs "$apk" \
+              | sed -n 's/^.*Signer.* certificate SHA-256 digest: //p' | sort -u)"
+            if [ "$digests" != "$RELEASE_CERT_SHA256" ]; then
+              echo "$apk is not signed with the release certificate only" >&2
+              exit 1
+            fi
+          done
       - name: Collect artifacts
         run: |
           mkdir -p dist/symbols
-          cp "$APK" "dist/Alisten-$VERSION-arm64-v8a.apk"
+          cp "$APK_ARM64" "dist/Alisten-$VERSION-arm64-v8a.apk"
+          cp "$APK_ARMV7" "dist/Alisten-$VERSION-armeabi-v7a.apk"
+          cp build/symbols/app.android-arm.symbols dist/symbols/
           cp build/symbols/app.android-arm64.symbols dist/symbols/
           cp build/app/outputs/mapping/release/mapping.txt dist/symbols/android-mapping.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -151,7 +157,8 @@ jobs:
           rm -r symbols
           cert="$(printf '%s' "$RELEASE_CERT_SHA256" | sed 's/../&:/g; s/:$//' | tr a-f A-F)"
           cat > "$RUNNER_TEMP/notes.md" <<EOF
-          - \`Alisten-$VERSION-arm64-v8a.apk\`：Android 安装包，正式签名，证书 SHA-256 \`$cert\`。
+          - \`Alisten-$VERSION-arm64-v8a.apk\`：Android 64 位 ARM 安装包，正式签名，证书 SHA-256 \`$cert\`。
+          - \`Alisten-$VERSION-armeabi-v7a.apk\`：Android 32 位 ARM 安装包，适用于部分安卓电视，正式签名，证书 SHA-256 \`$cert\`。
           - \`Alisten-$VERSION-ios-unsigned.ipa\`：iOS 安装包，未签名，需要用 AltStore、SideStore 或 Sideloadly 以自己的 Apple ID 重签后安装。
           - \`Alisten-$VERSION-symbols.zip\`：本次构建的调试符号和 Android R8 映射，用于还原崩溃堆栈，普通用户不需要下载。
           EOF
