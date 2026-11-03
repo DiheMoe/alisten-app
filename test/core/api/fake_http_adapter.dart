@@ -17,6 +17,7 @@ final class RecordedRequest {
     required this.headers,
     required this.contentType,
     required this.jsonBody,
+    required this.followRedirects,
   });
 
   final String method;
@@ -26,6 +27,9 @@ final class RecordedRequest {
   final Map<String, Object?> headers;
   final String? contentType;
   final Object? jsonBody;
+
+  /// 本替身从不跟随跳转，只记下请求是否要求跟随。
+  final bool followRedirects;
 }
 
 final class FakeHttpAdapter implements HttpClientAdapter {
@@ -100,6 +104,7 @@ final class FakeHttpAdapter implements HttpClientAdapter {
         headers: Map.of(options.headers),
         contentType: options.contentType,
         jsonBody: body,
+        followRedirects: options.followRedirects,
       ),
     );
     unawaited(cancelFuture?.then((_) => cancelled = true));

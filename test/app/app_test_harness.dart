@@ -21,6 +21,7 @@ import 'package:alisten/features/search/application/shared_link.dart';
 import 'package:alisten/features/search/data/link_resolver.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/index.dart';
+import 'package:alisten/features/update/index.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,6 +41,7 @@ import '../features/search/share_test_doubles.dart';
 import '../features/server/server_test_doubles.dart'
     show FakeCredentialStores, FakeServerProbe;
 import '../features/settings/settings_test_doubles.dart';
+import '../features/update/update_test_doubles.dart';
 
 const emptyLobbyText = '还没有可加入的房间';
 
@@ -63,6 +65,8 @@ Future<List<Override>> alistenAppOverrides({
   FakeSensitiveClipboard? sensitiveClipboard,
   FakeQrImageLoader? qrImages,
   FakeImageGallery? gallery,
+  FakeReleaseSource? releases,
+  FakeReleaseOpener? releaseOpener,
   Map<String, Object> preferences = const {},
 }) async {
   final stores = credentialStores ?? FakeCredentialStores();
@@ -115,6 +119,10 @@ Future<List<Override>> alistenAppOverrides({
     ),
     qrImageLoaderProvider.overrideWithValue(qrImages ?? FakeQrImageLoader()),
     imageGalleryProvider.overrideWithValue(gallery ?? FakeImageGallery()),
+    releaseSourceProvider.overrideWithValue(releases ?? FakeReleaseSource()),
+    releaseOpenerProvider.overrideWithValue(
+      releaseOpener ?? FakeReleaseOpener(),
+    ),
   ];
 }
 
@@ -140,6 +148,8 @@ Future<void> pumpAlistenApp(
   FakeSensitiveClipboard? sensitiveClipboard,
   FakeQrImageLoader? qrImages,
   FakeImageGallery? gallery,
+  FakeReleaseSource? releases,
+  FakeReleaseOpener? releaseOpener,
   Map<String, Object> preferences = const {},
   List<Override> overrides = const [],
 }) async {
@@ -165,6 +175,8 @@ Future<void> pumpAlistenApp(
           sensitiveClipboard: sensitiveClipboard,
           qrImages: qrImages,
           gallery: gallery,
+          releases: releases,
+          releaseOpener: releaseOpener,
           preferences: preferences,
         ),
         ...overrides,

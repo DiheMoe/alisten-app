@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:alisten/app/app.dart';
 import 'package:alisten/app/app_theme.dart';
+import 'package:alisten/app/app_version.dart';
 import 'package:alisten/app/assembly.dart';
 import 'package:alisten/app/deep_link_controller.dart';
 import 'package:alisten/core/api/alisten_api.dart';
@@ -18,6 +19,7 @@ import 'package:alisten/core/cache/disk_cover_cache.dart';
 import 'package:alisten/core/realtime/websocket_room_transport.dart';
 import 'package:alisten/core/storage/preferences.dart';
 import 'package:alisten/domain/history/search_record.dart';
+import 'package:alisten/domain/release/release_version.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/admin/data/dio_qr_image_loader.dart';
 import 'package:alisten/features/admin/data/gal_image_gallery.dart';
@@ -33,6 +35,10 @@ import 'package:alisten/features/server/data/alisten_server_probe.dart';
 import 'package:alisten/features/server/data/server_data_sweep.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/index.dart';
+import 'package:alisten/features/update/data/github_release_source.dart';
+import 'package:alisten/features/update/data/platform_release_opener.dart';
+import 'package:alisten/features/update/data/preferences_update_store.dart';
+import 'package:alisten/features/update/index.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -99,6 +105,21 @@ void main() {
     );
     expect(container.read(qrImageLoaderProvider), isA<DioQrImageLoader>());
     expect(container.read(imageGalleryProvider), isA<GalImageGallery>());
+    expect(container.read(releaseSourceProvider), isA<GitHubReleaseSource>());
+    expect(container.read(releaseOpenerProvider), isA<PlatformReleaseOpener>());
+  });
+
+  test('update checks keep their time and skipped version in the ordinary '
+      'preferences, and compare releases with the version built', () async {
+    final container = await wired();
+
+    expect(container.read(updateStoreProvider), isA<PreferencesUpdateStore>());
+    expect(
+      container.read(installedVersionProvider),
+      ReleaseVersion.fromAppVersion(appVersion),
+    );
+    // 发布源属于平台适配器，共用接线不得自带会联网的实现。
+    expect(() => container.read(releaseSourceProvider), throwsA(anything));
   });
 
   test('the shared wiring ends the site admin session when asked', () async {

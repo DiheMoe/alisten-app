@@ -8,12 +8,14 @@ import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/settings/application/image_cache.dart';
 import 'package:alisten/features/settings/application/settings_controller.dart';
 import 'package:alisten/features/settings/application/settings_state.dart';
+import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/alisten_toggle.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
+import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
@@ -158,6 +160,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       widget.onNotice(ToastKind.success, '已清除图片缓存');
     } else {
       widget.onNotice(ToastKind.failure, '没能清除图片缓存，请稍后再试。');
+    }
+  }
+
+  // 离开设置页后仍要提示结果，面板因此由根导航器弹出。
+  Future<void> _checkForUpdate() async {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final result = await ref.read(updateControllerProvider.notifier).checkNow();
+    switch (result) {
+      case null:
+        return;
+      case UpdateAvailable():
+        if (navigator.mounted) {
+          unawaited(
+            showUpdateSheet(
+              navigator.context,
+              result,
+              onNotice: widget.onNotice,
+            ),
+          );
+        }
+      case UpToDate():
+        widget.onNotice(ToastKind.info, '已是最新版本');
+      case UpdateCheckFailed():
+        widget.onNotice(ToastKind.failure, '检查更新失败，请稍后再试。');
     }
   }
 
@@ -320,6 +346,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: _InfoRow(title: '版本', value: widget.appVersion),
               ),
               _InfoRow(title: '协议版本', value: widget.protocolVersion),
+              _LinkRow(
+                title: '检查更新',
+                busy: ref.watch(updateControllerProvider),
+                onPressed: () => unawaited(_checkForUpdate()),
+              ),
               _LinkRow(title: '开源许可', onPressed: widget.onOpenLicenses),
             ],
           ),
@@ -569,15 +600,23 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _LinkRow extends StatelessWidget {
-  const _LinkRow({required this.title, required this.onPressed});
+  const _LinkRow({
+    required this.title,
+    required this.onPressed,
+    this.busy = false,
+  });
 
   final String title;
   final VoidCallback onPressed;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
+    final muted = AlistenColors.of(context).onGlassMuted;
     return Pressable(
-      onPressed: onPressed,
+      onPressed: busy ? null : onPressed,
+      // 进行中不等于不可用，不变淡。
+      dimWhenDisabled: !busy,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
           minHeight: AlistenSizes.largeTouchTarget,
@@ -593,11 +632,25 @@ class _LinkRow extends StatelessWidget {
             children: [
               Expanded(child: _RowTitle(title)),
               const SizedBox(width: AlistenSpacing.sm),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: AlistenSizes.icon,
-                color: AlistenColors.of(context).onGlassMuted,
-              ),
+              if (busy)
+                Semantics(
+                  value: busySemanticValue,
+                  child: SizedBox.square(
+                    dimension: AlistenSizes.icon,
+                    child: Center(
+                      child: BusyIndicator(
+                        size: AlistenSizes.iconSm * 0.8,
+                        color: muted,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: AlistenSizes.icon,
+                  color: muted,
+                ),
             ],
           ),
         ),

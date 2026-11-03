@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:alisten/app/app_version.dart';
+import 'package:alisten/domain/release/release_version.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -12,5 +13,12 @@ void main() {
     ).firstMatch(pubspec)!.group(1);
 
     expect(appVersion, version);
+  });
+
+  test('the version can be compared with release tags', () {
+    final version = ReleaseVersion.fromAppVersion(appVersion);
+
+    expect(version, isNotNull);
+    expect('$version', appVersion.split('+').first);
   });
 }

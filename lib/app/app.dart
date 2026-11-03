@@ -19,11 +19,13 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/index.dart';
+import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/avatar_images.dart';
 import 'package:alisten/shared/ui/cover_images.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -49,6 +51,7 @@ final class AlistenApp extends ConsumerStatefulWidget {
 
 final class _AlistenAppState extends ConsumerState<AlistenApp> {
   late final AppLifecycleListener _lifecycle;
+  late final Future<void> _started;
 
   // 链接或提醒已指定去处时，启动流程不再恢复上次的房间。
   bool _roomOpened = false;
@@ -67,7 +70,10 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
     listenForShares(ref);
     listenForInvites(ref, openRoute: _openRoute);
     _lifecycle = AppLifecycleListener(onStateChange: _onLifecycle);
-    unawaited(Future.microtask(_start));
+    _started = Future.microtask(_start);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_offerUpdate()),
+    );
   }
 
   @override
@@ -154,6 +160,56 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
     } else {
       ref.read(inviteOfferControllerProvider.notifier).offer(invite);
     }
+  }
+
+  // 启动链接打开的页面先就位，面板才不会被随后推入的页面盖住；已经打开的面板
+  // （如分享、邀请）关闭之后再弹出，不打断它们。出错与自动检查失败一样不打扰
+  // 用户，只记 debug 日志。
+  Future<void> _offerUpdate() async {
+    try {
+      final updates = ref.read(updateControllerProvider.notifier);
+      final update = await updates.checkOnLaunch();
+      if (update == null || !mounted) return;
+      await _started;
+      await SchedulerBinding.instance.endOfFrame;
+      final navigator = await _uncoveredRootNavigator();
+      if (navigator == null || !mounted || !updates.claimLaunchOffer(update)) {
+        return;
+      }
+      await showUpdateSheet(
+        navigator.context,
+        update,
+        onNotice: ref.read(toastControllerProvider).show,
+      );
+    } on Object catch (error) {
+      AppLog.debug(
+        'update',
+        'update not offered',
+        type: '${error.runtimeType}',
+      );
+    }
+  }
+
+  Future<NavigatorState?> _uncoveredRootNavigator() async {
+    while (mounted) {
+      final navigator = ref
+          .read(routerProvider)
+          .routerDelegate
+          .navigatorKey
+          .currentState;
+      if (navigator == null) return null;
+      Route<Object?>? top;
+      // 导航器不公开栈顶路由；谓词首次返回 true 时 popUntil 即停止，不弹出
+      // 任何路由。
+      navigator.popUntil((route) {
+        top = route;
+        return true;
+      });
+      final panel = top;
+      if (panel is! PopupRoute<Object?>) return navigator;
+      await panel.popped;
+    }
+    return null;
   }
 
   Future<void> _restoreIdentity() async {

@@ -32,6 +32,9 @@ import 'package:alisten/features/search/index.dart';
 import 'package:alisten/features/settings/data/local_settings_store.dart';
 import 'package:alisten/features/settings/data/platform_system_settings.dart';
 import 'package:alisten/features/settings/index.dart';
+import 'package:alisten/features/update/data/platform_release_opener.dart';
+import 'package:alisten/features/update/data/preferences_update_store.dart';
+import 'package:alisten/features/update/index.dart';
 import 'package:alisten/main.dart' as entrypoint;
 import 'package:alisten/shared/ui/avatar_images.dart';
 import 'package:alisten/shared/ui/cover_images.dart';
@@ -48,6 +51,7 @@ import 'app/app_test_harness.dart';
 import 'features/lobby/lobby_test_doubles.dart';
 import 'features/playback/playback_test_doubles.dart' show FakeAudioEngine;
 import 'features/server/server_test_doubles.dart' show FakeServerProbe;
+import 'features/update/update_test_doubles.dart';
 
 void main() {
   testWidgets('a cold start opens the lobby under its title', (tester) async {
@@ -115,6 +119,7 @@ void main() {
     final api = FakeAlistenApi();
     final credentials = FakeCredentialStore();
     final links = FakeAppLinkSource();
+    final releases = FakeReleaseSource();
     await entrypoint.main(
       startAudio: () async => engine,
       api: api,
@@ -122,6 +127,7 @@ void main() {
       connectivityStatus: const Stream<List<ConnectivityResult>>.empty(),
       appLinks: links,
       serverProbe: FakeServerProbe(),
+      releaseSource: releases,
     );
     await tester.pump();
 
@@ -208,6 +214,10 @@ void main() {
           .resolve('https://a'),
       AvatarImage('https://a', avatars),
     );
+    expect(container.read(releaseSourceProvider), same(releases));
+    expect(container.read(releaseOpenerProvider), isA<PlatformReleaseOpener>());
+    expect(container.read(updateStoreProvider), isA<PreferencesUpdateStore>());
+    expect(releases.calls, 1);
     // 内置字体和 gal 带入的 commons-imaging 的许可证须随应用列出。
     final licenses = await tester.runAsync(
       () => LicenseRegistry.licenses.toList(),
@@ -236,6 +246,7 @@ void main() {
       connectivityStatus: const Stream<List<ConnectivityResult>>.empty(),
       appLinks: FakeAppLinkSource(),
       serverProbe: FakeServerProbe(),
+      releaseSource: FakeReleaseSource(),
     );
     await tester.pump();
 
@@ -266,6 +277,7 @@ void main() {
       connectivityStatus: const Stream<List<ConnectivityResult>>.empty(),
       appLinks: FakeAppLinkSource(),
       serverProbe: FakeServerProbe(),
+      releaseSource: FakeReleaseSource(),
     );
     await tester.pump();
 

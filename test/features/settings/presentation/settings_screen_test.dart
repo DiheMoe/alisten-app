@@ -11,11 +11,14 @@ import 'package:alisten/core/protocol/protocol.gen.dart' show protocolVersion;
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/settings/index.dart';
+import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
+import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +32,7 @@ import '../../../app/app_test_harness.dart';
 import '../../../core/avatar/avatar_test_doubles.dart';
 import '../../../core/cache/cover_cache_test_doubles.dart';
 import '../../lobby/lobby_test_doubles.dart';
+import '../../update/update_test_doubles.dart';
 import '../settings_test_doubles.dart';
 
 Finder _field(String label) => find.descendant(
@@ -45,6 +49,8 @@ Future<void> _openSettings(
   FakeSystemSettings? systemSettings,
   FakeCoverCache? coverCache,
   FakeAvatarCache? avatarCache,
+  FakeReleaseSource? releases,
+  Map<String, Object> preferences = const {},
 }) async {
   tester.view
     ..physicalSize = const Size(360, 780) * 3
@@ -59,6 +65,8 @@ Future<void> _openSettings(
     systemSettings: systemSettings,
     coverCache: coverCache,
     avatarCache: avatarCache,
+    releases: releases,
+    preferences: preferences,
   );
   appContainer(tester).read(routerProvider).go('/settings');
   await tester.pumpAndSettle();
@@ -441,6 +449,97 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(LicensesScreen), findsNothing);
       expect(find.text('开源许可'), findsOneWidget);
+    });
+  });
+
+  group('checking for updates from the about section', () {
+    // 启动时的自动检查已用掉一次请求，之后都是手动检查。
+    Future<FakeReleaseSource> openAbout(
+      WidgetTester tester, {
+      Map<String, Object> preferences = const {},
+    }) async {
+      final releases = FakeReleaseSource();
+      await _openSettings(tester, releases: releases, preferences: preferences);
+      await _show(tester, find.text('检查更新'));
+      expect(find.text('协议版本'), findsOneWidget);
+      return releases;
+    }
+
+    Finder toastIcon(IconData icon) => find.descendant(
+      of: find.byType(ToastHost),
+      matching: find.byIcon(icon),
+    );
+
+    testWidgets('says the app is up to date', (tester) async {
+      final releases = await openAbout(tester);
+      final launchCalls = releases.calls;
+
+      await tester.tap(find.text('检查更新'));
+      await tester.pumpAndSettle();
+
+      expect(releases.calls, launchCalls + 1);
+      expect(find.text('已是最新版本'), findsOneWidget);
+      expect(find.textContaining('发现新版本'), findsNothing);
+    });
+
+    testWidgets('shows the panel of a newer version, even one skipped '
+        'before', (tester) async {
+      final releases = await openAbout(
+        tester,
+        preferences: {'alisten.update.skipped-version': '9.0.0'},
+      );
+      releases.release = testRelease(tag: 'v9.0.0');
+
+      await tester.tap(find.text('检查更新'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('发现新版本 9.0.0'), findsOneWidget);
+      expect(find.text('已是最新版本'), findsNothing);
+    });
+
+    testWidgets('that fails says so as a failure', (tester) async {
+      final releases = await openAbout(tester);
+      releases.error = const ReleaseUnavailable();
+
+      await tester.tap(find.text('检查更新'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('检查更新失败，请稍后再试。'), findsOneWidget);
+      expect(toastIcon(Icons.error_rounded), findsOneWidget);
+    });
+
+    testWidgets('shows the check in progress and cannot be started again '
+        'meanwhile', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final releases = await openAbout(tester);
+      final launchCalls = releases.calls;
+      final holding = releases.holding = Completer<void>();
+
+      await tester.tap(find.text('检查更新'));
+      await tester.pump();
+      expect(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('检查更新'),
+            matching: find.byType(Pressable),
+          ),
+          matching: find.byType(BusyIndicator),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSemantics(find.text('检查更新')),
+        isSemantics(value: busySemanticValue),
+      );
+      await tester.tap(find.text('检查更新'), warnIfMissed: false);
+      await tester.pump();
+      expect(releases.calls, launchCalls + 1);
+
+      holding.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('已是最新版本'), findsOneWidget);
+      expect(find.byType(BusyIndicator), findsNothing);
+      semantics.dispose();
     });
   });
 

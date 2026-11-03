@@ -1,4 +1,5 @@
 import 'package:alisten/app/app.dart';
+import 'package:alisten/app/app_version.dart';
 import 'package:alisten/app/deep_link_controller.dart';
 import 'package:alisten/app/third_party_http.dart';
 import 'package:alisten/core/api/alisten_api.dart';
@@ -12,6 +13,7 @@ import 'package:alisten/core/cache/disk_cover_cache.dart';
 import 'package:alisten/core/realtime/connectivity.dart';
 import 'package:alisten/core/realtime/websocket_room_transport.dart';
 import 'package:alisten/core/storage/preferences.dart';
+import 'package:alisten/domain/release/release_version.dart';
 import 'package:alisten/features/admin/data/dio_qr_image_loader.dart';
 import 'package:alisten/features/admin/data/gal_image_gallery.dart';
 import 'package:alisten/features/admin/data/platform_sensitive_clipboard.dart';
@@ -39,6 +41,10 @@ import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/data/local_settings_store.dart';
 import 'package:alisten/features/settings/data/platform_system_settings.dart';
 import 'package:alisten/features/settings/index.dart';
+import 'package:alisten/features/update/data/github_release_source.dart';
+import 'package:alisten/features/update/data/platform_release_opener.dart';
+import 'package:alisten/features/update/data/preferences_update_store.dart';
+import 'package:alisten/features/update/index.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -170,6 +176,13 @@ List<Override> alistenWiring(
         ]);
       };
     }),
+    updateStoreProvider.overrideWith(
+      (ref) => PreferencesUpdateStore(ref.watch(sharedPreferencesProvider)),
+    ),
+    // 版本号的格式由 app_version_test 保证。
+    installedVersionProvider.overrideWithValue(
+      ReleaseVersion.fromAppVersion(appVersion)!,
+    ),
   ];
 }
 
@@ -208,6 +221,7 @@ List<Override> platformAdapters({
   Stream<List<ConnectivityResult>>? connectivityStatus,
   AppLinkSource? appLinks,
   ServerProbe? serverProbe,
+  ReleaseSource? releaseSource,
 }) {
   return [
     audioEngineProvider.overrideWithValue(audioEngine),
@@ -289,6 +303,14 @@ List<Override> platformAdapters({
       ref.onDispose(() => dio.close(force: true));
       return DiskAvatarCache(AvatarLoader(dio));
     }),
+    // 请求发往 GitHub，不能用带当前服务器 baseUrl 和成员凭据的 API Dio。
+    releaseSourceProvider.overrideWith((ref) {
+      if (releaseSource != null) return releaseSource;
+      final dio = newThirdPartyDio();
+      ref.onDispose(() => dio.close(force: true));
+      return GitHubReleaseSource(dio);
+    }),
+    releaseOpenerProvider.overrideWithValue(PlatformReleaseOpener()),
   ];
 }
 
