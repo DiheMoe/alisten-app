@@ -169,11 +169,28 @@ void main() {
     router.go('/r/$testRoomId');
     await settle();
 
-    await tester.tap(find.bySemanticsLabel('邀请'));
+    await tester.tap(find.bySemanticsLabel('更多'));
+    await settle();
+    await tester.tap(find.text('复制邀请链接'));
     await settle();
 
     expect(copied, 'https://$host/r/listen');
     expect(find.text('邀请链接已复制'), findsOneWidget);
+    expect(find.text('复制邀请链接'), findsNothing, reason: 'the menu closes');
+  });
+
+  testWidgets('inviting lives in the more menu, above leaving the room', (
+    tester,
+  ) async {
+    final (rooms: _, router: _, :settle) = await _enterRoom(tester);
+    expect(find.bySemanticsLabel('邀请'), findsNothing);
+
+    await tester.tap(find.bySemanticsLabel('更多'));
+    await settle();
+
+    final invite = tester.getRect(find.text('复制邀请链接'));
+    final leave = tester.getRect(find.text('退出房间'));
+    expect(invite.bottom, lessThanOrEqualTo(leave.top));
   });
 
   testWidgets('the room fits a phone at twice the text size', (tester) async {
