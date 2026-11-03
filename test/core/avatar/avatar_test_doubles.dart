@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:alisten/core/avatar/avatar_cache.dart';
 import 'package:dio/dio.dart';
 
 const gravatar = 'www.gravatar.com';
@@ -19,6 +20,12 @@ final class AvatarServer implements HttpClientAdapter {
   final requests = <String>[];
   int cancelled = 0;
 
+  Future<void>? responding;
+
+  final _requested = Completer<void>();
+
+  Future<void> get requested => _requested.future;
+
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
@@ -27,8 +34,10 @@ final class AvatarServer implements HttpClientAdapter {
   ) async {
     final host = options.uri.host;
     requests.add(host);
+    if (!_requested.isCompleted) _requested.complete();
     unawaited(cancelFuture?.then((_) => cancelled++));
     if (hanging.contains(host)) return Completer<ResponseBody>().future;
+    await responding;
     final avatar = avatars[host];
     if (avatar != null) return ResponseBody.fromBytes(avatar, 200);
     if (missing.contains(host)) return ResponseBody.fromString('', 404);
@@ -37,4 +46,30 @@ final class AvatarServer implements HttpClientAdapter {
 
   @override
   void close({bool force = false}) {}
+}
+
+final class FakeAvatarCache implements AvatarCache {
+  FakeAvatarCache({this.bytes = 0});
+
+  int bytes;
+  int clears = 0;
+
+  Exception? clearError;
+
+  @override
+  Future<Uint8List?> load(String url) async => null;
+
+  @override
+  Future<void> discard(String url) async {}
+
+  @override
+  Future<int> size() async => bytes;
+
+  @override
+  Future<void> clear() async {
+    clears++;
+    final error = clearError;
+    if (error != null) throw error;
+    bytes = 0;
+  }
 }

@@ -9,7 +9,9 @@ import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/api/credential_store.dart';
-import 'package:alisten/core/avatar/avatar_loader.dart';
+import 'package:alisten/core/avatar/avatar_cache.dart';
+import 'package:alisten/core/avatar/avatar_image.dart';
+import 'package:alisten/core/avatar/disk_avatar_cache.dart';
 import 'package:alisten/core/cache/cached_cover_image.dart';
 import 'package:alisten/core/cache/cover_cache.dart';
 import 'package:alisten/core/cache/disk_cover_cache.dart';
@@ -39,6 +41,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/api/fake_http_adapter.dart';
+import '../core/avatar/avatar_test_doubles.dart';
 import '../core/cache/cover_cache_test_doubles.dart';
 import '../core/realtime/fake_web_socket_channel.dart';
 import '../features/admin/admin_test_doubles.dart';
@@ -83,7 +86,7 @@ void main() {
       isA<WebSocketRoomTransport>(),
     );
     expect(container.read(coverCacheProvider), isA<DiskCoverCache>());
-    expect(container.read(avatarLoaderProvider), isA<AvatarLoader>());
+    expect(container.read(avatarCacheProvider), isA<DiskAvatarCache>());
     expect(
       container.read(historyExporterProvider),
       isA<ShareHistoryExporter>(),
@@ -480,17 +483,51 @@ void main() {
     expect(() => container.read(historyExporterProvider), throwsA(anything));
   });
 
-  test('the storage settings measure and clear the cover cache', () async {
-    final cache = FakeCoverCache(bytes: 4096);
+  test('the storage settings measure and clear covers and avatars '
+      'together', () async {
+    final covers = FakeCoverCache(bytes: 4096);
+    final avatars = FakeAvatarCache(bytes: 1024);
     final container = await wired({}, [
-      coverCacheProvider.overrideWithValue(cache),
+      coverCacheProvider.overrideWithValue(covers),
+      avatarCacheProvider.overrideWithValue(avatars),
     ]);
 
-    expect(await container.read(coverCacheSizeProvider)(), 4096);
-    await container.read(clearCoverCacheProvider)();
+    expect(await container.read(imageCacheSizeProvider)(), 5120);
+    await container.read(clearImageCacheProvider)();
 
-    expect(cache.clears, 1);
-    expect(await container.read(coverCacheSizeProvider)(), 0);
+    expect(covers.clears, 1);
+    expect(avatars.clears, 1);
+    expect(await container.read(imageCacheSizeProvider)(), 0);
+  });
+
+  test('avatars are cleared even when covers cannot be, and clearing '
+      'fails', () async {
+    final covers = FakeCoverCache(bytes: 4096)
+      ..clearError = const FileSystemException('busy');
+    final avatars = FakeAvatarCache(bytes: 1024);
+    final container = await wired({}, [
+      coverCacheProvider.overrideWithValue(covers),
+      avatarCacheProvider.overrideWithValue(avatars),
+    ]);
+
+    await expectLater(
+      container.read(clearImageCacheProvider)(),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(avatars.clears, 1);
+    expect(await container.read(imageCacheSizeProvider)(), 4096);
+  });
+
+  test('avatar images come from the avatar cache', () async {
+    final cache = FakeAvatarCache();
+    final container = await wired({}, [
+      avatarCacheProvider.overrideWithValue(cache),
+    ]);
+
+    expect(
+      container.read(avatarImageSourceProvider)('https://avatar/a'),
+      AvatarImage('https://avatar/a', cache),
+    );
   });
 
   test('cover images come from the cover cache', () async {

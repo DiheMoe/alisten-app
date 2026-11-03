@@ -93,7 +93,7 @@ final class AlistenAudioHandler extends BaseAudioHandler {
   }
 
   // 只给系统媒体控件本地封面文件：给网络地址时 audio_service 会用自带缓存另行
-  // 下载，不计入也无法清理设置里的封面缓存。
+  // 下载，不计入也无法清理设置里的图片缓存。
   Future<void> _showCover(int load, Future<Uri?> Function() coverFile) async {
     final file = await coverFile();
     final item = mediaItem.value;

@@ -3,11 +3,6 @@ import 'dart:typed_data';
 
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-final avatarLoaderProvider = Provider<AvatarLoader>((ref) {
-  throw UnimplementedError('avatarLoader 未注入');
-});
 
 const _logSource = 'avatars';
 

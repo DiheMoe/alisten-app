@@ -6,8 +6,9 @@ import 'package:alisten/app/deep_link_controller.dart';
 import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/api/credential_store.dart';
+import 'package:alisten/core/avatar/avatar_cache.dart';
 import 'package:alisten/core/avatar/avatar_image.dart';
-import 'package:alisten/core/avatar/avatar_loader.dart';
+import 'package:alisten/core/avatar/disk_avatar_cache.dart';
 import 'package:alisten/core/cache/cached_cover_image.dart';
 import 'package:alisten/core/cache/cover_cache.dart';
 import 'package:alisten/core/cache/disk_cover_cache.dart';
@@ -183,12 +184,14 @@ void main() {
     expect(container.read(appLinkSourceProvider), same(links));
     final covers = container.read(coverCacheProvider);
     expect(covers, isA<DiskCoverCache>());
+    final avatars = container.read(avatarCacheProvider);
+    expect(avatars, isA<DiskAvatarCache>());
     expect(
-      container.read(coverCacheSizeProvider),
+      container.read(imageCacheSizeProvider),
       isA<Future<int> Function()>(),
     );
     expect(
-      container.read(clearCoverCacheProvider),
+      container.read(clearImageCacheProvider),
       isA<Future<void> Function()>(),
     );
     // 每一页的封面都经同一个缓存读取。
@@ -196,12 +199,12 @@ void main() {
       tester.widget<CoverImages>(find.byType(CoverImages)).resolve('https://c'),
       CachedCoverImage('https://c', covers),
     );
-    // 每个头像都经同一个下载器，它记住的可用站点才对所有头像生效。
+    // 每个头像都经同一个缓存和其中的下载器，它记住的可用站点才对所有头像生效。
     expect(
       tester
           .widget<AvatarImages>(find.byType(AvatarImages))
           .resolve('https://a'),
-      AvatarImage('https://a', container.read(avatarLoaderProvider)),
+      AvatarImage('https://a', avatars),
     );
     // 内置字体和 gal 带入的 commons-imaging 的许可证须随应用列出。
     final licenses = await tester.runAsync(

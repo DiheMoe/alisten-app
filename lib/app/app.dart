@@ -7,8 +7,8 @@ import 'package:alisten/app/invite_confirm_sheet.dart';
 import 'package:alisten/app/router.dart';
 import 'package:alisten/app/share_confirm_sheet.dart';
 import 'package:alisten/core/api/api_error.dart';
+import 'package:alisten/core/avatar/avatar_cache.dart';
 import 'package:alisten/core/avatar/avatar_image.dart';
-import 'package:alisten/core/avatar/avatar_loader.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/history/index.dart';
@@ -36,8 +36,8 @@ final reminderNotifierProvider = Provider<ReminderNotifier>((ref) {
 final avatarImageSourceProvider = Provider<ImageProvider Function(String url)>((
   ref,
 ) {
-  final loader = ref.watch(avatarLoaderProvider);
-  return (url) => AvatarImage(url, loader);
+  final cache = ref.watch(avatarCacheProvider);
+  return (url) => AvatarImage(url, cache);
 });
 
 final class AlistenApp extends ConsumerStatefulWidget {

@@ -26,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/app_test_harness.dart';
+import '../../../core/avatar/avatar_test_doubles.dart';
 import '../../../core/cache/cover_cache_test_doubles.dart';
 import '../../lobby/lobby_test_doubles.dart';
 import '../settings_test_doubles.dart';
@@ -43,6 +44,7 @@ Future<void> _openSettings(
   FakeNotificationGateway? notifications,
   FakeSystemSettings? systemSettings,
   FakeCoverCache? coverCache,
+  FakeAvatarCache? avatarCache,
 }) async {
   tester.view
     ..physicalSize = const Size(360, 780) * 3
@@ -56,6 +58,7 @@ Future<void> _openSettings(
     notifications: notifications,
     systemSettings: systemSettings,
     coverCache: coverCache,
+    avatarCache: avatarCache,
   );
   appContainer(tester).read(routerProvider).go('/settings');
   await tester.pumpAndSettle();
@@ -328,17 +331,19 @@ void main() {
   });
 
   testWidgets('the storage settings, between privacy and about, show how much '
-      'the cover cache takes', (tester) async {
+      'covers and avatars take together', (tester) async {
     await _openSettings(
       tester,
-      coverCache: FakeCoverCache(bytes: (23.4 * 1024 * 1024).round()),
+      coverCache: FakeCoverCache(bytes: (21.4 * 1024 * 1024).round()),
+      avatarCache: FakeAvatarCache(bytes: 2 * 1024 * 1024),
     );
     await _show(tester, find.text('版本'));
 
     expect(find.text('23.4 MB'), findsOneWidget);
+    expect(find.text('封面缓存'), findsNothing);
     double top(String text) => tester.getTopLeft(find.text(text)).dy;
     expect(top('存储'), greaterThan(top('记录播放历史')));
-    expect(top('存储'), lessThan(top('封面缓存')));
+    expect(top('存储'), lessThan(top('图片缓存')));
     expect(top('清除缓存'), lessThan(top('关于')));
   });
 
@@ -439,7 +444,7 @@ void main() {
     });
   });
 
-  testWidgets('the cover cache size shows a placeholder until it is '
+  testWidgets('the image cache size shows a placeholder until it is '
       'measured', (tester) async {
     final measuring = Completer<void>();
     await _openSettings(
@@ -457,7 +462,7 @@ void main() {
     expect(find.text('0.1 MB'), findsOneWidget);
   });
 
-  testWidgets('a cover cache size that cannot be measured says so', (
+  testWidgets('an image cache size that cannot be measured says so', (
     tester,
   ) async {
     final measuring = Completer<void>();
@@ -474,13 +479,14 @@ void main() {
     expect(find.text('无法计算'), findsOneWidget);
   });
 
-  testWidgets('clearing the cover cache empties it once and shows it '
-      'empty', (tester) async {
+  testWidgets('clearing the image cache empties covers and avatars once and '
+      'shows it empty', (tester) async {
     final clearing = Completer<void>();
     final cache = FakeCoverCache(bytes: 5 * 1024 * 1024)..clearing = clearing;
-    await _openSettings(tester, coverCache: cache);
+    final avatars = FakeAvatarCache(bytes: 1024 * 1024);
+    await _openSettings(tester, coverCache: cache, avatarCache: avatars);
     await _show(tester, find.text('清除缓存'));
-    expect(find.text('5.0 MB'), findsOneWidget);
+    expect(find.text('6.0 MB'), findsOneWidget);
     PillButton clear() =>
         tester.widget<PillButton>(find.widgetWithText(PillButton, '清除缓存'));
 
@@ -494,9 +500,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(cache.clears, 1);
+    expect(avatars.clears, 1);
     expect(find.text('0 MB'), findsOneWidget);
     expect(clear().busy, isFalse);
-    expect(find.text('已清除封面缓存'), findsOneWidget);
+    expect(find.text('已清除图片缓存'), findsOneWidget);
     expect(
       find.descendant(
         of: find.byType(ToastHost),
@@ -506,19 +513,20 @@ void main() {
     );
   });
 
-  testWidgets('a cover cache that cannot be cleared says so as a failure', (
-    tester,
-  ) async {
+  testWidgets('an image cache that cannot be cleared says so as a failure, '
+      'and still clears what it can', (tester) async {
     final cache = FakeCoverCache(bytes: 5 * 1024 * 1024)
       ..clearError = const FileSystemException('busy');
-    await _openSettings(tester, coverCache: cache);
+    final avatars = FakeAvatarCache(bytes: 1024 * 1024);
+    await _openSettings(tester, coverCache: cache, avatarCache: avatars);
     await _show(tester, find.text('清除缓存'));
 
     await tester.tap(find.text('清除缓存'));
     await tester.pumpAndSettle();
 
     expect(cache.clears, 1);
-    expect(find.textContaining('没能清除封面缓存'), findsOneWidget);
+    expect(avatars.clears, 1);
+    expect(find.text('没能清除图片缓存，请稍后再试。'), findsOneWidget);
     expect(
       find.descendant(
         of: find.byType(ToastHost),
@@ -527,7 +535,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('5.0 MB'), findsOneWidget);
-    expect(find.text('已清除封面缓存'), findsNothing);
+    expect(find.text('已清除图片缓存'), findsNothing);
   });
 
   testWidgets('a profile that could not be loaded at startup is loaded by '

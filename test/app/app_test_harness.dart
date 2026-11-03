@@ -7,7 +7,7 @@ import 'package:alisten/app/router.dart';
 import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/api/credential_store.dart';
-import 'package:alisten/core/avatar/avatar_loader.dart';
+import 'package:alisten/core/avatar/avatar_cache.dart';
 import 'package:alisten/core/cache/cover_cache.dart';
 import 'package:alisten/core/realtime/connectivity.dart';
 import 'package:alisten/domain/room/room.dart';
@@ -28,6 +28,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/avatar/avatar_test_doubles.dart';
 import '../core/cache/cover_cache_test_doubles.dart';
 import '../domain/room/room_fixtures.dart';
 import '../features/admin/admin_test_doubles.dart';
@@ -55,6 +56,7 @@ Future<List<Override>> alistenAppOverrides({
   FakeClipboardSource? clipboard,
   FakeSystemSettings? systemSettings,
   FakeCoverCache? coverCache,
+  FakeAvatarCache? avatarCache,
   FakeHistoryExporter? exporter,
   FakeServerProbe? probe,
   FakeAdminApi? admin,
@@ -102,9 +104,7 @@ Future<List<Override>> alistenAppOverrides({
       DioLinkResolver(Dio()..httpClientAdapter = FakeUrlHttpAdapter()),
     ),
     coverCacheProvider.overrideWithValue(coverCache ?? FakeCoverCache()),
-    avatarLoaderProvider.overrideWithValue(
-      AvatarLoader(Dio()..httpClientAdapter = FakeUrlHttpAdapter()),
-    ),
+    avatarCacheProvider.overrideWithValue(avatarCache ?? FakeAvatarCache()),
     historyExporterProvider.overrideWithValue(
       exporter ?? FakeHistoryExporter(),
     ),
@@ -133,6 +133,7 @@ Future<void> pumpAlistenApp(
   FakeClipboardSource? clipboard,
   FakeSystemSettings? systemSettings,
   FakeCoverCache? coverCache,
+  FakeAvatarCache? avatarCache,
   FakeHistoryExporter? exporter,
   FakeServerProbe? probe,
   FakeAdminApi? admin,
@@ -157,6 +158,7 @@ Future<void> pumpAlistenApp(
           clipboard: clipboard,
           systemSettings: systemSettings,
           coverCache: coverCache,
+          avatarCache: avatarCache,
           exporter: exporter,
           probe: probe,
           admin: admin,

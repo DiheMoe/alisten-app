@@ -5,7 +5,7 @@ import 'package:alisten/domain/history/search_record.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/mutation/mutation_result.dart';
 import 'package:alisten/features/identity/index.dart';
-import 'package:alisten/features/settings/application/cover_cache.dart';
+import 'package:alisten/features/settings/application/image_cache.dart';
 import 'package:alisten/features/settings/application/settings_controller.dart';
 import 'package:alisten/features/settings/application/settings_state.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
@@ -89,7 +89,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final TextEditingController _nickname;
   late final TextEditingController _email;
   bool _saving = false;
-  bool _clearingCovers = false;
+  bool _clearingImages = false;
 
   SettingsController get _settings =>
       ref.read(settingsControllerProvider.notifier);
@@ -148,16 +148,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   // 离开设置页后仍要提示结果。
-  Future<void> _clearCoverCache() async {
-    setState(() => _clearingCovers = true);
+  Future<void> _clearImageCache() async {
+    setState(() => _clearingImages = true);
     final cleared = await ref
-        .read(coverCacheControllerProvider.notifier)
+        .read(imageCacheControllerProvider.notifier)
         .clear();
-    if (mounted) setState(() => _clearingCovers = false);
+    if (mounted) setState(() => _clearingImages = false);
     if (cleared) {
-      widget.onNotice(ToastKind.success, '已清除封面缓存');
+      widget.onNotice(ToastKind.success, '已清除图片缓存');
     } else {
-      widget.onNotice(ToastKind.failure, '没能清除封面缓存，请稍后再试。');
+      widget.onNotice(ToastKind.failure, '没能清除图片缓存，请稍后再试。');
     }
   }
 
@@ -293,10 +293,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _Group(
             title: '存储',
             children: [
-              _CoverCache(
-                size: ref.watch(coverCacheControllerProvider),
-                clearing: _clearingCovers,
-                onClear: () => unawaited(_clearCoverCache()),
+              _ImageCache(
+                size: ref.watch(imageCacheControllerProvider),
+                clearing: _clearingImages,
+                onClear: () => unawaited(_clearImageCache()),
               ),
             ],
           ),
@@ -606,8 +606,8 @@ class _LinkRow extends StatelessWidget {
   }
 }
 
-class _CoverCache extends StatelessWidget {
-  const _CoverCache({
+class _ImageCache extends StatelessWidget {
+  const _ImageCache({
     required this.size,
     required this.clearing,
     required this.onClear,
@@ -638,7 +638,7 @@ class _CoverCache extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _RowTitle('封面缓存'),
+                  const _RowTitle('图片缓存'),
                   const SizedBox(height: AlistenSpacing.xxs / 2),
                   Text(
                     text,

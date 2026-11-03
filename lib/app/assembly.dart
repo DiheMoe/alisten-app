@@ -4,7 +4,9 @@ import 'package:alisten/app/third_party_http.dart';
 import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/api/credential_store.dart';
+import 'package:alisten/core/avatar/avatar_cache.dart';
 import 'package:alisten/core/avatar/avatar_loader.dart';
+import 'package:alisten/core/avatar/disk_avatar_cache.dart';
 import 'package:alisten/core/cache/cover_cache.dart';
 import 'package:alisten/core/cache/disk_cover_cache.dart';
 import 'package:alisten/core/realtime/connectivity.dart';
@@ -141,11 +143,23 @@ List<Override> alistenWiring(
         await ref.read(searchHistoryStoreProvider).truncate(limit);
       };
     }),
-    coverCacheSizeProvider.overrideWith((ref) {
-      return () => ref.read(coverCacheProvider).size();
+    imageCacheSizeProvider.overrideWith((ref) {
+      return () async {
+        final sizes = await Future.wait([
+          ref.read(coverCacheProvider).size(),
+          ref.read(avatarCacheProvider).size(),
+        ]);
+        return sizes.fold<int>(0, (total, size) => total + size);
+      };
     }),
-    clearCoverCacheProvider.overrideWith((ref) {
-      return () => ref.read(coverCacheProvider).clear();
+    // 一类清除失败时另一类照样清除，再报告失败。
+    clearImageCacheProvider.overrideWith((ref) {
+      return () async {
+        await Future.wait([
+          ref.read(coverCacheProvider).clear(),
+          ref.read(avatarCacheProvider).clear(),
+        ]);
+      };
     }),
   ];
 }
@@ -259,10 +273,10 @@ List<Override> platformAdapters({
       ref.onDispose(() => dio.close(force: true));
       return DiskCoverCache(dio);
     }),
-    avatarLoaderProvider.overrideWith((ref) {
+    avatarCacheProvider.overrideWith((ref) {
       final dio = newThirdPartyDio();
       ref.onDispose(() => dio.close(force: true));
-      return AvatarLoader(dio);
+      return DiskAvatarCache(AvatarLoader(dio));
     }),
   ];
 }
