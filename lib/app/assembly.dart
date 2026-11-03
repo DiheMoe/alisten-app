@@ -21,6 +21,7 @@ import 'package:alisten/features/history/data/local_history_store.dart';
 import 'package:alisten/features/history/data/share_history_exporter.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/identity/index.dart';
+import 'package:alisten/features/lobby/index.dart';
 import 'package:alisten/features/playback/data/reminder_notifier.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/room/data/preferences_last_room_store.dart';
@@ -133,6 +134,14 @@ List<Override> alistenWiring(
     notificationAccessProvider.overrideWith(
       (ref) => ref.watch(reminderNotifierProvider),
     ),
+    lobbyBrandProvider.overrideWith(
+      (ref) => ref.watch(
+        currentServerProvider.select((server) => server.displayName),
+      ),
+    ),
+    refreshLobbyBrandProvider.overrideWith(
+      (ref) => ref.read(serverDirectoryProvider.notifier).refreshCurrentBrand,
+    ),
     clearLocalEmailProvider.overrideWith((ref) {
       return () async {
         await ref.read(settingsStoreProvider).clearEmail();
@@ -198,6 +207,7 @@ List<Override> platformAdapters({
   WebSocketChannelFactory? roomChannels,
   Stream<List<ConnectivityResult>>? connectivityStatus,
   AppLinkSource? appLinks,
+  ServerProbe? serverProbe,
 }) {
   return [
     audioEngineProvider.overrideWithValue(audioEngine),
@@ -238,6 +248,7 @@ List<Override> platformAdapters({
       );
     }),
     serverProbeProvider.overrideWith((ref) {
+      if (serverProbe != null) return serverProbe;
       // 探测的是用户输入的服务器，不能用带当前服务器 baseUrl 的 API Dio。
       final dio = Dio();
       ref.onDispose(() => dio.close(force: true));

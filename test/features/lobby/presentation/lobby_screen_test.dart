@@ -33,6 +33,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../app/app_test_harness.dart';
+import '../../server/server_test_doubles.dart';
 import '../../../core/avatar/avatar_test_doubles.dart';
 import '../../../domain/room/room_fixtures.dart';
 import '../../room/room_test_doubles.dart';
@@ -97,6 +98,8 @@ final class _Lobby {
         roomTransportFactoryProvider.overrideWithValue(rooms.call),
         ...roomDeviceOverrides(),
         clearLocalEmailProvider.overrideWithValue(() async {}),
+        lobbyBrandProvider.overrideWithValue('Alisten'),
+        refreshLobbyBrandProvider.overrideWithValue(() async {}),
         ...overrides,
       ],
     );
@@ -936,6 +939,49 @@ void main() {
 
     expect(lobby.opened, isEmpty);
     expect(lobby.notices.map((notice) => notice.$1), [ToastKind.warning]);
+  });
+
+  group('the title', () {
+    Future<FakeServerProbe> open(WidgetTester tester, String brand) async {
+      tester.view
+        ..physicalSize = const Size(360, 780) * 3
+        ..devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      final probe = FakeServerProbe()
+        ..brands['https://livehouse.dihe.moe'] = brand;
+      await pumpAlistenApp(
+        tester,
+        api: FakeAlistenApi()..rooms = [roomListing()],
+        probe: probe,
+      );
+      await tester.pumpAndSettle();
+      return probe;
+    }
+
+    testWidgets('is the brand name of the current server, asked for when '
+        'the lobby opens, above the tagline', (tester) async {
+      final probe = await open(tester, '大猫听歌房');
+
+      expect(find.text('大猫听歌房'), findsOneWidget);
+      expect(find.text('Alisten'), findsNothing);
+      expect(find.text('音乐是最先诞生在这世界上的魔法'), findsOneWidget);
+      expect(probe.brandRequests, ['https://livehouse.dihe.moe']);
+    });
+
+    testWidgets('a long brand name stays on one line', (tester) async {
+      final long = '大猫听歌房' * 10;
+      await open(tester, long);
+
+      final title = tester.getRect(find.text(long));
+      expect(
+        title.height,
+        AlistenTypography.lineHeight(
+          AlistenTypography.largeTitle,
+          TextScaler.noScaling,
+        ),
+      );
+      expect(title.right, lessThanOrEqualTo(360 - AlistenSpacing.page));
+    });
   });
 
   group('the settings button', () {

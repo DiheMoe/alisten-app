@@ -165,15 +165,20 @@ final class ServerDirectory extends Notifier<ServerDirectoryState> {
   }
 
   /// 并发获取各服务器的品牌名，取不到的保持原名。不抛出。
-  Future<void> refreshBrands() async {
+  Future<void> refreshBrands() => _refreshBrands(state.profiles);
+
+  /// 只获取当前服务器的品牌名，规则同 [refreshBrands]。
+  Future<void> refreshCurrentBrand() => _refreshBrands([state.current]);
+
+  Future<void> _refreshBrands(List<ServerProfile> profiles) async {
     try {
       final probe = ref.read(serverProbeProvider);
       final asked = {
-        for (final profile in state.profiles) profile.id: profile.brandName,
+        for (final profile in profiles) profile.id: profile.brandName,
       };
       final fetched = Map.fromEntries(
         await Future.wait([
-          for (final profile in state.profiles)
+          for (final profile in profiles)
             probe
                 .fetchBrandName(profile.origin)
                 .then((name) => MapEntry(profile.id, name)),

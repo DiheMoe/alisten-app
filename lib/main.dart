@@ -11,6 +11,7 @@ import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/features/playback/data/alisten_audio_handler.dart';
 import 'package:alisten/features/playback/data/unavailable_audio_engine.dart';
 import 'package:alisten/features/playback/index.dart';
+import 'package:alisten/features/server/index.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +24,7 @@ Future<void> main({
   CredentialStore Function(String serverId)? credentialStores,
   Stream<List<ConnectivityResult>>? connectivityStatus,
   AppLinkSource? appLinks,
+  ServerProbe? serverProbe,
 }) async {
   WidgetsFlutterBinding.ensureInitialized();
   registerBundledLicenses();
@@ -42,6 +44,7 @@ Future<void> main({
           credentialStores: credentialStores,
           connectivityStatus: connectivityStatus,
           appLinks: appLinks,
+          serverProbe: serverProbe,
         ),
       ],
       child: const AlistenApp(),

@@ -72,10 +72,14 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     // 构建期间不能改 provider 状态。
     unawaited(
       Future.microtask(() async {
-        if (mounted) await _lobby.load();
+        if (!mounted) return;
+        unawaited(_refreshBrand());
+        await _lobby.load();
       }),
     );
   }
+
+  Future<void> _refreshBrand() => ref.read(refreshLobbyBrandProvider)();
 
   @override
   void dispose() {
@@ -163,6 +167,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
 
   Future<void> _pullRefresh() async {
     setState(() => _pulling = true);
+    unawaited(_refreshBrand());
     try {
       await _lobby.load();
     } finally {
@@ -173,6 +178,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
   @override
   Widget build(BuildContext context) {
     final lobby = ref.watch(lobbyControllerProvider);
+    final brand = ref.watch(lobbyBrandProvider);
     final avatarUrl = ref.watch(
       identityControllerProvider.select(
         (state) => state.member?.avatarUrl(AlistenSizes.avatar),
@@ -199,6 +205,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                   SliverPersistentHeader(
                     pinned: true,
                     delegate: _LobbyHeader(
+                      title: brand,
                       topInset: MediaQuery.paddingOf(context).top,
                       scaler: MediaQuery.textScalerOf(context),
                       barExtent: PillButton.heightOf(context),
@@ -433,6 +440,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
 // 小标题与它同字号），大标题区按字号算。
 final class _LobbyHeader extends SliverPersistentHeaderDelegate {
   _LobbyHeader({
+    required this.title,
     required this.topInset,
     required TextScaler scaler,
     required double barExtent,
@@ -440,6 +448,7 @@ final class _LobbyHeader extends SliverPersistentHeaderDelegate {
   }) : barExtent = (barExtent + 2 * AlistenSpacing.xxs).ceilToDouble(),
        titleExtent = _titleExtent(scaler);
 
+  final String title;
   final double topInset;
   final double barExtent;
   final double titleExtent;
@@ -511,7 +520,7 @@ final class _LobbyHeader extends SliverPersistentHeaderDelegate {
                                 child: Opacity(
                                   opacity: small,
                                   child: Text(
-                                    'Alisten',
+                                    title,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: barTitle,
@@ -554,8 +563,9 @@ final class _LobbyHeader extends SliverPersistentHeaderDelegate {
                                 shaderCallback:
                                     colors.brandGradient.createShader,
                                 child: Text(
-                                  'Alisten',
+                                  title,
                                   maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: AlistenTypography.largeTitle.copyWith(
                                     color: colors.onGlass,
                                   ),

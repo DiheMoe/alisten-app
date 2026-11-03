@@ -47,6 +47,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app/app_test_harness.dart';
 import 'features/lobby/lobby_test_doubles.dart';
 import 'features/playback/playback_test_doubles.dart' show FakeAudioEngine;
+import 'features/server/server_test_doubles.dart' show FakeServerProbe;
 
 void main() {
   testWidgets('a cold start opens the lobby under its title', (tester) async {
@@ -120,6 +121,7 @@ void main() {
       credentialStores: (_) => credentials,
       connectivityStatus: const Stream<List<ConnectivityResult>>.empty(),
       appLinks: links,
+      serverProbe: FakeServerProbe(),
     );
     await tester.pump();
 
@@ -233,6 +235,7 @@ void main() {
       credentialStores: (_) => FakeCredentialStore(),
       connectivityStatus: const Stream<List<ConnectivityResult>>.empty(),
       appLinks: FakeAppLinkSource(),
+      serverProbe: FakeServerProbe(),
     );
     await tester.pump();
 
@@ -262,6 +265,7 @@ void main() {
       credentialStores: (_) => FakeCredentialStore(),
       connectivityStatus: const Stream<List<ConnectivityResult>>.empty(),
       appLinks: FakeAppLinkSource(),
+      serverProbe: FakeServerProbe(),
     );
     await tester.pump();
 

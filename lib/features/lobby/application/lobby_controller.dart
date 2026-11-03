@@ -87,6 +87,16 @@ final class LobbyActionException implements Exception {
   String toString() => 'LobbyActionException($failure)';
 }
 
+/// 当前服务器的品牌名，作首页标题。
+final lobbyBrandProvider = Provider<String>((ref) {
+  throw UnimplementedError('lobbyBrand 未注入');
+});
+
+/// 重新获取当前服务器的品牌名。不抛出：取不到时沿用保存的名字，不提示。
+final refreshLobbyBrandProvider = Provider<Future<void> Function()>((ref) {
+  throw UnimplementedError('refreshLobbyBrand 未注入');
+});
+
 final lobbyControllerProvider = NotifierProvider<LobbyController, LobbyState>(
   LobbyController.new,
 );

@@ -353,6 +353,20 @@ void main() {
       ]);
     });
 
+    test('refreshing the current brand asks only the current server', () async {
+      store
+        ..profiles = [serverB, serverC]
+        ..currentId = serverB.id;
+      probe.brands[serverB.origin] = '新名字';
+      final container = open();
+
+      await directoryOf(container).refreshCurrentBrand();
+
+      expect(probe.brandRequests, [serverB.origin]);
+      expect(container.read(currentServerProvider).brandName, '新名字');
+      expect(saved(serverB.id)?.brandName, '新名字');
+    });
+
     test('refreshing asks every server at once', () async {
       store.profiles = [serverB, serverC];
       probe.gate = Completer<void>();
