@@ -34,8 +34,8 @@ class IconCircleButton extends StatelessWidget {
   final double iconSize;
   final bool? expanded;
 
-  /// 加载成功后淡入并取代 [icon]，加载中和失败时显示 [icon]。读屏只读
-  /// [semanticLabel]。
+  /// 加载成功后按头像大小居中淡入，取代 [icon]；加载中和失败时显示 [icon]。
+  /// 读屏只读 [semanticLabel]。
   final ImageProvider? image;
 
   @override
@@ -95,33 +95,47 @@ class IconCircleButton extends StatelessWidget {
             ),
             child: image == null
                 ? glyph
-                : Image(
-                    image: ResizeImage.resizeIfNeeded(
-                      (diameter * MediaQuery.devicePixelRatioOf(context))
-                          .round(),
-                      null,
-                      image,
+                : Center(
+                    child: Image(
+                      image: ResizeImage.resizeIfNeeded(
+                        (AlistenSizes.avatar *
+                                MediaQuery.devicePixelRatioOf(context))
+                            .round(),
+                        null,
+                        image,
+                      ),
+                      width: AlistenSizes.avatar,
+                      height: AlistenSizes.avatar,
+                      fit: BoxFit.cover,
+                      excludeFromSemantics: true,
+                      gaplessPlayback: true,
+                      frameBuilder: (context, child, frame, synchronous) {
+                        final loaded = synchronous || frame != null;
+                        return AnimatedSwitcher(
+                          duration: AlistenDurations.of(
+                            context,
+                            AlistenDurations.short,
+                          ),
+                          // 前后两个子组件的键必须不同，否则图标立即消失，不会淡出。
+                          child: KeyedSubtree(
+                            key: ValueKey(loaded),
+                            child: loaded
+                                ? Container(
+                                    // 细边让照片和旁边的线条图标在分量上接近。
+                                    foregroundDecoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: colors.glassStroke,
+                                      ),
+                                    ),
+                                    child: ClipOval(child: child),
+                                  )
+                                : glyph,
+                          ),
+                        );
+                      },
+                      errorBuilder: (_, _, _) => glyph,
                     ),
-                    width: diameter,
-                    height: diameter,
-                    fit: BoxFit.cover,
-                    excludeFromSemantics: true,
-                    gaplessPlayback: true,
-                    frameBuilder: (context, child, frame, synchronous) {
-                      final loaded = synchronous || frame != null;
-                      return AnimatedSwitcher(
-                        duration: AlistenDurations.of(
-                          context,
-                          AlistenDurations.short,
-                        ),
-                        // 前后两个子组件的键必须不同，否则图标立即消失，不会淡出。
-                        child: KeyedSubtree(
-                          key: ValueKey(loaded),
-                          child: loaded ? ClipOval(child: child) : glyph,
-                        ),
-                      );
-                    },
-                    errorBuilder: (_, _, _) => glyph,
                   ),
           ),
         ),

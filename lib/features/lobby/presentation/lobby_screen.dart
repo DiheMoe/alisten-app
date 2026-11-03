@@ -175,7 +175,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     final lobby = ref.watch(lobbyControllerProvider);
     final avatarUrl = ref.watch(
       identityControllerProvider.select(
-        (state) => state.member?.avatarUrl(AlistenSizes.iconButton),
+        (state) => state.member?.avatarUrl(AlistenSizes.avatar),
       ),
     );
     // 必须在 scaffold 之外读取：scaffold 会从页面中去掉键盘高度。

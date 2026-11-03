@@ -940,7 +940,7 @@ void main() {
 
   group('the settings button', () {
     const listener = Member(id: 'member-id', name: '听众', avatarHash: 'abc123');
-    final avatarUrl = listener.avatarUrl(AlistenSizes.iconButton)!;
+    final avatarUrl = listener.avatarUrl(AlistenSizes.avatar)!;
 
     setUp(() {
       imageCache
@@ -1015,7 +1015,7 @@ void main() {
         api: api,
         credentials: FakeCredentialStore()..memberToken = 'member-token',
         avatarCache: FakeAvatarCache(
-          avatars: {withAvatar.avatarUrl(AlistenSizes.iconButton)!: png},
+          avatars: {withAvatar.avatarUrl(AlistenSizes.avatar)!: png},
         ),
       );
       await _finishLoading(tester);
@@ -1111,8 +1111,9 @@ void main() {
       expect(tester.getRect(_settingsButton), shown);
       expect(
         tester.getSize(inSettings(find.byType(RawImage))),
-        const Size.square(AlistenSizes.iconButton),
+        const Size.square(AlistenSizes.avatar),
       );
+      expect(tester.getCenter(inSettings(find.byType(RawImage))), shown.center);
     });
   });
 }

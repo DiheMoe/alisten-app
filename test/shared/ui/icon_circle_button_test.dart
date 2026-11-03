@@ -84,8 +84,9 @@ void main() {
     expect(tester.widget<RawImage>(find.byType(RawImage)).image, isNotNull);
     expect(
       tester.getSize(find.byType(RawImage)),
-      const Size.square(AlistenSizes.iconButton),
+      const Size.square(AlistenSizes.avatar),
     );
+    expect(tester.getCenter(find.byType(RawImage)), button.center);
     expect(tester.getRect(find.byType(IconCircleButton)), button);
     final node = tester.getSemantics(find.bySemanticsLabel('设置'));
     expect(node.label, '设置');
