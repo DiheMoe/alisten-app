@@ -445,7 +445,8 @@ final class _LobbyHeader extends SliverPersistentHeaderDelegate {
   final double titleExtent;
   final List<Widget> actions;
 
-  static const _tagline = '和朋友同步收听同一首歌';
+  // 出自游戏 Metaphor: ReFantazio（《暗喻幻想：ReFantazio》）。
+  static const _tagline = '音乐是最先诞生在这世界上的魔法';
 
   static double _titleExtent(TextScaler scaler) {
     double line(TextStyle style) =>
