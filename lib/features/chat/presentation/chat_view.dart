@@ -785,10 +785,18 @@ class _MessageLine extends StatelessWidget {
       ),
       child: Padding(
         padding: _bubblePadding,
-        child: Text(
-          item.text,
-          style: AlistenTypography.body.copyWith(
-            color: mine ? colors.onBrand : colors.onGlass,
+        // 每条消息单独选择，不跨到相邻消息、名字或时间。触屏上只靠长按开始
+        // 选择，不争抢滚动和左右切换模式的拖动。
+        child: DefaultSelectionStyle.merge(
+          // 主题的选中色取自品牌色，在自己消息的品牌底色上几乎看不出。
+          selectionColor: mine ? colors.onBrand.withValues(alpha: 0.35) : null,
+          child: SelectionArea(
+            child: Text(
+              item.text,
+              style: AlistenTypography.body.copyWith(
+                color: mine ? colors.onBrand : colors.onGlass,
+              ),
+            ),
           ),
         ),
       ),

@@ -14,6 +14,7 @@ import 'package:alisten/shared/ui/member_avatar.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -176,6 +177,63 @@ void main() {
     expect(
       tester.getRect(_avatarInTimeline(_xiaoming.name)).right,
       lessThanOrEqualTo(theirs.left),
+    );
+  });
+
+  testWidgets('a long press selects within one message, which copies whole '
+      'after select all', (tester) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map<Object?, Object?>)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final room = _Room(tester);
+    await room.open();
+    await room.showChat();
+    room
+      ..say(_xiaoming, 'listen to this one')
+      ..say(_me, 'next please');
+    await room.deliver();
+
+    await tester.longPress(find.text('listen to this one'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Select all'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copy'));
+    await tester.pumpAndSettle();
+
+    expect(copied, 'listen to this one');
+  });
+
+  testWidgets('a selection in an own message is drawn in the ink of the '
+      'brand fill, not the brand colour it sits on', (tester) async {
+    final room = _Room(tester);
+    await room.open();
+    await room.showChat();
+    room
+      ..say(_xiaoming, 'listen to this one')
+      ..say(_me, 'next please');
+    await room.deliver();
+
+    final colors = AlistenColors.of(tester.element(find.byType(ChatView)));
+    Color? selectionIn(String text) =>
+        DefaultSelectionStyle.of(tester.element(find.text(text)))
+            .selectionColor;
+    expect(selectionIn('next please'), colors.onBrand.withValues(alpha: 0.35));
+    expect(
+      selectionIn('listen to this one'),
+      isNot(selectionIn('next please')),
     );
   });
 
