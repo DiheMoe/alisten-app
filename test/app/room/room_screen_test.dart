@@ -239,6 +239,30 @@ void main() {
     expect(router.state.uri.path, '/r/listen/lyrics');
   });
 
+  testWidgets('song search waits for a tap before raising the keyboard', (
+    tester,
+  ) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+
+    await tester.tap(find.text('点歌'));
+    await settle();
+
+    final field = find.descendant(
+      of: find.byType(SearchScreen),
+      matching: find.byType(EditableText),
+    );
+    expect(tester.widget<EditableText>(field).focusNode.hasFocus, isFalse);
+    expect(tester.testTextInput.isVisible, isFalse);
+
+    await tester.tap(field);
+    await tester.pump();
+
+    expect(tester.widget<EditableText>(field).focusNode.hasFocus, isTrue);
+    expect(tester.testTextInput.isVisible, isTrue);
+  });
+
   testWidgets('song search rises as a task, with a way to put it back down', (
     tester,
   ) async {

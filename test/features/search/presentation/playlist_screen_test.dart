@@ -34,13 +34,15 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('song search takes the keyboard when it opens, but not again '
-      'on the way back from a playlist', (tester) async {
+  testWidgets('a search field the user tapped does not take the keyboard '
+      'again on the way back from a playlist', (tester) async {
     final page = await SearchPage.open(tester);
     bool focused() => tester
         .widget<EditableText>(find.byType(EditableText))
         .focusNode
         .hasFocus;
+    await tester.tap(find.byType(EditableText));
+    await tester.pump();
     expect(focused(), isTrue);
     expect(tester.testTextInput.isVisible, isTrue);
 

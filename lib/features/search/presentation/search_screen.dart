@@ -273,7 +273,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: AlistenTextField(
                 controller: _input,
                 focusNode: _focus,
-                autofocus: true,
                 hint: '搜歌名、歌手，或粘贴链接',
                 icon: Icons.search_rounded,
                 pill: true,
