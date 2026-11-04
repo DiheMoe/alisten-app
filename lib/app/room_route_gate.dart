@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:alisten/app/feedback.dart';
 import 'package:alisten/app/room/connection_pill.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/lobby/index.dart';
 import 'package:alisten/features/room/index.dart';
+import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
@@ -320,7 +322,18 @@ final class _Refusal extends ConsumerWidget {
         ),
       ),
       RoomFailure.unavailable => enterAgain,
-      RoomFailure.notFound || RoomFailure.outdated => null,
+      RoomFailure.outdated => PillButton(
+        label: '检查更新',
+        icon: Icons.system_update_rounded,
+        onPressed: () => unawaited(
+          checkForUpdate(
+            context,
+            ref,
+            onNotice: ref.read(toastControllerProvider).show,
+          ),
+        ),
+      ),
+      RoomFailure.notFound => null,
     };
     return EmptyState(
       icon: icon,

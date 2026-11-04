@@ -163,30 +163,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  // 离开设置页后仍要提示结果，面板因此由根导航器弹出。
-  Future<void> _checkForUpdate() async {
-    final navigator = Navigator.of(context, rootNavigator: true);
-    final result = await ref.read(updateControllerProvider.notifier).checkNow();
-    switch (result) {
-      case null:
-        return;
-      case UpdateAvailable():
-        if (navigator.mounted) {
-          unawaited(
-            showUpdateSheet(
-              navigator.context,
-              result,
-              onNotice: widget.onNotice,
-            ),
-          );
-        }
-      case UpToDate():
-        widget.onNotice(ToastKind.info, '已是最新版本');
-      case UpdateCheckFailed():
-        widget.onNotice(ToastKind.failure, '检查更新失败，请稍后再试。');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     ref.listen(
@@ -349,7 +325,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _LinkRow(
                 title: '检查更新',
                 busy: ref.watch(updateControllerProvider),
-                onPressed: () => unawaited(_checkForUpdate()),
+                onPressed: () => unawaited(
+                  checkForUpdate(context, ref, onNotice: widget.onNotice),
+                ),
               ),
               _LinkRow(title: '开源许可', onPressed: widget.onOpenLicenses),
             ],

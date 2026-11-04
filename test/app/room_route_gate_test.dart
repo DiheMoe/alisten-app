@@ -7,6 +7,7 @@ import 'package:alisten/core/realtime/room_transport.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/lobby/presentation/join_room_sheet.dart';
 import 'package:alisten/features/room/index.dart';
+import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
@@ -19,6 +20,7 @@ import '../domain/room/room_fixtures.dart';
 import '../features/lobby/lobby_test_doubles.dart';
 import '../features/playback/playback_test_doubles.dart' show FakeAudioEngine;
 import '../features/room/room_test_doubles.dart';
+import '../features/update/update_test_doubles.dart';
 import 'app_test_harness.dart';
 
 const _roomId = '123e4567-e89b-42d3-a456-426614174000';
@@ -32,7 +34,7 @@ Future<
     Future<void> Function(String location) go,
   })
 >
-_openedRoom(WidgetTester tester) async {
+_openedRoom(WidgetTester tester, {FakeReleaseSource? releases}) async {
   final api = FakeAlistenApi()
     ..rooms = [
       roomListing(id: _roomId, slug: 'listen'),
@@ -46,6 +48,7 @@ _openedRoom(WidgetTester tester) async {
       ..tickets[_roomId] = 'saved-ticket'
       ..tickets[_otherId] = 'other-ticket',
     rooms: rooms,
+    releases: releases,
   );
   final container = appContainer(tester);
   final router = container.read(routerProvider);
@@ -212,6 +215,55 @@ void main() {
     expect(find.byType(RoomRouteGate), findsNothing);
     expect(container.read(roomControllerProvider).activeRoomId, isNull);
     expect(find.text(emptyLobbyText), findsNothing);
+  });
+
+  testWidgets('a room that needs a newer app offers to look for one', (
+    tester,
+  ) async {
+    final (:api, :rooms, :container, :go) = await _openedRoom(
+      tester,
+      releases: FakeReleaseSource(release: testRelease(tag: 'v9.0.0')),
+    );
+    await go('/r/listen');
+    rooms.last.disconnect(code: 4426);
+    await tester.pump();
+    expect(find.text('需要更新 Alisten'), findsOneWidget);
+
+    await tester.tap(find.text('检查更新'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(UpdateSheet), findsOneWidget);
+  });
+
+  testWidgets('a room that needs a newer app says when there is none yet', (
+    tester,
+  ) async {
+    final (:api, :rooms, :container, :go) = await _openedRoom(
+      tester,
+      releases: FakeReleaseSource(release: testRelease(tag: 'v0.0.1')),
+    );
+    await go('/r/listen');
+    rooms.last.disconnect(code: 4426);
+    await tester.pump();
+
+    await tester.tap(find.text('检查更新'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(UpdateSheet), findsNothing);
+    expect(find.text('已是最新版本'), findsOneWidget);
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a refusal that a new app would not cure does not offer one', (
+    tester,
+  ) async {
+    final (:api, :rooms, :container, :go) = await _openedRoom(tester);
+    await go('/r/listen');
+    rooms.last.disconnect(code: 4404);
+    await tester.pump();
+
+    expect(find.text('检查更新'), findsNothing);
   });
 
   testWidgets('"返回大厅" of a room that was refused while another plays '
