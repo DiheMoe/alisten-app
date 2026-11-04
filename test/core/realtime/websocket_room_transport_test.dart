@@ -27,7 +27,7 @@ void main() {
       expect(hello['data'], {
         'roomId': 'room-id',
         'ticket': 'ticket',
-        'protocolVersion': '09dbf7ea495db969',
+        'protocolVersion': '473ee31f5ef912b4',
       });
 
       channel.receive(_response(hello['id']! as String, 'hello', _helloData()));

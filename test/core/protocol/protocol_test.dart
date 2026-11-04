@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:alisten/core/protocol/domain_mapper.dart';
 import 'package:alisten/core/protocol/http.gen.dart' as http;
 import 'package:alisten/core/protocol/protocol.gen.dart' as protocol;
 import 'package:alisten/domain/member/member.dart' as domain_member;
@@ -25,6 +26,28 @@ void main() {
       expect(goVersion, isNotNull);
       expect(protocol.protocolVersion, goVersion);
     }, skip: _backendSkip);
+
+    test('a track without word timings keeps both lyric fields absent', () {
+      final nowPlaying = toDomainNowPlaying(
+        protocol.NowPlaying.fromJson(_nowPlayingPayload()),
+      );
+
+      expect(nowPlaying.lyricWords, isNull);
+      expect(nowPlaying.lyricTrans, isNull);
+    });
+
+    test('word timings and translations reach the domain unchanged', () {
+      final nowPlaying = toDomainNowPlaying(
+        protocol.NowPlaying.fromJson({
+          ..._nowPlayingPayload(),
+          'lyricWords': '[1000,900](1000,400,0)故(1400,500,0)事',
+          'lyricTrans': '[00:01.00]Story',
+        }),
+      );
+
+      expect(nowPlaying.lyricWords, '[1000,900](1000,400,0)故(1400,500,0)事');
+      expect(nowPlaying.lyricTrans, '[00:01.00]Story');
+    });
 
     test('DTO round trip keeps required nullable fields explicit', () {
       final payload = _entryPayload(by: null);
@@ -363,6 +386,17 @@ void main() {
     expect(event.term, 1);
     expect(event.seq, 3);
   });
+}
+
+Map<String, Object?> _nowPlayingPayload() {
+  return <String, Object?>{
+    'entry': _entryPayload(by: null),
+    'mediaUrl': '/media/netease/123',
+    'startedAtMs': 1000,
+    'durationMs': 180000,
+    'gain': 1,
+    'lyric': '[00:01.00]故事',
+  };
 }
 
 Map<String, Object?> _entryPayload({required Object? by}) {

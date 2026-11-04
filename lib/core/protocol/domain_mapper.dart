@@ -123,6 +123,8 @@ NowPlaying toDomainNowPlaying(protocol.NowPlaying nowPlaying) {
     durationMs: nowPlaying.durationMs,
     gain: nowPlaying.gain,
     lyric: nowPlaying.lyric,
+    lyricWords: nowPlaying.lyricWords,
+    lyricTrans: nowPlaying.lyricTrans,
   );
 }
 

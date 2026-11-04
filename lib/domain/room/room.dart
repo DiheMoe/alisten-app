@@ -83,6 +83,8 @@ final class NowPlaying {
     required this.durationMs,
     required this.gain,
     required this.lyric,
+    this.lyricWords,
+    this.lyricTrans,
   });
 
   final QueueEntry entry;
@@ -91,6 +93,8 @@ final class NowPlaying {
   final int durationMs;
   final double gain;
   final String lyric;
+  final String? lyricWords;
+  final String? lyricTrans;
 }
 
 final class RoomSnapshot {

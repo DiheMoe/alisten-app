@@ -5,7 +5,7 @@ import 'package:alisten/core/protocol/protocol_runtime.dart';
 export 'package:alisten/core/protocol/protocol_runtime.dart'
     show ProtocolMismatchException, WsEvent, WsRequest, WsResponse;
 
-const protocolVersion = '09dbf7ea495db969';
+const protocolVersion = '473ee31f5ef912b4';
 
 class APIKey {
   const APIKey({required this.key});
@@ -230,6 +230,8 @@ class NowPlaying {
     required this.entry,
     required this.gain,
     required this.lyric,
+    this.lyricTrans,
+    this.lyricWords,
     required this.mediaUrl,
     required this.startedAtMs,
   });
@@ -254,6 +256,14 @@ class NowPlaying {
         requiredField(json, 'lyric', 'NowPlaying'),
         'NowPlaying.lyric',
       ),
+      lyricTrans: switch (optionalField(json, 'lyricTrans', 'NowPlaying')) {
+        null => null,
+        final value => readString(value, 'NowPlaying.lyricTrans'),
+      },
+      lyricWords: switch (optionalField(json, 'lyricWords', 'NowPlaying')) {
+        null => null,
+        final value => readString(value, 'NowPlaying.lyricWords'),
+      },
       mediaUrl: readString(
         requiredField(json, 'mediaUrl', 'NowPlaying'),
         'NowPlaying.mediaUrl',
@@ -269,6 +279,8 @@ class NowPlaying {
   final Entry entry;
   final double gain;
   final String lyric;
+  final String? lyricTrans;
+  final String? lyricWords;
   final String mediaUrl;
   final int startedAtMs;
 
@@ -277,6 +289,8 @@ class NowPlaying {
     'entry': entry.toJson(),
     'gain': gain,
     'lyric': lyric,
+    'lyricTrans': ?lyricTrans,
+    'lyricWords': ?lyricWords,
     'mediaUrl': mediaUrl,
     'startedAtMs': startedAtMs,
   };
