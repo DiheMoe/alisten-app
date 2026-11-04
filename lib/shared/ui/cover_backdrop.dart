@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
@@ -48,6 +49,73 @@ const _side = 96.0;
 const _overscan = 1.25;
 const _blurSigma = _side * _overscan * 0.05;
 
+ui.Image blurCoverOnce(ui.Image cover) {
+  const bounds = Rect.fromLTWH(0, 0, _side, _side);
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder)
+    ..saveLayer(
+      bounds,
+      Paint()
+        ..imageFilter = ui.ImageFilter.blur(
+          sigmaX: _blurSigma,
+          sigmaY: _blurSigma,
+          tileMode: TileMode.clamp,
+        ),
+    );
+  paintImage(
+    canvas: canvas,
+    rect: Rect.fromCenter(
+      center: bounds.center,
+      width: _side * _overscan,
+      height: _side * _overscan,
+    ),
+    image: cover,
+    fit: BoxFit.cover,
+    filterQuality: FilterQuality.medium,
+  );
+  canvas.restore();
+  final picture = recorder.endRecording();
+  final blurred = picture.toImageSync(_side.toInt(), _side.toInt());
+  picture.dispose();
+  return blurred;
+}
+
+/// 取不到封面时为 null，从不抛出。
+Future<ui.Image?> blurredCoverOf(ImageProvider cover) {
+  final result = Completer<ui.Image?>();
+  final stream = ResizeImage(
+    cover,
+    width: _decodeWidth,
+  ).resolve(ImageConfiguration.empty);
+  late final ImageStreamListener listener;
+  void finish(ui.Image? image) {
+    stream.removeListener(listener);
+    if (!result.isCompleted) result.complete(image);
+  }
+
+  listener = ImageStreamListener((info, _) {
+    ui.Image? blurred;
+    // 监听器抛出的异常会被图片流当作加载失败静默处理，需自行上报。
+    try {
+      blurred = blurCoverOnce(info.image);
+    } catch (exception, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: exception,
+          stack: stack,
+          library: 'alisten',
+          context: ErrorDescription('while blurring a cover'),
+        ),
+      );
+    } finally {
+      info.dispose();
+    }
+    finish(blurred);
+  }, onError: (_, _) => finish(null));
+  stream.addListener(listener);
+  return result.future;
+}
+
 class _BlurredCover extends StatefulWidget {
   const _BlurredCover({required this.cover, super.key});
 
@@ -92,7 +160,7 @@ class _BlurredCoverState extends State<_BlurredCover> {
     ui.Image? blurred;
     // 监听器抛出的异常会被图片流当作加载失败交给 onError 静默处理，需自行上报。
     try {
-      blurred = _blur(info.image);
+      blurred = blurCoverOnce(info.image);
       if (_subscribing) {
         _blurred = blurred;
       } else {
@@ -111,37 +179,6 @@ class _BlurredCoverState extends State<_BlurredCover> {
     } finally {
       info.dispose();
     }
-  }
-
-  static ui.Image _blur(ui.Image cover) {
-    const bounds = Rect.fromLTWH(0, 0, _side, _side);
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder)
-      ..saveLayer(
-        bounds,
-        Paint()
-          ..imageFilter = ui.ImageFilter.blur(
-            sigmaX: _blurSigma,
-            sigmaY: _blurSigma,
-            tileMode: TileMode.clamp,
-          ),
-      );
-    paintImage(
-      canvas: canvas,
-      rect: Rect.fromCenter(
-        center: bounds.center,
-        width: _side * _overscan,
-        height: _side * _overscan,
-      ),
-      image: cover,
-      fit: BoxFit.cover,
-      filterQuality: FilterQuality.medium,
-    );
-    canvas.restore();
-    final picture = recorder.endRecording();
-    final blurred = picture.toImageSync(_side.toInt(), _side.toInt());
-    picture.dispose();
-    return blurred;
   }
 
   @override

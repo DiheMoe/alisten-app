@@ -39,6 +39,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  shaders:
+    - shaders/flowing_cover.frag
   assets:
     - assets/fonts/OFL.txt
     - assets/licenses/commons-imaging/LICENSE.txt

@@ -17,9 +17,8 @@ import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
-import 'package:alisten/shared/ui/aurora_background.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
-import 'package:alisten/shared/ui/cover_backdrop.dart';
+import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
 import 'package:alisten/shared/ui/toast.dart';
@@ -210,9 +209,8 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
       RoomMode.queue => QueueView(onAddSong: _addSong, onResult: reportQueue),
       RoomMode.chat => const ChatView(),
     };
-    final background = CoverBackdrop(
+    final background = FlowingCoverBackdrop(
       url: nowPlaying?.entry.meta.coverUrl,
-      child: const AuroraBackground(),
     );
     final topBar = RoomTopBar(
       name: room.name,
