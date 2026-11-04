@@ -2,13 +2,15 @@ import 'dart:convert';
 
 import 'package:alisten/app/router.dart';
 import 'package:alisten/features/admin/index.dart';
+import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/lobby/index.dart';
 import 'package:alisten/features/server/data/preferences_server_store.dart';
 import 'package:alisten/features/server/index.dart';
+import 'package:alisten/features/settings/index.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../features/admin/admin_test_doubles.dart';
@@ -18,6 +20,85 @@ import '../features/server/server_test_doubles.dart'
 import 'app_test_harness.dart';
 
 void main() {
+  group('page transitions through the real router', () {
+    for (final (from, to, page) in [
+      ('/', '/settings', SettingsScreen),
+      ('/', '/history', HistoryScreen),
+      ('/settings', '/settings/servers', ServerScreen),
+      ('/settings', '/settings/admin', AdminScreen),
+    ]) {
+      testWidgets('$to slides in from $from and slides back out', (
+        tester,
+      ) async {
+        await pumpAlistenApp(tester);
+        final router = appContainer(tester).read(routerProvider);
+        router.go(from);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        final width =
+            tester.view.physicalSize.width / tester.view.devicePixelRatio;
+        Finder shown() => find.byType(page, skipOffstage: false);
+
+        router.go(to);
+        await tester.pump();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 120));
+        expect(tester.getTopLeft(shown()).dx, inExclusiveRange(0, width));
+
+        await tester.pump(const Duration(seconds: 1));
+        expect(tester.getTopLeft(shown()).dx, 0);
+
+        router.pop();
+        await tester.pump();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 120));
+        expect(tester.getTopLeft(shown()).dx, inExclusiveRange(0, width));
+
+        await tester.pump(const Duration(seconds: 1));
+        expect(shown(), findsNothing);
+      });
+    }
+
+    testWidgets('the whole lobby recedes under a page above the mini player', (
+      tester,
+    ) async {
+      await pumpAlistenApp(tester);
+      final router = appContainer(tester).read(routerProvider);
+      router.go('/settings');
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      router.go('/settings/admin');
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 120));
+
+      expect(
+        tester.getTopLeft(find.byType(SettingsScreen, skipOffstage: false)).dx,
+        lessThan(0),
+      );
+    });
+
+    testWidgets('every page is built by the app, not go_router\'s fallback', (
+      tester,
+    ) async {
+      await pumpAlistenApp(tester);
+      final router = appContainer(tester).read(routerProvider);
+
+      expect(
+        ModalRoute.of(tester.element(find.byType(LobbyScreen))),
+        isA<MaterialRouteTransitionMixin<dynamic>>(),
+      );
+      router.go('/settings/licenses');
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        ModalRoute.of(tester.element(find.byType(LicensesScreen))),
+        isA<MaterialRouteTransitionMixin<dynamic>>(),
+      );
+    });
+  });
+
   testWidgets('a page left by a navigation it did not start, such as a link, '
       'does not take the keyboard back on return', (tester) async {
     tester.view

@@ -58,17 +58,16 @@ final _textTheme = TextTheme(
   labelSmall: AlistenTypography.caption,
 );
 
+/// 新页面从右侧推入，底下的页面退向左侧并变暗。`fullscreenDialog` 路由是从当前
+/// 页面临时打开的任务，从底部升起，底下的页面留在原地。
 final class AlistenPageTransitionsBuilder extends PageTransitionsBuilder {
   const AlistenPageTransitionsBuilder();
 
-  static final _opacity = CurveTween(curve: AlistenCurves.standard);
-  static final _rise = Tween(
-    begin: const Offset(0, 0.04),
-    end: Offset.zero,
-  ).chain(CurveTween(curve: AlistenCurves.standard));
+  @override
+  Duration get transitionDuration => AlistenDurations.pageEnter;
 
   @override
-  Duration get transitionDuration => AlistenDurations.medium;
+  Duration get reverseTransitionDuration => AlistenDurations.pageExit;
 
   @override
   Widget buildTransitions<T>(
@@ -79,9 +78,98 @@ final class AlistenPageTransitionsBuilder extends PageTransitionsBuilder {
     Widget child,
   ) {
     if (MediaQuery.disableAnimationsOf(context)) return child;
-    return FadeTransition(
-      opacity: animation.drive(_opacity),
-      child: SlideTransition(position: animation.drive(_rise), child: child),
+    return _PageMotion(
+      animation: animation,
+      secondaryAnimation: secondaryAnimation,
+      rises: route.fullscreenDialog,
+      child: child,
+    );
+  }
+}
+
+class _PageMotion extends StatefulWidget {
+  const _PageMotion({
+    required this.animation,
+    required this.secondaryAnimation,
+    required this.rises,
+    required this.child,
+  });
+
+  final Animation<double> animation;
+  final Animation<double> secondaryAnimation;
+  final bool rises;
+  final Widget child;
+
+  @override
+  State<_PageMotion> createState() => _PageMotionState();
+}
+
+class _PageMotionState extends State<_PageMotion> {
+  static final _fromRight = Tween(begin: const Offset(1, 0), end: Offset.zero);
+  static final _fromBottom = Tween(begin: const Offset(0, 1), end: Offset.zero);
+  static final _receded = Tween(
+    begin: Offset.zero,
+    end: const Offset(-0.25, 0),
+  );
+  static final _dimmed = Tween<double>(begin: 0, end: 0.18);
+
+  late CurvedAnimation _entering;
+  late CurvedAnimation _covered;
+
+  CurvedAnimation _curved(Animation<double> parent) {
+    return CurvedAnimation(
+      parent: parent,
+      curve: AlistenCurves.standard,
+      reverseCurve: AlistenCurves.exit,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _entering = _curved(widget.animation);
+    _covered = _curved(widget.secondaryAnimation);
+  }
+
+  @override
+  void didUpdateWidget(_PageMotion oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.animation != oldWidget.animation) {
+      _entering.dispose();
+      _entering = _curved(widget.animation);
+    }
+    if (widget.secondaryAnimation != oldWidget.secondaryAnimation) {
+      _covered.dispose();
+      _covered = _curved(widget.secondaryAnimation);
+    }
+  }
+
+  @override
+  void dispose() {
+    _entering.dispose();
+    _covered.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SlideTransition(
+      position: (widget.rises ? _fromBottom : _fromRight).animate(_entering),
+      child: SlideTransition(
+        position: _receded.animate(_covered),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            widget.child,
+            IgnorePointer(
+              child: FadeTransition(
+                opacity: _dimmed.animate(_covered),
+                child: const ColoredBox(color: Colors.black),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

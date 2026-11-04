@@ -70,55 +70,67 @@ final routerProvider = Provider<GoRouter>((ref) {
     errorBuilder: (context, state) => const _LostPage(),
     routes: [
       ShellRoute(
-        builder: (context, state, child) =>
-            MiniPlayerHost(location: state.uri, child: child),
+        pageBuilder: (context, state, child) => MaterialPage(
+          key: state.pageKey,
+          child: MiniPlayerHost(location: state.uri, child: child),
+        ),
         routes: [
           GoRoute(
             path: '/',
-            builder: (context, state) => LobbyScreen(
-              onOpenRoom: (roomRef) => context.go('/r/$roomRef'),
-              onOpenHistory: () => context.go('/history'),
-              onOpenSettings: () => context.go('/settings'),
-              onNotice: toasts.show,
+            pageBuilder: _page(
+              (context, state) => LobbyScreen(
+                onOpenRoom: (roomRef) => context.go('/r/$roomRef'),
+                onOpenHistory: () => context.go('/history'),
+                onOpenSettings: () => context.go('/settings'),
+                onNotice: toasts.show,
+              ),
             ),
             routes: [
               GoRoute(
                 path: 'history',
-                builder: (context, state) => HistoryScreen(
-                  onResult: reportPick,
-                  onDeleted: (message, undo) => undoOffer = toasts.show(
-                    ToastKind.info,
-                    message,
-                    action: ToastAction(label: '撤销', onPressed: undo),
+                pageBuilder: _page(
+                  (context, state) => HistoryScreen(
+                    onResult: reportPick,
+                    onDeleted: (message, undo) => undoOffer = toasts.show(
+                      ToastKind.info,
+                      message,
+                      action: ToastAction(label: '撤销', onPressed: undo),
+                    ),
+                    onCleared: () {
+                      if (undoOffer case final offer?) toasts.withdraw(offer);
+                    },
+                    onNotice: failed,
                   ),
-                  onCleared: () {
-                    if (undoOffer case final offer?) toasts.withdraw(offer);
-                  },
-                  onNotice: failed,
                 ),
               ),
               GoRoute(
                 path: 'settings',
-                builder: (context, state) => SettingsScreen(
-                  appVersion: appVersion,
-                  protocolVersion: protocolVersion,
-                  onProfileResult: (result) =>
-                      reportMutation(toasts, result, success: (_) => '资料已保存'),
-                  onNotice: toasts.show,
-                  onOpenLicenses: () => context.go('/settings/licenses'),
-                  onOpenServers: () => context.go('/settings/servers'),
-                  onOpenAdmin: () => context.go('/settings/admin'),
+                pageBuilder: _page(
+                  (context, state) => SettingsScreen(
+                    appVersion: appVersion,
+                    protocolVersion: protocolVersion,
+                    onProfileResult: (result) =>
+                        reportMutation(toasts, result, success: (_) => '资料已保存'),
+                    onNotice: toasts.show,
+                    onOpenLicenses: () => context.go('/settings/licenses'),
+                    onOpenServers: () => context.go('/settings/servers'),
+                    onOpenAdmin: () => context.go('/settings/admin'),
+                  ),
                 ),
                 routes: [
                   GoRoute(
                     path: 'licenses',
-                    builder: (context, state) => const LicensesScreen(),
+                    pageBuilder: _page(
+                      (context, state) => const LicensesScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'servers',
-                    builder: (context, state) => ServerScreen(
-                      onSwitched: () => context.go('/'),
-                      onNotice: toasts.show,
+                    pageBuilder: _page(
+                      (context, state) => ServerScreen(
+                        onSwitched: () => context.go('/'),
+                        onNotice: toasts.show,
+                      ),
                     ),
                   ),
                   GoRoute(
@@ -129,10 +141,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                       ref.read(adminSessionProvider.notifier).end();
                       return true;
                     },
-                    builder: (context, state) => AdminScreen(
-                      onNotice: toasts.show,
-                      onExit: () => context.go('/settings'),
-                      onOpenRoom: (roomRef) => context.go('/r/$roomRef'),
+                    pageBuilder: _page(
+                      (context, state) => AdminScreen(
+                        onNotice: toasts.show,
+                        onExit: () => context.go('/settings'),
+                        onOpenRoom: (roomRef) => context.go('/r/$roomRef'),
+                      ),
                     ),
                   ),
                 ],
@@ -148,7 +162,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: songSearchSegment,
                         parentNavigatorKey: rootNavigator,
-                        builder: (context, state) {
+                        pageBuilder: _page(task: true, (context, state) {
                           final roomRef = state.pathParameters['ref']!;
                           return RoomRouteGate(
                             roomRef: roomRef,
@@ -167,18 +181,20 @@ final routerProvider = Provider<GoRouter>((ref) {
                               onOpenRoom: context.go,
                             ),
                           );
-                        },
+                        }),
                       ),
                       GoRoute(
                         path: playlistSegment,
                         parentNavigatorKey: rootNavigator,
-                        builder: (context, state) => RoomRouteGate(
-                          roomRef: state.pathParameters['ref']!,
-                          child: PlaylistScreen(
-                            source: TrackSource.netease,
-                            id: state.pathParameters['id']!,
-                            onResult: reportPick,
-                            onNotice: notice,
+                        pageBuilder: _page(
+                          (context, state) => RoomRouteGate(
+                            roomRef: state.pathParameters['ref']!,
+                            child: PlaylistScreen(
+                              source: TrackSource.netease,
+                              id: state.pathParameters['id']!,
+                              onResult: reportPick,
+                              onNotice: notice,
+                            ),
                           ),
                         ),
                       ),
@@ -244,6 +260,26 @@ Page<void> _roomPage(String roomRef, RoomMode mode) {
       child: RoomScreen(roomRef: roomRef, mode: mode),
     ),
   );
+}
+
+// 页面都由这里给出：go_router 按 material_ui 的 MaterialApp 判断应用类型，认不出
+// flutter/material 的 MaterialApp，只给 builder 的路由会退回没有转场的页面。
+//
+// [task] 页面从底部升起。Apple 平台除外：全屏对话框没有边缘滑动返回。
+GoRouterPageBuilder _page(GoRouterWidgetBuilder builder, {bool task = false}) {
+  return (context, state) {
+    final platform = Theme.of(context).platform;
+    return MaterialPage(
+      key: state.pageKey,
+      name: state.name ?? state.path,
+      restorationId: state.pageKey.value,
+      fullscreenDialog:
+          task &&
+          platform != TargetPlatform.iOS &&
+          platform != TargetPlatform.macOS,
+      child: Builder(builder: (context) => builder(context, state)),
+    );
+  };
 }
 
 class _LostPage extends StatelessWidget {

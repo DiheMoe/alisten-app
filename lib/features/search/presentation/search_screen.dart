@@ -252,7 +252,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           children: [
             AlistenTopBar(
               leading: IconCircleButton(
-                icon: Icons.arrow_back_rounded,
+                // 页面从底部升起时，收起的方向是向下。
+                icon: ModalRoute.of(context)?.fullscreenDialog ?? false
+                    ? Icons.keyboard_arrow_down_rounded
+                    : Icons.arrow_back_rounded,
                 semanticLabel: '返回房间',
                 style: IconCircleButtonStyle.plain,
                 onPressed: () => unawaited(Navigator.maybePop(context)),

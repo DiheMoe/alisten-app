@@ -99,6 +99,8 @@ abstract final class AlistenDurations {
   static const layout = Duration(milliseconds: 400);
   static const track = Duration(milliseconds: 450);
   static const bounce = Duration(milliseconds: 420);
+  static const pageEnter = Duration(milliseconds: 350);
+  static const pageExit = Duration(milliseconds: 300);
   static const lyricState = Duration(milliseconds: 400);
   static const lyricBlur = Duration(milliseconds: 120);
   static const theme = Duration(milliseconds: 600);

@@ -14,6 +14,7 @@ import 'package:alisten/features/lyrics/presentation/render_lyric_line.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/room/index.dart';
+import 'package:alisten/features/search/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
@@ -21,7 +22,7 @@ import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
@@ -237,6 +238,37 @@ void main() {
     await settle();
     expect(router.state.uri.path, '/r/listen/lyrics');
   });
+
+  testWidgets('song search rises as a task, with a way to put it back down', (
+    tester,
+  ) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+
+    await tester.tap(find.text('点歌'));
+    await settle();
+
+    final route = ModalRoute.of(tester.element(find.byType(SearchScreen)))!;
+    expect((route as PageRoute<void>).fullscreenDialog, isTrue);
+    expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
+  });
+
+  testWidgets('on Apple platforms song search keeps the back swipe', (
+    tester,
+  ) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+
+    await tester.tap(find.text('点歌'));
+    await settle();
+
+    final route = ModalRoute.of(tester.element(find.byType(SearchScreen)))!;
+    expect((route as PageRoute<void>).fullscreenDialog, isFalse);
+    expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
   testWidgets('a track that fails here says so, and a tap tries again', (
     tester,
