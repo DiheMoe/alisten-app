@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/visible_frames.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -21,39 +22,15 @@ const _lightStrength = 0.3;
 const _frameInterval = Duration(milliseconds: 33);
 
 class _AuroraBackgroundState extends State<AuroraBackground>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, VisibleFrames {
   final _drift = ValueNotifier<double>(0);
   Timer? _timer;
   // 只累计实际漂移的时长，暂停后恢复不会跳变。
   Duration _drifted = Duration.zero;
-  bool _mayDrift = false;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // 被其他页面盖住时也要停：转场途中和半透明页面之下 TickerMode 仍开启。
-    // 输入法显示时系统每帧都要合成键盘和本应用，极光重绘会争抢 GPU，导致键盘
-    // 升降和打字掉帧。
-    _mayDrift =
-        !MediaQuery.disableAnimationsOf(context) &&
-        TickerMode.valuesOf(context).enabled &&
-        (ModalRoute.isCurrentOf(context) ?? true) &&
-        MediaQuery.viewInsetsOf(context).bottom == 0;
-    _schedule();
-  }
-
-  // 定时器不会像 Ticker 那样随引擎停止出帧而停下，应用在后台播放时须自行停止。
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) => _schedule();
-
-  void _schedule() {
-    final drifting = _mayDrift && WidgetsBinding.instance.framesEnabled;
+  void visibleFramesChanged() {
+    final drifting = onScreen && !keyboardUp && !animationsRemoved;
     final timer = _timer;
     if (drifting == (timer != null)) return;
     if (timer == null) {
@@ -75,7 +52,6 @@ class _AuroraBackgroundState extends State<AuroraBackground>
   @override
   void dispose() {
     _timer?.cancel();
-    WidgetsBinding.instance.removeObserver(this);
     _drift.dispose();
     super.dispose();
   }

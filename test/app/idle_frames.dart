@@ -10,7 +10,7 @@ import 'app_test_harness.dart';
 /// 调试构建中 Riverpod 每次通知状态还会多排一帧，同样每半秒一次。
 const periodicFrames = 4;
 
-/// 房间页的极光每秒约 30 帧，另加半秒一次的刷新。
+/// 房间页的背景每秒约 30 帧，另加半秒一次的刷新。
 const roomPageFrames = 31 + periodicFrames;
 
 /// 先让进出场动画、提示等有时限的变化结束，再以 120 Hz 的节奏推进 1 秒，返回
@@ -39,11 +39,12 @@ Future<int> idleFrames(WidgetTester tester) async {
 }
 
 Future<({GoRouter router, Future<void> Function() settle})> enterBusyRoom(
-  WidgetTester tester,
-) async {
+  WidgetTester tester, {
+  String? lyricWords,
+}) async {
   final (:rooms, :router, :settle) = await enterRoom(
     tester,
-    nowPlaying: const NowPlaying(
+    nowPlaying: NowPlaying(
       entry: testQueueEntry,
       mediaUrl: '/media/netease/track-id',
       startedAtMs: 1000000,
@@ -52,6 +53,7 @@ Future<({GoRouter router, Future<void> Function() settle})> enterBusyRoom(
       lyric:
           '[00:00.00]第一行\n[00:04.00]第二行\n[00:08.00]第三行\n'
           '[00:12.00]第四行\n[00:16.00]第五行',
+      lyricWords: lyricWords,
     ),
     serverNow: 1002000,
   );

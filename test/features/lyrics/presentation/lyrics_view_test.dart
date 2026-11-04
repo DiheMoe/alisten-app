@@ -1,13 +1,12 @@
 import 'package:alisten/domain/playback/lrc.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/lyrics/index.dart';
+import 'package:alisten/features/lyrics/presentation/render_lyric_line.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
-import 'package:alisten/shared/theme/tokens.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -30,7 +29,12 @@ String _lrc(int count) {
   ].join('\n');
 }
 
-NowPlaying _track({String id = 'entry-id', String lyric = ''}) {
+NowPlaying _track({
+  String id = 'entry-id',
+  String lyric = '',
+  String? words,
+  String? translation,
+}) {
   return NowPlaying(
     entry: QueueEntry(
       id: id,
@@ -46,6 +50,8 @@ NowPlaying _track({String id = 'entry-id', String lyric = ''}) {
     durationMs: 600000,
     gain: 1,
     lyric: lyric,
+    lyricWords: words,
+    lyricTrans: translation,
   );
 }
 
@@ -91,9 +97,14 @@ Future<ProviderContainer> _pumpLyrics(
   final container = ProviderContainer(
     overrides: [
       nowPlayingProvider.overrideWith((ref) => ref.watch(_trackFixture)),
-      lyricsProvider.overrideWith(
-        (ref) => parseLrc(ref.watch(_trackFixture)?.lyric ?? ''),
-      ),
+      lyricsProvider.overrideWith((ref) {
+        final track = ref.watch(_trackFixture);
+        return buildLyricLines(
+          lyric: track?.lyric ?? '',
+          words: track?.lyricWords,
+          translation: track?.lyricTrans,
+        );
+      }),
       playbackControllerProvider.overrideWithBuild(
         (ref, _) => ref.watch(_playbackFixture),
       ),
@@ -140,33 +151,37 @@ double _viewportCenter(WidgetTester tester) {
   return tester.getCenter(find.byType(SingleChildScrollView)).dy;
 }
 
+Finder _rowOf(String text) {
+  return find.byWidgetPredicate(
+    (widget) => widget is LyricLineRow && widget.line.text == text,
+  );
+}
+
+Finder _row(int index) => _rowOf(_text(index));
+
+LyricLineRow _lineOf(WidgetTester tester, String text) {
+  return tester.widget<LyricLineRow>(_rowOf(text).first);
+}
+
+LyricLinePhase _phaseOf(WidgetTester tester, int index) {
+  return _lineOf(tester, _text(index)).phase;
+}
+
 double _offsetFromCenter(WidgetTester tester, int index) {
-  return (tester.getCenter(find.text(_text(index))).dy -
-          _viewportCenter(tester))
-      .abs();
+  return (tester.getCenter(_row(index)).dy - _viewportCenter(tester)).abs();
 }
 
 double _singleLineHeight(WidgetTester tester) {
-  return tester.getSize(find.text(_text(1))).height;
+  return tester.getSize(_row(1)).height;
+}
+
+// 动画由定时器驱动，`pumpAndSettle` 不会等它。
+Future<void> _settle(WidgetTester tester) async {
+  await _pumpFor(tester, const Duration(seconds: 3));
 }
 
 double _scrollOffset(WidgetTester tester) {
   return tester.state<ScrollableState>(find.byType(Scrollable)).position.pixels;
-}
-
-TextStyle _styleOf(WidgetTester tester, String text) {
-  return tester.renderObject<RenderParagraph>(find.text(text)).text.style!;
-}
-
-double _scaleOf(WidgetTester tester, String text) {
-  return tester
-      .widget<AnimatedScale>(
-        find.ancestor(
-          of: find.text(text),
-          matching: find.byType(AnimatedScale),
-        ),
-      )
-      .scale;
 }
 
 void main() {
@@ -177,19 +192,19 @@ void main() {
       track: _track(lyric: _lrc(80)),
       playback: _playingAt(40),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     final lineHeight = _singleLineHeight(tester);
-    expect(find.text(_text(40)), findsOneWidget);
+    expect(_row(40), findsOneWidget);
     expect(_offsetFromCenter(tester, 40), lessThan(lineHeight));
 
     // 第 52 行会折成多行，且离视口很远。
     _show(container, _playingAt(52));
-    await tester.pumpAndSettle();
+    await _settle(tester);
     expect(_offsetFromCenter(tester, 52), lessThan(lineHeight));
 
     _show(container, _playingAt(45));
-    await tester.pumpAndSettle();
+    await _settle(tester);
     expect(_offsetFromCenter(tester, 45), lessThan(lineHeight));
   });
 
@@ -201,7 +216,7 @@ void main() {
       track: _track(lyric: _lrc(40)),
       playback: _playingAt(20),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
     expectFadedByRow(tester, find.byType(LyricsView), top: true, bottom: true);
 
     await tester.drag(find.byType(SingleChildScrollView), const Offset(0, 75));
@@ -209,47 +224,22 @@ void main() {
     expectFadedByRow(tester, find.byType(LyricsView), top: true, bottom: true);
   });
 
-  testWidgets('the current line is emphasised and the others fade with '
-      'their distance from it', (tester) async {
+  testWidgets('the current line is focused and the others know how far away '
+      'they are', (tester) async {
     await _pumpLyrics(
       tester,
       track: _track(lyric: _lrc(20)),
       playback: _playingAt(10),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
-    final current = _styleOf(tester, _text(10));
-    expect(current.fontWeight!.value, greaterThanOrEqualTo(700));
-    expect(current.color!.a, closeTo(1, 0.001));
-    expect(
-      current.shadows,
-      AlistenColors.of(tester.element(find.byType(LyricsView))).glowTextShadows,
-    );
-    expect(_scaleOf(tester, _text(10)), 1.08);
-    expect(
-      tester
-          .widget<AnimatedScale>(
-            find.ancestor(
-              of: find.text(_text(10)),
-              matching: find.byType(AnimatedScale),
-            ),
-          )
-          .duration,
-      AlistenDurations.lyricLine,
-    );
-
-    for (final (distance, opacity) in [(1, 0.82), (2, 0.64), (3, 0.46)]) {
-      for (final index in [10 - distance, 10 + distance]) {
-        final style = _styleOf(tester, _text(index));
-        expect(style.color!.a, closeTo(opacity, 0.001), reason: '$index');
-        expect(style.fontWeight!.value, lessThan(700), reason: '$index');
-        expect(style.shadows ?? const [], isEmpty, reason: '$index');
-        expect(_scaleOf(tester, _text(index)), 1, reason: '$index');
-      }
+    expect(_phaseOf(tester, 10), LyricLinePhase.focused);
+    expect(_lineOf(tester, _text(10)).distance, 0);
+    for (final distance in [1, 2, 3]) {
+      expect(_phaseOf(tester, 10 - distance), LyricLinePhase.past);
+      expect(_phaseOf(tester, 10 + distance), LyricLinePhase.upcoming);
+      expect(_lineOf(tester, _text(10 + distance)).distance, distance);
     }
-    // 1 - 0.18 * 5 低于下限。
-    expect(_styleOf(tester, _text(15)).color!.a, closeTo(0.25, 0.001));
-    expect(_styleOf(tester, _text(19)).color!.a, closeTo(0.25, 0.001));
   });
 
   testWidgets('a blank line takes part in the timing without a row of its '
@@ -262,14 +252,13 @@ void main() {
         positionMs: 3500,
       ),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
-    expect(find.text(''), findsNothing);
+    expect(tester.getSize(_rowOf('')).height, 0);
     // 空行是当前行时，其他行都不是当前行。
-    for (final text in ['第一行', '第三行']) {
-      expect(_styleOf(tester, text).fontWeight!.value, lessThan(700));
-      expect(_scaleOf(tester, text), 1);
-    }
+    expect(_lineOf(tester, '第一行').phase, LyricLinePhase.past);
+    expect(_lineOf(tester, '第三行').phase, LyricLinePhase.upcoming);
+    expect(_lineOf(tester, '').phase, LyricLinePhase.focused);
   });
 
   testWidgets('a drag stops the lyrics from following for three seconds', (
@@ -280,7 +269,7 @@ void main() {
       track: _track(lyric: _lrc(80)),
       playback: _playingAt(10),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
     final lineHeight = _singleLineHeight(tester);
 
     await tester.drag(
@@ -297,12 +286,12 @@ void main() {
 
     // 拖动三秒后歌词即回到正在唱的行，不等下一行开始。
     await tester.pump(const Duration(milliseconds: 1500));
-    await tester.pumpAndSettle();
+    await _settle(tester);
     expect(_scrollOffset(tester), isNot(dragged));
     expect(_offsetFromCenter(tester, 30), lessThan(lineHeight));
 
     _show(container, _playingAt(33));
-    await tester.pumpAndSettle();
+    await _settle(tester);
     expect(_offsetFromCenter(tester, 33), lessThan(lineHeight));
   });
 
@@ -314,7 +303,7 @@ void main() {
       track: _track(lyric: _lrc(80)),
       playback: _playingAt(10),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     final finger = await tester.startGesture(
       tester.getCenter(find.byType(SingleChildScrollView)),
@@ -330,25 +319,7 @@ void main() {
 
     await finger.up();
     await tester.pump(const Duration(seconds: 3));
-    await tester.pumpAndSettle();
-    expect(_offsetFromCenter(tester, 30), lessThan(_singleLineHeight(tester)));
-  });
-
-  testWidgets('the current line is centred again once its transition ends, '
-      'however the lines reflowed meanwhile', (tester) async {
-    final container = await _pumpLyrics(
-      tester,
-      track: _track(lyric: _lrc(80)),
-      playback: _playingAt(10),
-    );
-    await tester.pumpAndSettle();
-
-    _show(container, _playingAt(30));
-    await _pumpFor(tester, const Duration(milliseconds: 100));
-    // 模拟字重变化后各行折行改变造成的偏移。
-    tester.state<ScrollableState>(find.byType(Scrollable)).position.jumpTo(0);
-    await tester.pumpAndSettle();
-
+    await _settle(tester);
     expect(_offsetFromCenter(tester, 30), lessThan(_singleLineHeight(tester)));
   });
 
@@ -359,7 +330,7 @@ void main() {
       track: _track(lyric: _lrc(80)),
       playback: _playingAt(10),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     _show(container, _playingAt(30));
     await _pumpFor(tester, const Duration(milliseconds: 100));
@@ -379,7 +350,7 @@ void main() {
       track: _track(lyric: _lrc(80)),
       playback: _playingAt(10),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
     final position = tester
         .state<ScrollableState>(find.byType(Scrollable))
         .position;
@@ -395,7 +366,7 @@ void main() {
     expect(tester.binding.hasScheduledFrame, isFalse);
 
     _show(container, _playingAt(11));
-    await tester.pumpAndSettle();
+    await _settle(tester);
     expect(_offsetFromCenter(tester, 11), lessThan(_singleLineHeight(tester)));
   });
 
@@ -426,10 +397,10 @@ void main() {
       around: (lyrics) =>
           SingleChildScrollView(child: Column(children: [lyrics])),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     expect(tester.takeException(), isNull);
-    expect(find.text(_text(2)), findsOneWidget);
+    expect(_row(2), findsOneWidget);
     expect(tester.getSize(find.byType(LyricsView)).height.isFinite, isTrue);
   });
 
@@ -441,7 +412,7 @@ void main() {
       track: _track(lyric: _lrc(80)),
       playback: _playingAt(10),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     await tester.drag(
       find.byType(SingleChildScrollView),
@@ -463,7 +434,7 @@ void main() {
     expect(_scrollOffset(tester), dragged);
 
     await tester.pump(const Duration(seconds: 2));
-    await tester.pumpAndSettle();
+    await _settle(tester);
     expect(_scrollOffset(tester), isNot(dragged));
   });
 
@@ -500,9 +471,9 @@ void main() {
         positionMs: 5 * _lineMs,
       ),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
     // 暂停时打开，暂停位置所在的行就是当前行。
-    expect(_styleOf(tester, _text(5)).fontWeight!.value, greaterThan(600));
+    expect(_phaseOf(tester, 5), LyricLinePhase.focused);
 
     _show(
       container,
@@ -511,14 +482,14 @@ void main() {
         positionMs: 9 * _lineMs,
       ),
     );
-    await tester.pumpAndSettle();
-    expect(_styleOf(tester, _text(5)).fontWeight!.value, greaterThan(600));
-    expect(_styleOf(tester, _text(9)).fontWeight!.value, lessThan(700));
+    await _settle(tester);
+    expect(_phaseOf(tester, 5), LyricLinePhase.focused);
+    expect(_phaseOf(tester, 9), LyricLinePhase.upcoming);
 
     _show(container, _playingAt(9));
-    await tester.pumpAndSettle();
-    expect(_styleOf(tester, _text(9)).fontWeight!.value, greaterThan(600));
-    expect(_styleOf(tester, _text(5)).fontWeight!.value, lessThan(700));
+    await _settle(tester);
+    expect(_phaseOf(tester, 9), LyricLinePhase.focused);
+    expect(_phaseOf(tester, 5), LyricLinePhase.past);
   });
 
   testWidgets('another lyric of the same playback keeps the line at the '
@@ -531,12 +502,12 @@ void main() {
         positionMs: 5 * _lineMs,
       ),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     container.read(_trackFixture.notifier).play(_track(lyric: _lrc(41)));
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
-    expect(_scaleOf(tester, _text(5)), 1.08);
+    expect(_phaseOf(tester, 5), LyricLinePhase.focused);
     expect(_offsetFromCenter(tester, 5), lessThan(_singleLineHeight(tester)));
   });
 
@@ -547,7 +518,7 @@ void main() {
       track: _track(lyric: _lrc(40)),
       playback: _playingAt(30),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
     expect(_scrollOffset(tester), greaterThan(0));
     final before = tester.state<ScrollableState>(find.byType(Scrollable));
 
@@ -564,17 +535,15 @@ void main() {
       tester.state<ScrollableState>(find.byType(Scrollable)),
       isNot(same(before)),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
-    for (var index = 0; index < 40; index++) {
-      if (find.text(_text(index)).evaluate().isEmpty) continue;
-      expect(_scaleOf(tester, _text(index)), 1, reason: '$index');
-    }
+    // 开播前按歌曲开头计算，首行从 0 ms 开始时它就是当前行。
+    expect(_phaseOf(tester, 0), LyricLinePhase.focused);
     expect(_offsetFromCenter(tester, 0), lessThan(_singleLineHeight(tester)));
 
-    _show(container, _playingAt(0));
-    await tester.pumpAndSettle();
-    expect(_scaleOf(tester, _text(0)), 1.08);
+    _show(container, _playingAt(1));
+    await _settle(tester);
+    expect(_phaseOf(tester, 1), LyricLinePhase.focused);
   });
 
   testWidgets('a track that starts under a finger on the old lyrics is '
@@ -584,7 +553,7 @@ void main() {
       track: _track(lyric: _lrc(40)),
       playback: _playingAt(30),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     final finger = await tester.startGesture(
       tester.getCenter(find.byType(SingleChildScrollView)),
@@ -597,12 +566,12 @@ void main() {
         .read(_trackFixture.notifier)
         .play(_track(id: 'next', lyric: _lrc(40)));
     _show(container, _playingAt(5));
-    await tester.pumpAndSettle();
+    await _settle(tester);
     final lineHeight = _singleLineHeight(tester);
     expect(_offsetFromCenter(tester, 5), lessThan(lineHeight));
 
     _show(container, _playingAt(8));
-    await tester.pumpAndSettle();
+    await _settle(tester);
     expect(_offsetFromCenter(tester, 8), lessThan(lineHeight));
     await finger.up();
   });
@@ -614,7 +583,7 @@ void main() {
       track: _track(lyric: _lrc(40)),
       playback: _playingAt(30),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     final finger = await tester.startGesture(
       tester.getCenter(find.byType(SingleChildScrollView)),
@@ -634,7 +603,7 @@ void main() {
     expect(_scrollOffset(tester), held);
 
     await _pumpFor(tester, const Duration(seconds: 2));
-    await tester.pumpAndSettle();
+    await _settle(tester);
     expect(_offsetFromCenter(tester, 33), lessThan(_singleLineHeight(tester)));
   });
 
@@ -668,5 +637,322 @@ void main() {
     await _pumpLyrics(tester);
 
     expect(find.text('暂无歌词'), findsOneWidget);
+  });
+
+  group('word lyrics', () {
+    const words =
+        '[1000,1000](1000,500,0)故(1500,500,0)事\n'
+        '[2100,1000](2100,500,0)的(2600,500,0)花';
+
+    LocalPlaybackState playingAt(int positionMs) {
+      return LocalPlaybackState(
+        status: LocalPlaybackStatus.playing,
+        positionMs: positionMs,
+      );
+    }
+
+    testWidgets('words light without rebuilding the list, and only the '
+        'current line repaints', (tester) async {
+      final container = await _pumpLyrics(
+        tester,
+        track: _track(words: words),
+        playback: playingAt(1100),
+      );
+      await _settle(tester);
+      final current = tester.renderObject<RenderLyricLine>(_rowOf('故事'));
+      final other = tester.renderObject<RenderLyricLine>(_rowOf('的花'));
+      final widget = _lineOf(tester, '故事');
+      final painted = current.debugPaintCount;
+      final otherPainted = other.debugPaintCount;
+
+      _show(container, playingAt(1200));
+      await tester.pump(const Duration(milliseconds: 20));
+      await tester.pump(const Duration(milliseconds: 20));
+
+      expect(_lineOf(tester, '故事'), same(widget));
+      expect(current.debugPaintCount, greaterThan(painted));
+      expect(other.debugPaintCount, otherPainted);
+    });
+
+    testWidgets('a paused word line asks for no frames', (tester) async {
+      final container = await _pumpLyrics(
+        tester,
+        track: _track(words: words),
+        playback: playingAt(1100),
+      );
+      await _settle(tester);
+
+      _show(
+        container,
+        const LocalPlaybackState(
+          status: LocalPlaybackStatus.paused,
+          positionMs: 1200,
+        ),
+      );
+      await _settle(tester);
+      final painted = tester
+          .renderObject<RenderLyricLine>(_rowOf('故事'))
+          .debugPaintCount;
+
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(tester.binding.hasScheduledFrame, isFalse);
+      expect(
+        tester.renderObject<RenderLyricLine>(_rowOf('故事')).debugPaintCount,
+        painted,
+      );
+    });
+
+    testWidgets('frames stop once a line has been sung', (tester) async {
+      await _pumpLyrics(
+        tester,
+        track: _track(words: '[1000,1000](1000,1000,0)字'),
+        playback: playingAt(9000),
+      );
+      await _settle(tester);
+
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(tester.binding.hasScheduledFrame, isFalse);
+    });
+
+    testWidgets('before a track starts its position is not the last one', (
+      tester,
+    ) async {
+      final container = await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(40)),
+        playback: _playingAt(30),
+      );
+      await _settle(tester);
+
+      container
+          .read(_trackFixture.notifier)
+          .play(_track(id: 'next', words: words));
+      _show(
+        container,
+        const LocalPlaybackState(
+          status: LocalPlaybackStatus.loading,
+          positionMs: 90000,
+        ),
+      );
+      await _settle(tester);
+
+      expect(_lineOf(tester, '故事').phase, isNot(LyricLinePhase.past));
+    });
+
+    testWidgets('a translation is read out with its line', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await _pumpLyrics(
+        tester,
+        track: _track(words: words, translation: '[00:01.00]Story'),
+        playback: playingAt(1100),
+      );
+      await _settle(tester);
+
+      expect(find.bySemanticsLabel('故事\nStory'), findsOneWidget);
+      expect(find.bySemanticsLabel('的花'), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('a gap of three seconds clears the highlight and leaves no '
+        'room for dots', (tester) async {
+      await _pumpLyrics(
+        tester,
+        track: _track(words: '[0,1000](0,1000,0)一\n[4000,1000](4000,1000,0)二'),
+        playback: playingAt(1500),
+      );
+      await _settle(tester);
+
+      expect(_lineOf(tester, '一').phase, LyricLinePhase.past);
+      expect(_lineOf(tester, '二').phase, LyricLinePhase.upcoming);
+      expect(_lineOf(tester, '').gap, isNull);
+    });
+
+    testWidgets('a gap of seven seconds opens room for dots, and closes it', (
+      tester,
+    ) async {
+      const gapped = '[0,1000](0,1000,0)一\n[9000,1000](9000,1000,0)二';
+      double apart() {
+        return tester.getTopLeft(_rowOf('二')).dy -
+            tester.getTopLeft(_rowOf('一')).dy;
+      }
+
+      final container = await _pumpLyrics(
+        tester,
+        track: _track(words: gapped),
+        playback: playingAt(500),
+      );
+      await _settle(tester);
+      final closed = apart();
+
+      _show(container, playingAt(2000));
+      await _settle(tester);
+      expect(_lineOf(tester, '').gap, isNotNull);
+      expect(apart(), closeTo(closed + 0.83 * 26, 0.5));
+
+      _show(container, playingAt(8900));
+      await _settle(tester);
+      expect(apart(), closeTo(closed, 0.5));
+    });
+
+    testWidgets('the line after a long break comes to the middle', (
+      tester,
+    ) async {
+      final container = await _pumpLyrics(
+        tester,
+        track: _track(
+          words:
+              '[0,1000](0,1000,0)一\n[9000,1000](9000,1000,0)二\n'
+              '[10500,1000](10500,1000,0)三',
+        ),
+        playback: playingAt(2000),
+      );
+      await _settle(tester);
+
+      _show(container, playingAt(8900));
+      await _settle(tester);
+
+      final center = tester.getCenter(_rowOf('二')).dy;
+      expect(center, closeTo(_viewportCenter(tester), 1));
+    });
+
+    testWidgets('dots keep moving between the half-second updates', (
+      tester,
+    ) async {
+      await _pumpLyrics(
+        tester,
+        track: _track(words: '[0,1000](0,1000,0)一\n[9000,1000](9000,1000,0)二'),
+        playback: playingAt(2000),
+      );
+      await _settle(tester);
+      final dots = tester.renderObject<RenderLyricLine>(_rowOf('').first);
+      final painted = dots.debugPaintCount;
+
+      for (var frame = 0; frame < 30; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      expect(dots.debugPaintCount, greaterThan(painted + 10));
+    });
+
+    testWidgets('a line change repaints only the lines whose look changes', (
+      tester,
+    ) async {
+      final container = await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(40)),
+        playback: _playingAt(20),
+      );
+      await _settle(tester);
+      final far = tester.renderObject<RenderLyricLine>(_row(27));
+      final painted = far.debugPaintCount;
+
+      _show(container, _playingAt(21));
+      await _settle(tester);
+
+      expect(far.debugPaintCount, painted);
+    });
+
+    testWidgets('with the keyboard up the lyrics step instead of sweeping', (
+      tester,
+    ) async {
+      addTearDown(tester.view.resetViewInsets);
+      await _pumpLyrics(
+        tester,
+        track: _track(words: words),
+        playback: playingAt(1100),
+      );
+      await _settle(tester);
+      expect(_lineOf(tester, '故事').smooth, isTrue);
+
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pump();
+      await tester.pump();
+
+      expect(_lineOf(tester, '故事').smooth, isFalse);
+    });
+
+    testWidgets('lines far from the viewport are not painted', (tester) async {
+      await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(80)),
+        playback: _playingAt(0),
+      );
+      await _settle(tester);
+
+      expect(tester.renderObject<RenderLyricLine>(_row(79)).debugPaintCount, 0);
+      expect(
+        tester.renderObject<RenderLyricLine>(_row(1)).debugPaintCount,
+        greaterThan(0),
+      );
+    });
+
+    testWidgets('a line left while the user holds the lyrics still fades', (
+      tester,
+    ) async {
+      final container = await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(40)),
+        playback: _playingAt(20),
+      );
+      await _settle(tester);
+      await tester.drag(_row(20), const Offset(0, -50));
+      await tester.pump();
+
+      _show(container, _playingAt(21));
+      await _pumpFor(tester, const Duration(seconds: 1));
+
+      expect(tester.renderObject<RenderLyricLine>(_row(20)).debugSelection, 0);
+      expect(tester.renderObject<RenderLyricLine>(_row(21)).debugSelection, 1);
+    });
+
+    testWidgets('rows leave one after another, from the top of the viewport', (
+      tester,
+    ) async {
+      final container = await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(40)),
+        playback: _playingAt(20),
+      );
+      await _settle(tester);
+      final viewport = tester.getRect(find.byType(SingleChildScrollView));
+      final rows = [
+        for (var index = 0; index < 40; index++)
+          if (viewport.contains(tester.getCenter(_row(index)))) index,
+      ];
+      final top = rows.first;
+      final middle = rows[rows.length ~/ 2];
+      final topBefore = tester.getTopLeft(_row(top)).dy;
+      final middleBefore = tester.getTopLeft(_row(middle)).dy;
+
+      _show(container, _playingAt(21));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 30));
+      await tester.pump(const Duration(milliseconds: 30));
+
+      final topMoved = topBefore - tester.getTopLeft(_row(top)).dy;
+      final middleMoved = middleBefore - tester.getTopLeft(_row(middle)).dy;
+      expect(topMoved, greaterThan(0));
+      expect(middleMoved, lessThan(topMoved));
+    });
+
+    testWidgets('while the user holds the lyrics nothing blurs, and it comes '
+        'back after', (tester) async {
+      await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(40)),
+        playback: _playingAt(20),
+      );
+      await _settle(tester);
+      expect(_lineOf(tester, _text(21)).scrolling, isFalse);
+
+      await tester.drag(_row(20), const Offset(0, -50));
+      await tester.pump();
+      expect(_lineOf(tester, _text(21)).scrolling, isTrue);
+
+      await _pumpFor(tester, const Duration(seconds: 5));
+      expect(_lineOf(tester, _text(21)).scrolling, isFalse);
+    });
   });
 }

@@ -53,6 +53,41 @@ void main() {
     }
   });
 
+  testWidgets('waiting for the next word line adds no frames', (tester) async {
+    final room = await enterBusyRoom(
+      tester,
+      lyricWords: '[0,1000](0,1000,0)一\n[5000,1000](5000,1000,0)二',
+    );
+
+    room.router.go(RoomMode.lyrics.routeIn('listen'));
+
+    expect(await idleFrames(tester), lessThanOrEqualTo(roomPageFrames));
+  });
+
+  testWidgets('a break with dots to move stays within the rate of a sung '
+      'line', (tester) async {
+    final room = await enterBusyRoom(
+      tester,
+      lyricWords: '[100000,1000](100000,1000,0)字',
+    );
+
+    room.router.go(RoomMode.lyrics.routeIn('listen'));
+
+    expect(await idleFrames(tester), lessThanOrEqualTo(62 + roomPageFrames));
+  });
+
+  testWidgets('a word line being sung draws about 60 frames a second, not '
+      'one for each refresh of the screen', (tester) async {
+    final room = await enterBusyRoom(
+      tester,
+      lyricWords: '[0,170000](0,170000,0)字',
+    );
+
+    room.router.go(RoomMode.lyrics.routeIn('listen'));
+
+    expect(await idleFrames(tester), inInclusiveRange(40, 62 + roomPageFrames));
+  });
+
   testWidgets('pages over an active room draw no more than the half-second '
       'refreshes', (tester) async {
     final room = await enterBusyRoom(tester);

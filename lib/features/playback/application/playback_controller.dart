@@ -22,6 +22,13 @@ final playbackControllerProvider =
       PlaybackController.new,
     );
 
+typedef LivePosition = int Function();
+
+final livePositionProvider = Provider<LivePosition>((ref) {
+  final controller = ref.read(playbackControllerProvider.notifier);
+  return () => controller.livePositionMs;
+});
+
 const _tick = Duration(milliseconds: 500);
 final _ticksPerDriftCheck =
     playbackDriftCheckIntervalMs ~/ _tick.inMilliseconds;
@@ -137,6 +144,11 @@ final class PlaybackController extends Notifier<LocalPlaybackState> {
       await ref.read(settingsControllerProvider.notifier).setMuted(muted);
     }
   }
+
+  /// 逐帧读取，不发布状态：音源就绪前不读引擎，它还在报上一首的位置。
+  int get livePositionMs => _loaded != null && _loaded == _identity
+      ? _engine.position.inMilliseconds
+      : state.positionMs;
 
   bool get _held => _userPaused || _interrupted || _stopped || _enginePaused;
 

@@ -404,6 +404,8 @@ final class PlaybackHarness {
     async.flushMicrotasks();
   }
 
+  int livePosition() => container.read(livePositionProvider)();
+
   final FakeAsync async;
   final FakeCoverCache covers;
   final reminder = FakeTrackStartReminder();

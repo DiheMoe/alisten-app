@@ -14,14 +14,10 @@ void main() {
   Widget aurora({
     bool disableAnimations = false,
     bool tickers = true,
-    double keyboard = 0,
     GlobalKey<NavigatorState>? navigator,
   }) {
     return MediaQuery(
-      data: MediaQueryData(
-        disableAnimations: disableAnimations,
-        viewInsets: EdgeInsets.only(bottom: keyboard),
-      ),
+      data: MediaQueryData(disableAnimations: disableAnimations),
       child: MaterialApp(
         navigatorKey: navigator,
         theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
@@ -88,15 +84,18 @@ void main() {
 
   testWidgets('the aurora stands still while the keyboard is up, and goes on '
       'from where it stood once it is down', (tester) async {
+    addTearDown(tester.view.resetViewInsets);
     await tester.pumpWidget(aurora());
     await tester.pump(AlistenDurations.auroraLoop ~/ 4);
 
-    await tester.pumpWidget(aurora(keyboard: 300));
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.pump();
     final before = _lights(tester);
     expect(await _framesIn(tester, second), 0);
     await tester.pump(AlistenDurations.auroraLoop ~/ 4);
 
-    await tester.pumpWidget(aurora());
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     // 键盘显示期间的时间不计入，极光从停下的位置继续。
     expect(

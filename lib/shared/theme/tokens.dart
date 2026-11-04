@@ -99,7 +99,8 @@ abstract final class AlistenDurations {
   static const layout = Duration(milliseconds: 400);
   static const track = Duration(milliseconds: 450);
   static const bounce = Duration(milliseconds: 420);
-  static const lyricLine = Duration(milliseconds: 500);
+  static const lyricState = Duration(milliseconds: 400);
+  static const lyricBlur = Duration(milliseconds: 120);
   static const theme = Duration(milliseconds: 600);
   static const backdrop = Duration(milliseconds: 800);
   static const toast = Duration(seconds: 3);
@@ -153,10 +154,12 @@ abstract final class AlistenTypography {
 
   static final lyric = _style(
     26,
-    FontWeight.w600,
+    FontWeight.w700,
     height: 1.3,
     letterSpacing: -0.3,
   );
+
+  static final lyricTranslation = _style(15, FontWeight.w600, height: 1.3);
 
   static final timecode = _style(
     13,

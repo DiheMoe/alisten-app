@@ -10,6 +10,7 @@ import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/chat/index.dart';
 import 'package:alisten/features/lyrics/index.dart';
+import 'package:alisten/features/lyrics/presentation/render_lyric_line.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/room/index.dart';
@@ -707,7 +708,7 @@ void main() {
     router.go('/r/listen/lyrics');
     await settle();
 
-    await tester.drag(_inRoom(find.text('第一行')), const Offset(-250, 0));
+    await tester.drag(_inRoom(_lyric('第一行')), const Offset(-250, 0));
     await settle();
     expect(router.state.uri.path, '/r/listen/queue');
     expect(_inRoom(find.byType(QueueView)), findsOneWidget);
@@ -912,7 +913,7 @@ void main() {
     await settle();
 
     final gesture = await tester.startGesture(
-      tester.getCenter(_inRoom(find.text('第一行'))),
+      tester.getCenter(_inRoom(_lyric('第一行'))),
     );
     await gesture.moveBy(const Offset(-30, 0));
     await tester.pump();
@@ -939,7 +940,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
     }
 
-    expect(find.text('另一首的第一行'), findsOneWidget);
+    expect(_lyric('另一首的第一行'), findsOneWidget);
     expect(_scrolledPages(tester), moreOrLessEquals(held));
     await gesture.up();
     await settle();
@@ -1178,6 +1179,12 @@ final _sung = _track(
 enum _Leave { collapse, back, player }
 
 final _leaving = ValueVariant(_Leave.values.toSet());
+
+Finder _lyric(String text) {
+  return find.byWidgetPredicate(
+    (widget) => widget is LyricLineRow && widget.line.text == text,
+  );
+}
 
 Finder _inRoom(Finder finder) =>
     find.descendant(of: find.byType(RoomScreen), matching: finder);

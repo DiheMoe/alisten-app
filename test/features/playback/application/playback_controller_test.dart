@@ -614,4 +614,45 @@ void main() {
       expect(h.engine.playCalls, 0);
     });
   });
+
+  test('the live position follows the engine between published ticks', () {
+    run((h) {
+      h.hello(nowPlayingWith(), serverNow: trackStart + 30000);
+      h.async.elapse(const Duration(seconds: 1));
+      h.async.elapse(const Duration(milliseconds: 100));
+
+      expect(h.livePosition(), h.engine.position.inMilliseconds);
+      expect(h.livePosition(), isNot(h.state.positionMs));
+    });
+  });
+
+  test('the live position stands still with a paused engine', () {
+    run((h) {
+      h.hello(nowPlayingWith(), serverNow: trackStart + 30000);
+      h.async.elapse(const Duration(seconds: 1));
+      unawaited(h.playback.toggleLocalPause());
+      h.async.flushMicrotasks();
+      final paused = h.livePosition();
+
+      h.async.elapse(const Duration(seconds: 1));
+
+      expect(h.livePosition(), paused);
+    });
+  });
+
+  test('while the next track loads the live position is not the last '
+      "track's", () {
+    run((h) {
+      h.hello(nowPlayingWith(), serverNow: trackStart + 30000);
+      h.async.elapse(const Duration(seconds: 1));
+      h.engine.loadDuration = const Duration(seconds: 2);
+
+      h.play(nowPlayingWith(entryId: 'next', startedAtMs: h.serverNow));
+      h.async.flushMicrotasks();
+
+      expect(h.state.status, LocalPlaybackStatus.loading);
+      expect(h.livePosition(), h.state.positionMs);
+      expect(h.livePosition(), lessThan(1000));
+    });
+  });
 }
