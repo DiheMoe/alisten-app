@@ -61,10 +61,16 @@ Widget _faded(Widget child) {
 
 /// 列表只随房间快照变化，发起变更时不做乐观更新。
 class QueueView extends ConsumerWidget {
-  const QueueView({required this.onAddSong, required this.onResult, super.key});
+  const QueueView({
+    required this.onAddSong,
+    required this.onResult,
+    required this.onCopyTitle,
+    super.key,
+  });
 
   final VoidCallback onAddSong;
   final QueueResultCallback onResult;
+  final ValueChanged<String> onCopyTitle;
 
   Future<bool> _like(QueueController queue, QueueEntry entry) async {
     final result = await queue.like(entry.id);
@@ -157,6 +163,7 @@ class QueueView extends ConsumerWidget {
                   child: _EntryRow(
                     entry: playing,
                     mine: mine,
+                    onCopyTitle: onCopyTitle,
                     trailing: _Playing(likes: playing.likes),
                   ),
                 ),
@@ -177,6 +184,7 @@ class QueueView extends ConsumerWidget {
                   child: _EntryRow(
                     entry: pending,
                     mine: mine,
+                    onCopyTitle: onCopyTitle,
                     trailing: _LikeCount(likes: pending.likes),
                   ),
                 ),
@@ -239,6 +247,7 @@ class QueueView extends ConsumerWidget {
                           child: _EntryRow(
                             entry: entry,
                             mine: mine,
+                            onCopyTitle: onCopyTitle,
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -430,12 +439,18 @@ class _PanelPainter extends CustomPainter {
 
 // 不使用 Hero 标签：正在播放的封面已在房间头部。
 class _EntryRow extends StatelessWidget {
-  const _EntryRow({required this.entry, required this.mine, this.trailing});
+  const _EntryRow({
+    required this.entry,
+    required this.mine,
+    required this.onCopyTitle,
+    this.trailing,
+  });
 
   final QueueEntry entry;
 
   /// 本机成员的 ID。
   final String? mine;
+  final ValueChanged<String> onCopyTitle;
   final Widget? trailing;
 
   @override
@@ -460,6 +475,8 @@ class _EntryRow extends StatelessWidget {
             )
           : null,
       coverUrl: entry.meta.coverUrl,
+      onLongPress: () => onCopyTitle(entry.meta.title),
+      longPressHint: copyTitleHint,
       trailing: trailing,
       padding: _rowPadding,
     );

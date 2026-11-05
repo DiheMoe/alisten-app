@@ -12,12 +12,14 @@ import 'package:alisten/features/playback/presentation/player_controls.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
-import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
+import 'package:alisten/shared/ui/track_row.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// [compact] 时曲目收拢为顶部一行，[body] 显示在其下方；否则是占满空间的
@@ -30,6 +32,7 @@ class NowPlayingHeader extends ConsumerStatefulWidget {
     required this.onAddSong,
     required this.onVoteSkipped,
     this.onExpand,
+    this.onCopyTitle,
     this.body,
     super.key,
   });
@@ -40,6 +43,7 @@ class NowPlayingHeader extends ConsumerStatefulWidget {
   final VoidCallback onAddSong;
   final ValueChanged<MutationResult<VoteSkipResult>> onVoteSkipped;
   final VoidCallback? onExpand;
+  final ValueChanged<String>? onCopyTitle;
   final Widget? body;
 
   @override
@@ -180,7 +184,11 @@ class _NowPlayingHeaderState extends ConsumerState<NowPlayingHeader>
             ),
             LayoutId(
               id: _Part.title,
-              child: _TitleBlock(nowPlaying: nowPlaying, shrink: _shrink),
+              child: _TitleBlock(
+                nowPlaying: nowPlaying,
+                shrink: _shrink,
+                onCopyTitle: widget.onCopyTitle,
+              ),
             ),
             if (!status.isCompleted)
               LayoutId(
@@ -382,10 +390,15 @@ String _playKey(NowPlaying? nowPlaying) => nowPlaying == null
     : '${nowPlaying.entry.id}@${nowPlaying.startedAtMs}';
 
 class _TitleBlock extends ConsumerWidget {
-  const _TitleBlock({required this.nowPlaying, required this.shrink});
+  const _TitleBlock({
+    required this.nowPlaying,
+    required this.shrink,
+    required this.onCopyTitle,
+  });
 
   final NowPlaying? nowPlaying;
   final Animation<double> shrink;
+  final ValueChanged<String>? onCopyTitle;
 
   static TextStyle _title({required bool compact}) =>
       AlistenTypography.weighted(
@@ -421,6 +434,10 @@ class _TitleBlock extends ConsumerWidget {
           )
         : null;
     final title = entry?.meta.title ?? '还没有歌，点一首吧';
+    final copyTitle = onCopyTitle;
+    final onLongPress = entry == null || copyTitle == null
+        ? null
+        : () => copyTitle(title);
     final requester = entry == null
         ? null
         : entry.auto
@@ -464,11 +481,25 @@ class _TitleBlock extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: titleStyle,
+              // 用自定义操作：歌名只有一行高，长按语义会让它算作过小的点按
+              // 目标。
+              Semantics(
+                customSemanticsActions: onLongPress == null
+                    ? null
+                    : {
+                        const CustomSemanticsAction(label: copyTitleHint):
+                            onLongPress,
+                      },
+                child: GestureDetector(
+                  onLongPress: onLongPress,
+                  excludeFromSemantics: true,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: titleStyle,
+                  ),
+                ),
               ),
               SizedBox(
                 height: lerpDouble(

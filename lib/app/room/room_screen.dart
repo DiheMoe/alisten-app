@@ -204,9 +204,14 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
     final toasts = ref.read(toastControllerProvider);
     void reportQueue(MutationResult<Object?> result, String success) =>
         reportMutation(toasts, result, success: (_) => success);
+    void copyTitle(String title) => copySongTitle(toasts, title);
     Widget content(RoomMode page) => switch (page) {
       RoomMode.lyrics || RoomMode.player => const LyricsView(),
-      RoomMode.queue => QueueView(onAddSong: _addSong, onResult: reportQueue),
+      RoomMode.queue => QueueView(
+        onAddSong: _addSong,
+        onResult: reportQueue,
+        onCopyTitle: copyTitle,
+      ),
       RoomMode.chat => const ChatView(),
     };
     final background = FlowingCoverBackdrop(
@@ -235,6 +240,7 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
       onAddSong: _addSong,
       onVoteSkipped: (result) => _reportVote(toasts, result),
       onExpand: () => _show(RoomMode.player),
+      onCopyTitle: copyTitle,
       body: twoPanes
           ? null
           : RoomPager(

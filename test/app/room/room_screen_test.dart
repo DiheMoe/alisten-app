@@ -158,6 +158,78 @@ void main() {
     unawaited(rooms.last.stop());
   });
 
+  testWidgets('long pressing the song title copies it, and a tap does not', (
+    tester,
+  ) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map<Object?, Object?>)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final (rooms: _, :router, :settle) = await enterRoom(
+      tester,
+      nowPlaying: _sung,
+    );
+    router.go('/r/listen/lyrics');
+    await settle();
+    final title = _inRoom(find.text('夜曲'));
+
+    await tester.tap(title);
+    await settle();
+    expect(copied, isNull);
+
+    await tester.longPress(title);
+    await tester.pump();
+
+    expect(copied, '夜曲');
+    expect(find.text('已复制歌名'), findsOneWidget);
+    expect(router.state.uri.path, '/r/listen/lyrics');
+  });
+
+  testWidgets('a room without a song has no title to copy', (tester) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map<Object?, Object?>)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final (:rooms, :router, :settle) = await enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+    rooms.last.emit(
+      const RoomEventReceived(
+        PlaybackUpdatedEvent(term: 1, seq: 2, nowPlaying: null),
+      ),
+    );
+    await settle();
+
+    await tester.longPress(_inRoom(find.text('还没有歌，点一首吧')));
+    await tester.pump();
+
+    expect(copied, isNull);
+  });
+
   testWidgets('the invite link names the room by its alias, as the website '
       'does, also when the room was opened by its id', (tester) async {
     String? copied;

@@ -38,6 +38,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
     required this.onDeleted,
     required this.onCleared,
     required this.onNotice,
+    required this.onCopyTitle,
     super.key,
   });
 
@@ -50,6 +51,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
   final VoidCallback onCleared;
 
   final ValueChanged<String> onNotice;
+  final ValueChanged<String> onCopyTitle;
 
   @override
   ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
@@ -328,6 +330,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       currentOrigin: currentOrigin,
                       onPick: _pick,
                       onDelete: () => _delete(record),
+                      onCopyTitle: widget.onCopyTitle,
                     );
                   },
                 ),
@@ -453,6 +456,7 @@ class _PlayRow extends StatelessWidget {
     required this.currentOrigin,
     required this.onPick,
     required this.onDelete,
+    required this.onCopyTitle,
     super.key,
   });
 
@@ -460,6 +464,7 @@ class _PlayRow extends StatelessWidget {
   final String currentOrigin;
   final PickSong onPick;
   final VoidCallback onDelete;
+  final ValueChanged<String> onCopyTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -504,6 +509,8 @@ class _PlayRow extends StatelessWidget {
             originAuthority(record.serverOrigin),
         ].where((part) => part.isNotEmpty).join(' · '),
         coverUrl: meta.coverUrl,
+        onLongPress: () => onCopyTitle(meta.title),
+        longPressHint: copyTitleHint,
         semanticActions: {const CustomSemanticsAction(label: '删除'): onDelete},
         padding: const EdgeInsets.fromLTRB(
           AlistenSpacing.page,

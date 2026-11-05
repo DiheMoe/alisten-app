@@ -5,6 +5,8 @@ import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/widgets.dart';
 
+const copyTitleHint = '复制歌名';
+
 class TrackRow extends StatelessWidget {
   const TrackRow({
     required this.title,

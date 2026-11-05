@@ -4,6 +4,7 @@ import 'package:alisten/features/chat/index.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/ui/toast.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final toastControllerProvider = Provider<ToastController>((ref) {
@@ -13,6 +14,12 @@ final toastControllerProvider = Provider<ToastController>((ref) {
 });
 
 const mutationUnknownText = '结果未知，已重新同步';
+
+void copySongTitle(ToastController toasts, String title) {
+  unawaited(Clipboard.setData(ClipboardData(text: title)));
+  unawaited(HapticFeedback.mediumImpact());
+  toasts.show(ToastKind.success, '已复制歌名');
+}
 
 void showMutationFeedback<T>(
   WidgetRef ref,

@@ -92,6 +92,7 @@ final class _Room {
   int sent = 0;
   int added = 0;
   final reported = <_Result>[];
+  final copied = <String>[];
 
   late final ProviderContainer container = ProviderContainer(
     overrides: [
@@ -130,6 +131,7 @@ final class _Room {
     await tester.pumpWidget(
       _app(
         QueueView(
+          onCopyTitle: copied.add,
           onAddSong: () => added++,
           onResult: (result, success) =>
               reported.add((result: result, success: success)),
@@ -254,6 +256,30 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('1'), findsNothing);
     expect(find.text('2'), findsOneWidget);
+  });
+
+  testWidgets('long pressing a song copies its title, wherever it stands', (
+    tester,
+  ) async {
+    final room = await _pumpQueue(
+      tester,
+      _snapshot(
+        playing: _entry('a'),
+        pending: _entry('b'),
+        items: [_entry('c')],
+      ),
+    );
+
+    for (final id in ['a', 'b', 'c']) {
+      await tester.longPress(
+        find.widgetWithText(TrackRow, _entry(id).meta.title),
+      );
+      await tester.pump();
+    }
+
+    expect(room.copied, [
+      for (final id in ['a', 'b', 'c']) _entry(id).meta.title,
+    ]);
   });
 
   testWidgets('a room without songs invites to add one', (tester) async {

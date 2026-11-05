@@ -13,6 +13,7 @@ import 'package:alisten/features/server/data/preferences_server_store.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/track_row.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -185,6 +186,32 @@ void main() {
     expect(tester.getTopLeft(find.text('今天')).dy, lessThanOrEqualTo(heading));
     expect(find.text('today-0'), findsNothing);
     expect(floorOf('今天').a, greaterThan(0.9));
+  });
+
+  testWidgets('long pressing a record copies its title', (tester) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map<Object?, Object?>)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await _openHistory(tester, [_played('一首歌', at: _now)]);
+
+    await tester.longPress(find.text('一首歌'));
+    await tester.pump();
+
+    expect(copied, '一首歌');
+    expect(find.text('已复制歌名'), findsOneWidget);
   });
 
   testWidgets('a row swiped away is deleted once and leaves the list', (

@@ -100,6 +100,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                       if (undoOffer case final offer?) toasts.withdraw(offer);
                     },
                     onNotice: failed,
+                    onCopyTitle: (title) => copySongTitle(toasts, title),
                   ),
                 ),
               ),
