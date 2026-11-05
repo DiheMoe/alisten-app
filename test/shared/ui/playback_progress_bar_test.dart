@@ -5,6 +5,45 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  Widget bar({required int positionMs}) {
+    return MaterialApp(
+      theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
+      home: Center(
+        child: SizedBox(
+          width: 200,
+          child: PlaybackProgressBar(
+            positionMs: positionMs,
+            durationMs: 100000,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Finder track() => find.descendant(
+    of: find.byType(PlaybackProgressBar),
+    matching: find.byType(CustomPaint),
+  );
+
+  testWidgets('the played part ends in a glowing head', (tester) async {
+    await tester.pumpWidget(bar(positionMs: 25000));
+
+    expect(
+      track(),
+      paints
+        ..rrect()
+        ..rrect()
+        ..circle(x: 50)
+        ..circle(x: 50),
+    );
+  });
+
+  testWidgets('nothing played has no head', (tester) async {
+    await tester.pumpWidget(bar(positionMs: 0));
+
+    expect(track(), isNot(paints..circle()));
+  });
+
   testWidgets('shows elapsed and total time and speaks them in words', (
     tester,
   ) async {

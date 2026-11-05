@@ -10,6 +10,7 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_slider.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
+import 'package:alisten/shared/ui/nudge.dart';
 import 'package:alisten/shared/ui/popover.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/material.dart';
@@ -190,6 +191,7 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
                     labelHeight: labelHeight,
                     active: vote != null,
                     busy: widget.voting,
+                    nudge: vote,
                     onPressed: onVoteSkip,
                   ),
                 ),
@@ -403,6 +405,7 @@ class _SideControl extends StatelessWidget {
     this.expanded,
     this.active = false,
     this.busy = false,
+    this.nudge,
   });
 
   final IconData icon;
@@ -420,6 +423,9 @@ class _SideControl extends StatelessWidget {
   /// 展开内容打开或操作效果仍在（如投票已计入）时点亮。
   final bool active;
   final bool busy;
+
+  /// 变成新的非空值时，图标向前推一下，表示操作已计入。
+  final Object? nudge;
 
   /// 使圆形按钮与播放按钮中心对齐的上方留白。
   static const inset =
@@ -468,10 +474,13 @@ class _SideControl extends StatelessWidget {
                 child: Center(
                   child: busy
                       ? const BusyIndicator(size: AlistenSizes.iconSm)
-                      : Icon(
-                          icon,
-                          size: AlistenSizes.icon,
-                          color: colors.onGlass,
+                      : Nudge(
+                          trigger: nudge,
+                          child: Icon(
+                            icon,
+                            size: AlistenSizes.icon,
+                            color: colors.onGlass,
+                          ),
                         ),
                 ),
               ),
@@ -544,10 +553,13 @@ class _CompactVote extends StatelessWidget {
                 child: Center(
                   child: voting
                       ? const BusyIndicator(size: AlistenSizes.iconSm)
-                      : Icon(
-                          Icons.skip_next_rounded,
-                          size: AlistenSizes.icon,
-                          color: colors.onGlass,
+                      : Nudge(
+                          trigger: vote,
+                          child: Icon(
+                            Icons.skip_next_rounded,
+                            size: AlistenSizes.icon,
+                            color: colors.onGlass,
+                          ),
                         ),
                 ),
               ),

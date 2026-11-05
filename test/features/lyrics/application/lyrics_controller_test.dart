@@ -1,5 +1,7 @@
+import 'package:alisten/domain/playback/lrc.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/lyrics/index.dart';
+import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,6 +41,65 @@ final class _Room extends Notifier<RoomState> {
 final _roomFixture = NotifierProvider<_Room, RoomState>(_Room.new);
 
 void main() {
+  group('currentLyricProvider', () {
+    ProviderContainer playing(
+      String lyric, {
+      required int positionMs,
+      LocalPlaybackStatus status = LocalPlaybackStatus.playing,
+    }) {
+      final container = ProviderContainer(
+        overrides: [
+          lyricsProvider.overrideWith((ref) => buildLyricLines(lyric: lyric)),
+          playbackControllerProvider.overrideWithBuild(
+            (ref, _) =>
+                LocalPlaybackState(status: status, positionMs: positionMs),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    const lyric = '[00:01.00]第一句\n[00:03.00]\n[00:05.00]第二句';
+
+    test('names the line being sung', () {
+      expect(
+        playing(lyric, positionMs: 1500).read(currentLyricProvider),
+        '第一句',
+      );
+      expect(
+        playing(lyric, positionMs: 6000).read(currentLyricProvider),
+        '第二句',
+      );
+    });
+
+    test('has nothing before the first line or in a gap', () {
+      expect(
+        playing(lyric, positionMs: 500).read(currentLyricProvider),
+        isNull,
+      );
+      expect(
+        playing(lyric, positionMs: 3500).read(currentLyricProvider),
+        isNull,
+      );
+    });
+
+    test('has nothing unless this device is playing', () {
+      expect(
+        playing(
+          lyric,
+          positionMs: 1500,
+          status: LocalPlaybackStatus.paused,
+        ).read(currentLyricProvider),
+        isNull,
+      );
+    });
+
+    test('has nothing without lyrics', () {
+      expect(playing('', positionMs: 1500).read(currentLyricProvider), isNull);
+    });
+  });
+
   ProviderContainer containerWith(RoomState room) {
     final container = ProviderContainer(
       overrides: [

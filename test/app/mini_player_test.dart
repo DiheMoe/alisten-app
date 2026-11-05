@@ -5,10 +5,13 @@ import 'package:alisten/app/router.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/realtime/room_transport.dart';
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/features/lyrics/index.dart';
+import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../domain/room/room_fixtures.dart';
@@ -29,13 +32,18 @@ Future<
     Future<void> Function() settle,
   })
 >
-_openedRoom(WidgetTester tester) async {
+_openedRoom(
+  WidgetTester tester, {
+  String? lyric,
+  List<Override> overrides = const [],
+}) async {
   final rooms = FakeRoomTransportFactory();
   await pumpAlistenApp(
     tester,
     api: FakeAlistenApi()..rooms = [roomListing(id: _roomId, slug: 'listen')],
     credentials: FakeCredentialStore()..tickets[_roomId] = 'saved-ticket',
     rooms: rooms,
+    overrides: [currentLyricProvider.overrideWithValue(lyric), ...overrides],
   );
   final container = appContainer(tester);
   Future<void> settle() async {
@@ -63,6 +71,67 @@ _openedRoom(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('the bar shows the line being sung in place of the artist', (
+    tester,
+  ) async {
+    await _openedRoom(tester, lyric: '故事的小黄花');
+
+    expect(find.text('故事的小黄花'), findsOneWidget);
+    expect(
+      find.text('一起听 · ${testNowPlaying.entry.meta.artist}'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('between lines the bar names the room and the artist', (
+    tester,
+  ) async {
+    await _openedRoom(tester);
+
+    expect(
+      find.text('一起听 · ${testNowPlaying.entry.meta.artist}'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('trouble with the connection comes before the lyrics', (
+    tester,
+  ) async {
+    final (:rooms, :container, :settle) = await _openedRoom(
+      tester,
+      lyric: '故事的小黄花',
+    );
+
+    rooms.last.disconnect();
+    await settle();
+
+    expect(find.text('故事的小黄花'), findsNothing);
+    // 让重连的定时器走完。
+    await tester.pump(const Duration(minutes: 1));
+  });
+
+  testWidgets('the progress ends in a glowing head', (tester) async {
+    await _openedRoom(
+      tester,
+      overrides: [
+        playbackControllerProvider.overrideWithBuild(
+          (ref, _) => const LocalPlaybackState(
+            status: LocalPlaybackStatus.playing,
+            positionMs: 30000,
+            durationMs: 60000,
+          ),
+        ),
+      ],
+    );
+
+    expect(
+      find.byType(MiniPlayerProgress),
+      paints
+        ..circle()
+        ..circle(),
+    );
+  });
+
   testWidgets('outside the room the mini player shows what the active room '
       'plays and leads back to it', (tester) async {
     final rooms = FakeRoomTransportFactory();

@@ -77,7 +77,12 @@ final class _Room {
   _Room(this.tester, this.snapshot, {this.refusal, this.hold});
 
   final WidgetTester tester;
-  final RoomSnapshot snapshot;
+  RoomSnapshot snapshot;
+
+  void show(RoomSnapshot next) {
+    snapshot = next;
+    container.invalidate(roomControllerProvider);
+  }
 
   /// 为 null 时房间不答复，结果未知。
   final ({String code, String message})? refusal;
@@ -227,6 +232,28 @@ void main() {
     final choices = find.byType(SegmentedPills<RoomPlayMode>);
     expect(tester.getRect(choices).top, greaterThanOrEqualTo(band));
     expect(tester.getRect(find.text('播放模式')).top, greaterThanOrEqualTo(band));
+  });
+
+  testWidgets('likes the song playing gets slide in like those in the queue', (
+    tester,
+  ) async {
+    final room = await _pumpQueue(tester, _snapshot(playing: _entry('a')));
+    expect(find.text('1'), findsNothing);
+
+    room.show(_snapshot(playing: _entry('a', likes: 1)));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    room.show(_snapshot(playing: _entry('a', likes: 2)));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('1'), findsNothing);
+    expect(find.text('2'), findsOneWidget);
   });
 
   testWidgets('a room without songs invites to add one', (tester) async {

@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
+import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -181,14 +183,27 @@ class MiniPlayer extends StatelessWidget {
     final meta = nowPlaying?.entry.meta;
     final closable =
         failure == RoomFailure.notFound || failure == RoomFailure.outdated;
-    final (subtitle, subtitleInk) = switch ((status, meta)) {
-      _ when failure != null => (errorMessage ?? '与房间的连接已经停止', colors.danger),
-      (RoomConnectionStatus.connecting, _) => ('正在连接房间…', colors.warning),
-      (RoomConnectionStatus.reconnecting, _) => ('连接中断，正在重连…', colors.warning),
-      (_, null) => ('房间暂时没有播放', colors.onGlassMuted),
+    final (subtitle, subtitleInk, lyricsFit) = switch ((status, meta)) {
+      _ when failure != null => (
+        errorMessage ?? '与房间的连接已经停止',
+        colors.danger,
+        false,
+      ),
+      (RoomConnectionStatus.connecting, _) => (
+        '正在连接房间…',
+        colors.warning,
+        false,
+      ),
+      (RoomConnectionStatus.reconnecting, _) => (
+        '连接中断，正在重连…',
+        colors.warning,
+        false,
+      ),
+      (_, null) => ('房间暂时没有播放', colors.onGlassMuted, false),
       (_, final meta?) => (
         [?roomName, meta.artist].where((part) => part.isNotEmpty).join(' · '),
         colors.onGlassMuted,
+        true,
       ),
     };
     void open() => context.go('/r/$roomId');
@@ -252,13 +267,10 @@ class MiniPlayer extends StatelessWidget {
                               ).copyWith(color: colors.onGlass),
                             ),
                             const SizedBox(height: _lineGap),
-                            Text(
-                              subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AlistenTypography.secondary.copyWith(
-                                color: subtitleInk,
-                              ),
+                            _Subtitle(
+                              text: subtitle,
+                              color: subtitleInk,
+                              lyricsFit: lyricsFit,
                             ),
                           ],
                         ),
@@ -275,7 +287,7 @@ class MiniPlayer extends StatelessWidget {
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    child: _Progress(),
+                    child: MiniPlayerProgress(),
                   ),
               ],
             ),
@@ -288,6 +300,40 @@ class MiniPlayer extends StatelessWidget {
 
 // 单位为逻辑像素每秒。
 const _openVelocity = 250.0;
+
+class _Subtitle extends ConsumerWidget {
+  const _Subtitle({
+    required this.text,
+    required this.color,
+    required this.lyricsFit,
+  });
+
+  final String text;
+  final Color color;
+
+  /// 连接出问题时要说明原因，不让歌词盖住。
+  final bool lyricsFit;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lyric = lyricsFit ? ref.watch(currentLyricProvider) : null;
+    final shown = lyric ?? text;
+    return AnimatedSwitcher(
+      duration: AlistenDurations.of(context, AlistenDurations.short),
+      layoutBuilder: (current, previous) => Stack(
+        alignment: AlignmentDirectional.centerStart,
+        children: [...previous, ?current],
+      ),
+      child: Text(
+        shown,
+        key: ValueKey(shown),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AlistenTypography.secondary.copyWith(color: color),
+      ),
+    );
+  }
+}
 
 class _Close extends ConsumerWidget {
   const _Close();
@@ -344,8 +390,9 @@ class _LocalPause extends ConsumerWidget {
   }
 }
 
-class _Progress extends ConsumerWidget {
-  const _Progress();
+@visibleForTesting
+class MiniPlayerProgress extends ConsumerWidget {
+  const MiniPlayerProgress({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -355,15 +402,53 @@ class _Progress extends ConsumerWidget {
       ),
     );
     if (duration <= 0) return const SizedBox.shrink();
-    return Align(
-      alignment: AlignmentDirectional.centerStart,
-      child: FractionallySizedBox(
-        widthFactor: (position / duration).clamp(0.0, 1.0),
-        child: SizedBox(
-          height: AlistenSizes.progressTrack / 2,
-          child: ColoredBox(color: AlistenColors.of(context).glow),
-        ),
+    final colors = AlistenColors.of(context);
+    return CustomPaint(
+      size: const Size.fromHeight(AlistenSizes.progressTrack / 2),
+      painter: _ProgressPainter(
+        played: (position / duration).clamp(0.0, 1.0),
+        ink: colors.onGlass,
+        glow: colors.glow,
+        rtl: Directionality.of(context) == TextDirection.rtl,
       ),
     );
+  }
+}
+
+class _ProgressPainter extends CustomPainter {
+  _ProgressPainter({
+    required this.played,
+    required this.ink,
+    required this.glow,
+    required this.rtl,
+  });
+
+  final double played;
+  final Color ink;
+  final Color glow;
+  final bool rtl;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (played <= 0) return;
+    final width = size.width * played;
+    final filled = rtl
+        ? Rect.fromLTWH(size.width - width, 0, width, size.height)
+        : Rect.fromLTWH(0, 0, width, size.height);
+    canvas.drawRect(filled, Paint()..color = glow);
+    paintProgressHead(
+      canvas,
+      Offset(rtl ? filled.left : filled.right, size.height / 2),
+      ink: ink,
+      glow: glow,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ProgressPainter oldDelegate) {
+    return oldDelegate.played != played ||
+        oldDelegate.ink != ink ||
+        oldDelegate.glow != glow ||
+        oldDelegate.rtl != rtl;
   }
 }

@@ -51,6 +51,7 @@ class PlaybackProgressBar extends StatelessWidget {
               played: known ? position / durationMs : 0,
               ink: colors.onGlass,
               empty: colors.outline,
+              glow: colors.glow,
               rtl: Directionality.of(context) == TextDirection.rtl,
             ),
           ),
@@ -109,17 +110,41 @@ String spokenDuration(int ms) {
   ].join();
 }
 
+const _headRadius = 3.0;
+const _headGlowRadius = 7.0;
+const _headGlowBlur = 3.5;
+
+/// 进度的端点：一个亮点，外面一圈跟随封面取色的光晕。
+void paintProgressHead(
+  Canvas canvas,
+  Offset center, {
+  required Color ink,
+  required Color glow,
+}) {
+  canvas
+    ..drawCircle(
+      center,
+      _headGlowRadius,
+      Paint()
+        ..color = glow
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, _headGlowBlur),
+    )
+    ..drawCircle(center, _headRadius, Paint()..color = ink);
+}
+
 class _TrackPainter extends CustomPainter {
   _TrackPainter({
     required this.played,
     required this.ink,
     required this.empty,
+    required this.glow,
     required this.rtl,
   });
 
   final double played;
   final Color ink;
   final Color empty;
+  final Color glow;
   final bool rtl;
 
   @override
@@ -139,6 +164,12 @@ class _TrackPainter extends CustomPainter {
       RRect.fromRectAndRadius(filled, radius),
       Paint()..color = ink,
     );
+    paintProgressHead(
+      canvas,
+      Offset(rtl ? filled.left : filled.right, size.height / 2),
+      ink: ink,
+      glow: glow,
+    );
   }
 
   @override
@@ -146,6 +177,7 @@ class _TrackPainter extends CustomPainter {
     return oldDelegate.played != played ||
         oldDelegate.ink != ink ||
         oldDelegate.empty != empty ||
+        oldDelegate.glow != glow ||
         oldDelegate.rtl != rtl;
   }
 }

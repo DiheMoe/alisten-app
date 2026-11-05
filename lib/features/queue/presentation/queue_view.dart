@@ -565,12 +565,39 @@ class _LikeCount extends StatelessWidget {
                 color: muted,
               ),
               const SizedBox(width: AlistenSpacing.xxs),
-              Text(
-                '$likes',
-                style: AlistenTypography.timecode.copyWith(color: muted),
-              ),
+              _LikeNumber(likes),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LikeNumber extends StatelessWidget {
+  const _LikeNumber(this.likes);
+
+  final int likes;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: AlistenDurations.of(context, AlistenDurations.short),
+      layoutBuilder: (current, previous) => Stack(
+        alignment: AlignmentDirectional.centerStart,
+        children: [...previous, ?current],
+      ),
+      transitionBuilder: (child, animation) => SlideTransition(
+        position: animation.drive(
+          Tween(begin: const Offset(0, 0.6), end: Offset.zero),
+        ),
+        child: FadeTransition(opacity: animation, child: child),
+      ),
+      child: Text(
+        '$likes',
+        key: ValueKey(likes),
+        style: AlistenTypography.timecode.copyWith(
+          color: AlistenColors.of(context).onGlassMuted,
         ),
       ),
     );
@@ -694,29 +721,7 @@ class _LikeButtonState extends State<_LikeButton>
                   const SizedBox(width: AlistenSpacing.xxs),
                   ConstrainedBox(
                     constraints: BoxConstraints(minWidth: countWidth),
-                    child: AnimatedSwitcher(
-                      duration: AlistenDurations.of(
-                        context,
-                        AlistenDurations.short,
-                      ),
-                      layoutBuilder: (current, previous) => Stack(
-                        alignment: AlignmentDirectional.centerStart,
-                        children: [...previous, ?current],
-                      ),
-                      transitionBuilder: (child, animation) => SlideTransition(
-                        position: animation.drive(
-                          Tween(begin: const Offset(0, 0.6), end: Offset.zero),
-                        ),
-                        child: FadeTransition(opacity: animation, child: child),
-                      ),
-                      child: Text(
-                        '${widget.likes}',
-                        key: ValueKey(widget.likes),
-                        style: AlistenTypography.timecode.copyWith(
-                          color: colors.onGlassMuted,
-                        ),
-                      ),
-                    ),
+                    child: _LikeNumber(widget.likes),
                   ),
                 ],
               ),
