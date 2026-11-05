@@ -13,6 +13,7 @@ import 'package:alisten/core/realtime/connectivity.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/history/index.dart';
+import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/playback/data/reminder_notifier.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/room/index.dart';
@@ -35,6 +36,7 @@ import '../domain/room/room_fixtures.dart';
 import '../features/admin/admin_test_doubles.dart';
 import '../features/history/history_test_doubles.dart';
 import '../features/lobby/lobby_test_doubles.dart';
+import '../features/lyrics/lyrics_test_doubles.dart';
 import '../features/playback/playback_test_doubles.dart' show FakeAudioEngine;
 import '../features/room/room_test_doubles.dart';
 import '../features/search/share_test_doubles.dart';
@@ -119,6 +121,7 @@ Future<List<Override>> alistenAppOverrides({
     ),
     qrImageLoaderProvider.overrideWithValue(qrImages ?? FakeQrImageLoader()),
     imageGalleryProvider.overrideWithValue(gallery ?? FakeImageGallery()),
+    screenAwakeDeviceProvider.overrideWithValue(FakeScreenAwakeDevice()),
     releaseSourceProvider.overrideWithValue(releases ?? FakeReleaseSource()),
     releaseOpenerProvider.overrideWithValue(
       releaseOpener ?? FakeReleaseOpener(),

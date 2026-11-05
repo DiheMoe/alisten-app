@@ -24,6 +24,8 @@ import 'package:alisten/features/history/data/share_history_exporter.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/lobby/index.dart';
+import 'package:alisten/features/lyrics/data/wakelock_screen_awake.dart';
+import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/playback/data/reminder_notifier.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/room/data/preferences_last_room_store.dart';
@@ -225,6 +227,7 @@ List<Override> platformAdapters({
 }) {
   return [
     audioEngineProvider.overrideWithValue(audioEngine),
+    screenAwakeDeviceProvider.overrideWithValue(const WakelockScreenAwake()),
     credentialStoreFactoryProvider.overrideWith((ref) {
       if (credentialStores != null) return credentialStores;
       return (serverId) => SecureCredentialStore(

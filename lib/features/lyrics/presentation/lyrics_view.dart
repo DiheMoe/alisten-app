@@ -7,6 +7,7 @@ import 'package:alisten/domain/playback/playback_identity.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/lyrics/application/lyric_clock.dart';
 import 'package:alisten/features/lyrics/application/lyrics_controller.dart';
+import 'package:alisten/features/lyrics/application/screen_awake.dart';
 import 'package:alisten/features/lyrics/presentation/lyric_line_layout.dart';
 import 'package:alisten/features/lyrics/presentation/lyric_motion.dart';
 import 'package:alisten/features/lyrics/presentation/lyric_snapshots.dart';
@@ -53,6 +54,8 @@ class _LyricsViewState extends ConsumerState<LyricsView>
   final _motion = LyricMotion();
   final _snapshots = LyricSnapshotCache();
   final _position = LyricClock();
+  late final _screen = ref.read(screenAwakeProvider);
+  bool _holdingScreen = false;
 
   bool _started = false;
   List<LyricLine> _lines = const [];
@@ -94,6 +97,7 @@ class _LyricsViewState extends ConsumerState<LyricsView>
 
   @override
   void dispose() {
+    if (_holdingScreen) _screen.release();
     _resume?.cancel();
     _frames?.cancel();
     _nextEvent?.cancel();
@@ -200,6 +204,7 @@ class _LyricsViewState extends ConsumerState<LyricsView>
   void _arm() {
     _nextEvent?.cancel();
     _nextEvent = null;
+    if (mounted) _syncScreen();
     if (!mounted || !onScreen) {
       _frames?.cancel();
       _frames = null;
@@ -229,6 +234,18 @@ class _LyricsViewState extends ConsumerState<LyricsView>
       Duration(milliseconds: math.max(nextMs - positionMs, 1)),
       _requestFrame,
     );
+  }
+
+  // 暂停时不留着：人可能已经走开，屏幕一直亮着既耗电又灼屏。
+  void _syncScreen() {
+    final wanted = onScreen && _playing;
+    if (wanted == _holdingScreen) return;
+    _holdingScreen = wanted;
+    if (wanted) {
+      _screen.hold();
+    } else {
+      _screen.release();
+    }
   }
 
   bool _animating(int positionMs) {

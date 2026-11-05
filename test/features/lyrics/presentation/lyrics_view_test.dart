@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:alisten/domain/playback/lrc.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/lyrics/index.dart';
@@ -12,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../domain/room/room_fixtures.dart';
 import '../../../shared/ui/edge_fade_probe.dart';
+import '../lyrics_test_doubles.dart';
 
 const _lineMs = 3000;
 
@@ -81,6 +84,8 @@ LocalPlaybackState _playingAt(int index, {int offsetMs = 0}) {
   );
 }
 
+late FakeScreenAwakeDevice _screen;
+
 Future<ProviderContainer> _pumpLyrics(
   WidgetTester tester, {
   NowPlaying? track,
@@ -94,8 +99,10 @@ Future<ProviderContainer> _pumpLyrics(
     ..devicePixelRatio = 1
     ..physicalSize = const Size(360, 640);
   addTearDown(tester.view.reset);
+  _screen = FakeScreenAwakeDevice();
   final container = ProviderContainer(
     overrides: [
+      screenAwakeDeviceProvider.overrideWithValue(_screen),
       nowPlayingProvider.overrideWith((ref) => ref.watch(_trackFixture)),
       lyricsProvider.overrideWith((ref) {
         final track = ref.watch(_trackFixture);
@@ -637,6 +644,135 @@ void main() {
     await _pumpLyrics(tester);
 
     expect(find.text('暂无歌词'), findsOneWidget);
+  });
+
+  group('keeping the screen on', () {
+    const paused = LocalPlaybackState(
+      status: LocalPlaybackStatus.paused,
+      positionMs: 5 * _lineMs,
+    );
+
+    testWidgets('it stays on while lyrics play', (tester) async {
+      await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(20)),
+        playback: _playingAt(5),
+      );
+      await _settle(tester);
+
+      expect(_screen.keptOn, isTrue);
+    });
+
+    testWidgets('pausing lets it sleep, and playing keeps it on again', (
+      tester,
+    ) async {
+      final container = await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(20)),
+        playback: _playingAt(5),
+      );
+      await _settle(tester);
+
+      _show(container, paused);
+      await tester.pump();
+      expect(_screen.keptOn, isFalse);
+
+      _show(container, _playingAt(6));
+      await _settle(tester);
+      expect(_screen.keptOn, isTrue);
+    });
+
+    testWidgets('lyrics opened while paused let it sleep', (tester) async {
+      await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(20)),
+        playback: paused,
+      );
+      await _settle(tester);
+
+      expect(_screen.requests, isEmpty);
+    });
+
+    testWidgets('a track without lyrics keeps it on as well', (tester) async {
+      await _pumpLyrics(tester, track: _track());
+      await _settle(tester);
+
+      expect(find.text('暂无歌词'), findsOneWidget);
+      expect(_screen.keptOn, isTrue);
+    });
+
+    testWidgets('leaving the lyrics lets it sleep', (tester) async {
+      await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(20)),
+        playback: _playingAt(5),
+      );
+      await _settle(tester);
+
+      await tester.pumpWidget(const SizedBox());
+
+      expect(_screen.keptOn, isFalse);
+    });
+
+    testWidgets('the background lets it sleep, and coming back keeps it on', (
+      tester,
+    ) async {
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(20)),
+        playback: _playingAt(5),
+      );
+      await _settle(tester);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      expect(_screen.keptOn, isFalse);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump();
+      expect(_screen.keptOn, isTrue);
+    });
+
+    testWidgets('a page over the lyrics lets it sleep', (tester) async {
+      await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(20)),
+        playback: _playingAt(5),
+      );
+      await _settle(tester);
+
+      unawaited(
+        Navigator.of(tester.element(find.byType(LyricsView))).push(
+          MaterialPageRoute<void>(builder: (_) => const SizedBox.expand()),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(_screen.keptOn, isFalse);
+    });
+
+    testWidgets('the keyboard does not let it sleep', (tester) async {
+      addTearDown(tester.view.resetViewInsets);
+      await _pumpLyrics(
+        tester,
+        track: _track(lyric: _lrc(20)),
+        playback: _playingAt(5),
+      );
+      await _settle(tester);
+
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pump();
+      await tester.pump();
+
+      expect(_screen.keptOn, isTrue);
+    });
   });
 
   group('word lyrics', () {
