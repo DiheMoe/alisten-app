@@ -5,7 +5,6 @@ import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/lobby/application/lobby_controller.dart';
 import 'package:alisten/features/lobby/presentation/create_room_sheet.dart';
 import 'package:alisten/features/lobby/presentation/join_room_sheet.dart';
-import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
@@ -13,8 +12,6 @@ import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/avatar_images.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/collapsible.dart';
-import 'package:alisten/shared/ui/cover_art.dart';
-import 'package:alisten/shared/ui/cover_backdrop.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
@@ -229,7 +226,6 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                     ),
                   ),
                   SliverPullRefresh(onRefresh: _pullRefresh),
-                  _ContinueListening(onOpen: widget.onOpenRoom),
                   SliverToBoxAdapter(
                     child: SectionHeader(
                       '房间',
@@ -597,169 +593,6 @@ final class _LobbyHeader extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_LobbyHeader oldDelegate) => true;
-}
-
-typedef _Continue = ({
-  String id,
-  String? name,
-  NowPlaying? nowPlaying,
-  RoomConnectionStatus status,
-});
-
-_Continue? _continueOf(RoomState room) {
-  final id = room.activeRoomId;
-  // 已停止或被拒绝的房间不能继续收听，由迷你播放条说明原因。
-  if (id == null || room.failure != null) return null;
-  return (
-    id: id,
-    name: room.snapshot?.room.name ?? room.roomName,
-    nowPlaying: room.snapshot?.nowPlaying,
-    status: room.status,
-  );
-}
-
-class _ContinueListening extends ConsumerWidget {
-  const _ContinueListening({required this.onOpen});
-
-  final ValueChanged<String> onOpen;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final room = ref.watch(roomControllerProvider.select(_continueOf));
-    if (room == null) return const SliverToBoxAdapter();
-    final colors = AlistenColors.of(context);
-    final meta = room.nowPlaying?.entry.meta;
-    final (subtitle, ink) = switch (meta) {
-      final meta? => (
-        [meta.title, meta.artist].where((part) => part.isNotEmpty).join(' · '),
-        colors.onGlassMuted,
-      ),
-      null when room.status != RoomConnectionStatus.open => (
-        '正在连接房间…',
-        colors.warning,
-      ),
-      null => ('房间暂时没有播放', colors.onGlassMuted),
-    };
-    final shape = BorderRadius.circular(AlistenRadii.lg);
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(
-        AlistenSpacing.page,
-        AlistenSpacing.xs,
-        AlistenSpacing.page,
-        0,
-      ),
-      sliver: SliverToBoxAdapter(
-        child: Pressable(
-          onPressed: () => onOpen(room.id),
-          focusRadius: shape,
-          child: DecoratedBox(
-            position: DecorationPosition.foreground,
-            decoration: BoxDecoration(
-              borderRadius: shape,
-              border: Border.all(color: colors.glassStroke),
-            ),
-            child: ClipRRect(
-              borderRadius: shape,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: CoverBackdrop(
-                      url: meta?.coverUrl,
-                      child: ColoredBox(color: colors.glassFill),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(AlistenSpacing.md),
-                    child: Row(
-                      children: [
-                        // 不带 Hero 标签：迷你播放条已使用
-                        // `cover-<entryId>`，同一路由子树内标签必须唯一。
-                        CoverArt(
-                          url: meta?.coverUrl,
-                          size: AlistenSizes.featureCover,
-                          radius: AlistenRadii.md,
-                        ),
-                        const SizedBox(width: AlistenSpacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.graphic_eq_rounded,
-                                    size: AlistenSizes.inlineIcon,
-                                    color: colors.glow,
-                                  ),
-                                  const SizedBox(width: AlistenSpacing.xxs),
-                                  Flexible(
-                                    child: Text(
-                                      '继续收听',
-                                      style: AlistenTypography.caption.copyWith(
-                                        color: colors.onGlassMuted,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: AlistenSpacing.xxs),
-                              Text(
-                                room.name ?? '房间',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AlistenTypography.weighted(
-                                  AlistenTypography.title,
-                                  FontWeight.w700,
-                                ).copyWith(color: colors.onGlass),
-                              ),
-                              const SizedBox(height: AlistenSpacing.xxs / 2),
-                              Text(
-                                subtitle,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: AlistenTypography.secondary.copyWith(
-                                  color: ink,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: AlistenSpacing.xs),
-                        ExcludeSemantics(
-                          child: Container(
-                            width: AlistenSizes.iconButton,
-                            height: AlistenSizes.iconButton,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: colors.brandGradient,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: colors.glow.withValues(
-                                    alpha: AlistenTint.glow,
-                                  ),
-                                  blurRadius: AlistenSpacing.lg,
-                                  offset: const Offset(0, AlistenSpacing.xxs),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.arrow_forward_rounded,
-                              size: AlistenSizes.icon,
-                              color: colors.onBrand,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _RoomCard extends StatelessWidget {

@@ -35,7 +35,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../app/app_test_harness.dart';
 import '../../server/server_test_doubles.dart';
 import '../../../core/avatar/avatar_test_doubles.dart';
-import '../../../domain/room/room_fixtures.dart';
 import '../../room/room_test_doubles.dart';
 import '../lobby_test_doubles.dart';
 
@@ -614,46 +613,6 @@ void main() {
     await lobby.settle();
     expect(find.text('还没有可加入的房间'), findsNothing);
     expect(find.text('一起听'), findsOneWidget);
-  });
-
-  testWidgets('the active room is offered to continue with its playing song, '
-      'its cover not taking the mini player\'s flight', (tester) async {
-    final lobby = await _Lobby.open(
-      tester,
-      api: FakeAlistenApi()..rooms = [roomListing(slug: 'listen')],
-      credentials: FakeCredentialStore()..tickets['room-id'] = 'ticket',
-    );
-    expect(find.text('继续收听'), findsNothing);
-
-    unawaited(
-      lobby.container.read(roomControllerProvider.notifier).openRoom('listen'),
-    );
-    await lobby.settle();
-    lobby.rooms.last.emitHello(testRoomSnapshot());
-    await lobby.settle();
-
-    final card = find.ancestor(
-      of: find.text('继续收听'),
-      matching: find.byWidgetPredicate(
-        (widget) => widget is Semantics && widget.properties.button == true,
-      ),
-    );
-    expect(card, findsOneWidget);
-    expect(
-      find.descendant(of: card, matching: find.text('房间')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: card, matching: find.text('歌曲 · 歌手')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: card, matching: find.byType(Hero)),
-      findsNothing,
-    );
-
-    await tester.tap(find.text('继续收听'));
-    expect(lobby.opened, ['room-id']);
   });
 
   testWidgets('the room filter stays folded behind its button until asked '
