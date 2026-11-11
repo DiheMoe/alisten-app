@@ -1,3 +1,3 @@
-const appVersion = '1.2.1+4';
+const appVersion = '1.4.1+5';
 
 final appUserAgent = 'Alisten/${appVersion.split('+').first}';
