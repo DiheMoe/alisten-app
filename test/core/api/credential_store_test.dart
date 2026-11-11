@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../features/lobby/lobby_test_doubles.dart';
+
 final class _LockedStorage extends FlutterSecureStorage {
   const _LockedStorage();
 
@@ -212,5 +214,21 @@ void main() {
       'aaaa',
     );
     expect(SecureCredentialStore.serverIdOf('login_device@'), isNull);
+  });
+
+  group('readMemberTokenOrNull', () {
+    test('returns the token as it is read', () async {
+      final fake = FakeCredentialStore()..memberToken = 'member-token';
+
+      expect(await fake.readMemberTokenOrNull(), 'member-token');
+    });
+
+    test('a token that cannot be read is null, not an error', () async {
+      final fake = FakeCredentialStore()
+        ..memberToken = 'member-token'
+        ..readMemberTokenError = PlatformException(code: '-25308');
+
+      expect(await fake.readMemberTokenOrNull(), isNull);
+    });
   });
 }

@@ -27,6 +27,18 @@ abstract class CredentialStore {
   Future<void> clear();
 }
 
+extension MemberTokenOrNull on CredentialStore {
+  /// 用于记下被拒时要交给 `recoverFromRefusal` 的 token：读不出与没有 token
+  /// 一样处理。需要区分两者时直接调用 [CredentialStore.readMemberToken]。
+  Future<String?> readMemberTokenOrNull() async {
+    try {
+      return await readMemberToken();
+    } on Object {
+      return null;
+    }
+  }
+}
+
 final credentialStoreProvider = Provider<CredentialStore>((ref) {
   throw UnimplementedError('credentialStore 未注入');
 });

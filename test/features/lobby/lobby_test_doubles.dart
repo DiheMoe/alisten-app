@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/credential_store.dart';
 import 'package:alisten/core/storage/preferences.dart';
 import 'package:alisten/domain/member/account.dart';
+import 'package:alisten/domain/member/github.dart';
 import 'package:alisten/domain/member/member.dart';
+import 'package:alisten/domain/member/pairing_code.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/domain/server/site_capabilities.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -58,6 +61,7 @@ final class FakeAlistenApi implements AlistenApi {
 
   int registerCalls = 0;
   Exception? registerError;
+  Completer<void>? registerGate;
   Account registeredAccount = const Account(username: 'mao', github: false);
 
   int loginCalls = 0;
@@ -84,6 +88,44 @@ final class FakeAlistenApi implements AlistenApi {
     registrationOpen: true,
     githubLogin: false,
   );
+  PairingCode pairingCode = PairingCode(
+    code: 'ABCD2345',
+    expiresAtMs: 1700000300000,
+    qrPng: Uint8List.fromList(const [1, 2, 3]),
+  );
+  int createPairingCodeCalls = 0;
+  Exception? createPairingCodeError;
+  Future<PairingCode> Function()? createPairingCodeHandler;
+
+  int redeemCalls = 0;
+  String? redeemedCode;
+  Exception? redeemError;
+  Completer<void>? redeemGate;
+  SignedIn paired = const SignedIn(
+    memberToken: 'paired-token',
+    member: accountMember,
+    account: Account(username: 'mao', github: false),
+  );
+
+  final List<({GithubIntent intent, String nonce, String? currentPassword})>
+  githubStarts = [];
+  Exception? startGithubError;
+  Completer<void>? startGithubGate;
+  Uri githubUrl = Uri.parse('https://github.com/login/oauth/authorize?state=s');
+
+  final List<({String code, String nonce})> githubFinishes = [];
+  Exception? finishGithubError;
+  Completer<void>? finishGithubGate;
+  GithubExchange githubExchange = const GithubExchange(
+    member: member,
+    account: Account(github: true),
+  );
+
+  int unbindCalls = 0;
+  String? unbindPassword;
+  Exception? unbindError;
+  Completer<void>? unbindGate;
+
   Completer<Member>? updateMeResult;
 
   Completer<void>? createMemberGate;
@@ -127,6 +169,7 @@ final class FakeAlistenApi implements AlistenApi {
     required String password,
   }) async {
     registerCalls++;
+    await registerGate?.future;
     final error = registerError;
     if (error != null) throw error;
     account = registeredAccount;
@@ -175,6 +218,77 @@ final class FakeAlistenApi implements AlistenApi {
     final error = getSiteError;
     if (error != null) throw error;
     return site;
+  }
+
+  @override
+  Future<PairingCode> createPairingCode() async {
+    createPairingCodeCalls++;
+    final error = createPairingCodeError;
+    if (error != null) throw error;
+    final handler = createPairingCodeHandler;
+    if (handler != null) return handler();
+    return pairingCode;
+  }
+
+  @override
+  Future<SignedIn> redeemPairingCode(String code) async {
+    redeemCalls++;
+    redeemedCode = code;
+    await redeemGate?.future;
+    final error = redeemError;
+    if (error != null) throw error;
+    me = paired.member;
+    account = paired.account;
+    return paired;
+  }
+
+  @override
+  Future<Uri> startGithubLogin({
+    required GithubIntent intent,
+    required String nonce,
+    String? currentPassword,
+  }) async {
+    githubStarts.add((
+      intent: intent,
+      nonce: nonce,
+      currentPassword: currentPassword,
+    ));
+    await startGithubGate?.future;
+    final error = startGithubError;
+    if (error != null) throw error;
+    return githubUrl;
+  }
+
+  @override
+  Future<GithubExchange> finishGithubLogin({
+    required String code,
+    required String nonce,
+  }) async {
+    githubFinishes.add((code: code, nonce: nonce));
+    await finishGithubGate?.future;
+    final error = finishGithubError;
+    if (error != null) throw error;
+    final exchange = githubExchange;
+    if (exchange.signedIn != null) me = exchange.member;
+    account = exchange.account;
+    return exchange;
+  }
+
+  @override
+  Future<void> unbindGithub({required String currentPassword}) async {
+    unbindCalls++;
+    unbindPassword = currentPassword;
+    await unbindGate?.future;
+    final error = unbindError;
+    if (error != null) throw error;
+    final current = account;
+    if (current != null) {
+      account = Account(
+        username: current.username,
+        email: current.email,
+        github: false,
+      );
+    }
   }
 
   @override

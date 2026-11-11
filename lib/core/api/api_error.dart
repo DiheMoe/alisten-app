@@ -50,3 +50,10 @@ final class ApiException implements Exception {
   @override
   String toString() => 'ApiException($code, $status)';
 }
+
+String rateLimitedText(ApiException error) {
+  final seconds = error.retryAfter?.inSeconds;
+  return seconds == null || seconds <= 0
+      ? error.message
+      : '请求太频繁，请 $seconds 秒后再试';
+}

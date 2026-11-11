@@ -395,6 +395,36 @@ void main() {
     expect(_cookieField, findsNothing);
   });
 
+  testWidgets('a save that ends under another page still closes the sheet', (
+    tester,
+  ) async {
+    final gate = api.setYoutubeCookieGate = Completer();
+    await open(tester);
+    await tap(tester, find.text('填写'));
+    await tester.enterText(_cookieField, _cookies);
+    await tester.ensureVisible(_save);
+    await tester.pumpAndSettle();
+    await tester.tap(_save);
+    await tester.pump();
+    final navigator = Navigator.of(tester.element(_cookieField));
+    unawaited(
+      navigator.push(
+        MaterialPageRoute<void>(builder: (_) => const Text('邀请确认')),
+      ),
+    );
+    // 保存中的忙碌指示一直在动，不能 pumpAndSettle。
+    await tester.pump(const Duration(seconds: 1));
+
+    gate.complete();
+    await tester.pump(const Duration(seconds: 1));
+    navigator.pop();
+    await tester.pumpAndSettle();
+
+    expect(find.text('邀请确认'), findsNothing);
+    expect(find.text('填写 YouTube Cookie'), findsNothing);
+    expect(notices, [(ToastKind.success, '已保存 YouTube Cookie')]);
+  });
+
   testWidgets('a clear still says how it ended and reads the status again '
       'when the list is scrolled away meanwhile', (tester) async {
     api

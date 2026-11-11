@@ -35,6 +35,18 @@ Future<T?> showSheetPanel<T>(
   return result;
 }
 
+/// 以 [result] 结束 [context] 所在的面板。被邀请、分享等面板盖住时也要移除：只
+/// pop 会关掉盖在上面的那一个。面板已在关闭时什么都不做，以免弹掉下方的页面。
+void dismissSheet(BuildContext context, [Object? result]) {
+  final route = ModalRoute.of(context);
+  if (route == null || !route.isActive) return;
+  if (route.isCurrent) {
+    Navigator.of(context).pop(result);
+  } else {
+    Navigator.of(context).removeRoute(route, result);
+  }
+}
+
 final class _SheetRoute<T> extends PopupRoute<T> {
   _SheetRoute({
     required this.builder,

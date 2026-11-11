@@ -16,8 +16,13 @@ const identityLostNotice = '身份已失效，请重试';
 
 const signedOutNotice = '已退出登录';
 
+const serverChangedNotice = '服务器已经切换，这次操作没有完成。';
+
+const doneOnOldServerText = '服务器已经切换，这次操作在原来的服务器上完成。';
+
+const identityUnreadableText = '身份凭据暂时无法读取，请稍后重试。';
+
 const _unauthorized = 'UNAUTHORIZED';
-const _serverChanged = '服务器已经切换，这次操作没有完成。';
 const _logSource = 'identity';
 
 final identityControllerProvider =
@@ -33,6 +38,9 @@ final class IdentityController extends Notifier<IdentityState> {
   // 换服务器时换成新的作用域。之前发出的操作仍用发起时的凭据和 API 完成，
   // 旧服务器的 memberToken 写回旧服务器名下，但不再改动状态。
   var _scope = _Scope();
+
+  // 换服务器之后，按发起请求时的凭据找回旧服务器的身份队列。
+  final _scopes = Expando<_Scope>();
 
   @override
   IdentityState build() => const IdentityState();
@@ -61,7 +69,7 @@ final class IdentityController extends Notifier<IdentityState> {
     final session = _session();
     final scope = session.scope;
     return scope.restoring ??= _serialized(
-      session,
+      scope,
       () => _restore(session),
     ).whenComplete(() => scope.restoring = null);
   }
@@ -76,6 +84,24 @@ final class IdentityController extends Notifier<IdentityState> {
   Future<Member> replaceAfterUnauthorized({String? rejectedToken}) =>
       _replaceMember(_session(), rejectedToken);
 
+  /// 需要成员的请求返回 `UNAUTHORIZED` 之后调用。[credentials] 是发起请求时
+  /// 取定的凭据，[rejectedToken] 是发送之前从中读出的 memberToken，读不出时为
+  /// null。不抛出，返回要提示的文字。
+  ///
+  /// 不能在身份队列中的操作里调用（例如 `adoptSession`、`adoptSessionIfIssued`
+  /// 的 `request` 回调）：它要排在当前操作之后，当前操作又在等它，会一直挂起。
+  Future<String> recoverFromRefusal(
+    CredentialStore credentials,
+    String? rejectedToken,
+  ) async {
+    // 从这次比较到取定会话之间不能有 await：替换必须发生在发起请求的服务器上。
+    if (identical(ref.read(credentialStoreProvider), credentials)) {
+      return _replaceAfterRefusal(_session(), rejectedToken);
+    }
+    await _dropRefusedElsewhere(credentials, rejectedToken);
+    return serverChangedNotice;
+  }
+
   /// 用 [request] 换来账号的新会话并采用它：写入新 memberToken，删除本服务器的
   /// 全部票据，会话代号加 1。在身份队列中执行，期间其他操作用旧 token 被拒触发
   /// 的替换排在之后，那时 token 已经换掉，不会多建一个游客。本机还没有身份时
@@ -85,7 +111,36 @@ final class IdentityController extends Notifier<IdentityState> {
     Future<SignedIn> Function(AlistenApi api) request,
   ) {
     final session = _session();
-    return _serialized(session, () => _adopt(session, request));
+    return _serialized(session.scope, () async {
+      var token = await session.credentials.readMemberToken();
+      if (token == null || token.isEmpty) {
+        await _createMember(session);
+        token = await session.credentials.readMemberToken();
+      }
+      final signedIn = await _sendRefusable(session, token, request);
+      await _adoptSignedIn(session, signedIn);
+      return signedIn;
+    });
+  }
+
+  /// 与 [adoptSession] 共用身份队列和被拒的处理，区别有两点：本机没有
+  /// memberToken 时不建游客，因为 [request] 必须由发起它的成员发出；结果不带
+  /// 新会话时 memberToken、票据和会话代号都不变，只在成员仍是当前成员时更新
+  /// 账号。
+  Future<GithubExchange> adoptSessionIfIssued(
+    Future<GithubExchange> Function(AlistenApi api) request,
+  ) {
+    final session = _session();
+    return _serialized(session.scope, () async {
+      final token = await session.credentials.readMemberToken();
+      final result = await _sendRefusable(session, token, request);
+      if (result.signedIn case final signedIn?) {
+        await _adoptSignedIn(session, signedIn);
+      } else if (_isCurrent(session) && state.member?.id == result.member.id) {
+        state = state.copyWith(member: result.member, account: result.account);
+      }
+      return result;
+    });
   }
 
   /// 用 [request] 结束当前会话，然后换成新的游客。[request] 返回
@@ -93,7 +148,7 @@ final class IdentityController extends Notifier<IdentityState> {
   /// memberToken 保留。新建游客失败时身份留空，下次需要成员时再建。
   Future<void> signOut(Future<void> Function(AlistenApi api) request) {
     final session = _session();
-    return _serialized(session, () => _signOut(session, request));
+    return _serialized(session.scope, () => _signOut(session, request));
   }
 
   /// [memberId] 是发起操作时的成员：期间身份变了就不再改动状态。
@@ -124,7 +179,7 @@ final class IdentityController extends Notifier<IdentityState> {
     } on ApiException catch (error) {
       return MutationNotSent(error.message);
     } on Object {
-      return const MutationNotSent('身份凭据暂时无法读取，请稍后重试。');
+      return const MutationNotSent(identityUnreadableText);
     }
     try {
       final member = await session.api.updateMe(name: nickname, email: email);
@@ -142,7 +197,7 @@ final class IdentityController extends Notifier<IdentityState> {
       if (error.code == _unauthorized && !created) {
         return MutationFailed(
           error.code,
-          await _replaceAfterRefusal(session, sentToken),
+          await recoverFromRefusal(session.credentials, sentToken),
         );
       }
       if (error.answerLost) {
@@ -174,22 +229,51 @@ final class IdentityController extends Notifier<IdentityState> {
     final registered = state.account != null;
     try {
       await _replaceMember(session, rejectedToken);
+      if (!_isCurrent(session)) return serverChangedNotice;
       return registered ? signedOutNotice : identityRenewedNotice;
     } on _ServerChanged {
-      return _serverChanged;
+      return serverChangedNotice;
     } on Object {
+      if (!_isCurrent(session)) return serverChangedNotice;
       // 旧身份已丢弃并已提示，下一个需要成员的操作会创建新成员。
       return registered ? signedOutNotice : identityLostNotice;
     }
   }
 
+  // 已经换了服务器：不在任何服务器上建游客。旧服务器上仍是被拒的那个
+  // memberToken 时，连同它的票据一起删掉；状态和本机邮箱属于新服务器，不动。
+  // 排在旧服务器仍在进行的身份变更之后，以免删掉它刚写入的 token。
+  Future<void> _dropRefusedElsewhere(
+    CredentialStore credentials,
+    String? rejectedToken,
+  ) async {
+    if (rejectedToken == null) return;
+    Future<void> drop() async {
+      try {
+        if (await credentials.readMemberToken() != rejectedToken) return;
+      } on Object {
+        return;
+      }
+      AppLog.info(_logSource, 'member token rejected', code: _unauthorized);
+      await credentials.deleteMemberToken();
+      await credentials.deleteTickets();
+    }
+
+    final scope = _scopes[credentials];
+    return scope == null ? drop() : _serialized(scope, drop);
+  }
+
   // 凭据与 API 在发起时一并取定，之后即使换了服务器，也不会把 memberToken
   // 发给另一个服务器或写到它名下。
-  _Session _session() => (
-    scope: _scope,
-    credentials: ref.read(credentialStoreProvider),
-    api: ref.read(alistenApiProvider),
-  );
+  _Session _session() {
+    final credentials = ref.read(credentialStoreProvider);
+    _scopes[credentials] = _scope;
+    return (
+      scope: _scope,
+      credentials: credentials,
+      api: ref.read(alistenApiProvider),
+    );
+  }
 
   bool _isCurrent(_Session session) =>
       ref.mounted && identical(session.scope, _scope);
@@ -197,7 +281,7 @@ final class IdentityController extends Notifier<IdentityState> {
   Future<Member> _ensureMember(_Session session) {
     final scope = session.scope;
     return scope.ensuring ??= _serialized(
-      session,
+      scope,
       () => _ensure(session),
     ).whenComplete(() => scope.ensuring = null);
   }
@@ -205,13 +289,12 @@ final class IdentityController extends Notifier<IdentityState> {
   Future<Member> _replaceMember(_Session session, String? rejectedToken) {
     final scope = session.scope;
     return scope.replacing ??= _serialized(
-      session,
+      scope,
       () => _replace(session, rejectedToken),
     ).whenComplete(() => scope.replacing = null);
   }
 
-  Future<T> _serialized<T>(_Session session, Future<T> Function() action) {
-    final scope = session.scope;
+  Future<T> _serialized<T>(_Scope scope, Future<T> Function() action) {
     final run = scope.tail.then((_) => action());
     scope.tail = run.then<void>((_) {}, onError: (Object _) {});
     return run;
@@ -247,9 +330,12 @@ final class IdentityController extends Notifier<IdentityState> {
     }
   }
 
-  // 换服务器之后只丢弃旧服务器上被拒的 memberToken：用户已经离开，不再在那里
-  // 新建成员。
+  // 换服务器之后只丢弃旧服务器上确认被拒的 memberToken，不知道是哪个时什么都
+  // 不删：用户已经离开，不再在那里新建成员。
   Future<Member> _replace(_Session session, String? rejectedToken) async {
+    if (rejectedToken == null && !_isCurrent(session)) {
+      throw const _ServerChanged();
+    }
     if (rejectedToken != null) {
       final current = await session.credentials.readMemberToken();
       // 没有 token 说明被拒的身份已由 restore 或 signOut 丢弃，只差新成员；再丢弃
@@ -332,31 +418,31 @@ final class IdentityController extends Notifier<IdentityState> {
     );
   }
 
-  Future<SignedIn> _adopt(
+  // [request] 返回 `UNAUTHORIZED` 说明 [token] 已经失效：按被拒替换身份，再原样
+  // 抛出。没有 [token] 时被拒说明不了哪个身份失效，不替换。
+  Future<T> _sendRefusable<T>(
     _Session session,
-    Future<SignedIn> Function(AlistenApi api) request,
+    String? token,
+    Future<T> Function(AlistenApi api) request,
   ) async {
-    var token = await session.credentials.readMemberToken();
-    if (token == null || token.isEmpty) {
-      await _createMember(session);
-      token = await session.credentials.readMemberToken();
-    }
-    final SignedIn signedIn;
     try {
-      signedIn = await request(session.api);
+      return await request(session.api);
     } on ApiException catch (error) {
-      if (error.code == _unauthorized) {
+      if (error.code == _unauthorized && token != null && token.isNotEmpty) {
         try {
           await _replace(session, token);
         } on Object {
           AppLog.debug(
             _logSource,
-            'guest not replaced after a refused sign-in',
+            'identity not replaced after a refused session request',
           );
         }
       }
       rethrow;
     }
+  }
+
+  Future<void> _adoptSignedIn(_Session session, SignedIn signedIn) async {
     // 换了服务器也要写回发起时的服务器：那里的旧 token 已经失效。
     await session.credentials.writeMemberToken(signedIn.memberToken);
     await session.credentials.deleteTickets();
@@ -375,7 +461,6 @@ final class IdentityController extends Notifier<IdentityState> {
         code: error is ApiException ? error.code : null,
       );
     }
-    return signedIn;
   }
 
   Future<void> _signOut(

@@ -14,6 +14,8 @@ import 'package:alisten/core/realtime/connectivity.dart';
 import 'package:alisten/core/realtime/websocket_room_transport.dart';
 import 'package:alisten/core/storage/preferences.dart';
 import 'package:alisten/domain/release/release_version.dart';
+import 'package:alisten/features/account/data/web_auth_github_authorizer.dart';
+import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/data/dio_qr_image_loader.dart';
 import 'package:alisten/features/admin/data/gal_image_gallery.dart';
 import 'package:alisten/features/admin/data/platform_sensitive_clipboard.dart';
@@ -314,6 +316,7 @@ List<Override> platformAdapters({
       return GitHubReleaseSource(dio);
     }),
     releaseOpenerProvider.overrideWithValue(PlatformReleaseOpener()),
+    githubAuthorizerProvider.overrideWithValue(const WebAuthGithubAuthorizer()),
   ];
 }
 

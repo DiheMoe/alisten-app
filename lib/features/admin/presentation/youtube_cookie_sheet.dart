@@ -99,7 +99,7 @@ class _YoutubeCookieSheetState extends ConsumerState<YoutubeCookieSheet> {
       _cookies.clear();
       _field = UniqueKey();
     });
-    if (ModalRoute.of(context)?.isCurrent ?? false) Navigator.of(context).pop();
+    dismissSheet(context);
     widget.onNotice(kind, text);
   }
 

@@ -35,6 +35,7 @@ const _pages = {
   '/settings/admin',
   '/settings/account/login',
   '/settings/account/register',
+  '/settings/account/pair',
 };
 
 const invalidLinkText = '链接无效，已回到大厅';
@@ -147,12 +148,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'account/login',
                     pageBuilder: _page(
                       (context, state) => LoginScreen(
-                        onDone: () {
-                          toasts.show(ToastKind.success, '已登录');
-                          context.go('/settings');
-                        },
+                        onDone: () => context.go('/settings'),
                         onOpenRegister: () =>
                             context.go('/settings/account/register'),
+                        onOpenPairing: () =>
+                            context.go('/settings/account/pair'),
+                        onNotice: toasts.show,
                       ),
                     ),
                   ),
@@ -166,6 +167,19 @@ final routerProvider = Provider<GoRouter>((ref) {
                         },
                       ),
                     ),
+                  ),
+                  GoRoute(
+                    path: 'account/pair',
+                    pageBuilder: _page((context, state) {
+                      final extra = state.extra;
+                      return PairScreen(
+                        prefill: extra is PairPrefill ? extra : null,
+                        onDone: () {
+                          toasts.show(ToastKind.success, '已登录');
+                          context.go('/settings');
+                        },
+                      );
+                    }),
                   ),
                   GoRoute(
                     path: 'admin',

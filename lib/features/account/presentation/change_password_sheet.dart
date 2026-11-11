@@ -4,11 +4,13 @@ import 'package:alisten/domain/mutation/mutation_result.dart';
 import 'package:alisten/features/account/application/account_controller.dart';
 import 'package:alisten/features/account/presentation/credentials_form.dart';
 import 'package:alisten/features/account/presentation/show_password_row.dart';
+import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -60,7 +62,7 @@ class _ChangePasswordSheetState extends ConsumerState<ChangePasswordSheet> {
         // 面板在请求期间被关掉时密码也已经改了，仍要提示，并让密码管理器保存。
         TextInput.finishAutofillContext();
         onNotice(ToastKind.success, '已修改密码，其他设备已退出登录');
-        if (mounted) Navigator.of(context).pop();
+        if (mounted) dismissSheet(context);
         return;
       case MutationFailed(:final message) || MutationNotSent(:final message):
         problem = message;
@@ -76,6 +78,13 @@ class _ChangePasswordSheetState extends ConsumerState<ChangePasswordSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // 为一个服务器输入的密码绝不能发给另一个服务器，会话或成员一换就关闭。
+    ref.listen(
+      identityControllerProvider.select(
+        (identity) => (identity.session, identity.member?.id),
+      ),
+      (_, _) => dismissSheet(context),
+    );
     final colors = AlistenColors.of(context);
     final problem = _problem;
     return AutofillGroup(

@@ -121,7 +121,7 @@ class _RoomFormSheetState extends ConsumerState<RoomFormSheet> {
   }
 
   void _close(ToastKind kind, String text) {
-    if (ModalRoute.of(context)?.isCurrent ?? false) Navigator.of(context).pop();
+    dismissSheet(context);
     widget.onNotice(kind, text);
   }
 

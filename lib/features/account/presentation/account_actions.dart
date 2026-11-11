@@ -1,9 +1,16 @@
 import 'dart:async';
 
+import 'package:alisten/domain/member/account.dart';
+import 'package:alisten/domain/member/github.dart';
 import 'package:alisten/domain/server/site_capabilities.dart';
 import 'package:alisten/features/account/application/account_controller.dart';
+import 'package:alisten/features/account/application/github_controller.dart';
 import 'package:alisten/features/account/application/site_capabilities.dart';
 import 'package:alisten/features/account/presentation/change_password_sheet.dart';
+import 'package:alisten/features/account/presentation/github_notice.dart';
+import 'package:alisten/features/account/presentation/github_password_sheet.dart';
+import 'package:alisten/features/account/presentation/pairing_code_sheet.dart';
+import 'package:alisten/features/account/presentation/set_credentials_sheet.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
@@ -62,8 +69,33 @@ class _AccountActionsState extends ConsumerState<AccountActions> {
     unawaited(
       showSheetPanel<void>(
         context,
-        builder: (_) =>
-            SheetPanel(child: ChangePasswordSheet(onNotice: widget.onNotice)),
+        builder: (_) => ChangePasswordSheet(onNotice: widget.onNotice),
+      ),
+    );
+  }
+
+  void _showPairingCode() {
+    unawaited(showPairingCodeSheet(context, onNotice: widget.onNotice));
+  }
+
+  Future<void> _setCredentials() async {
+    final onNotice = widget.onNotice;
+    final result = await ref.read(githubControllerProvider.notifier).verify();
+    if (result is! MutationSucceeded<GithubOutcome>) {
+      noticeGithubResult(onNotice, result);
+      return;
+    }
+    // 设置页已经不在就不打开面板，用户回来再点一次即可。
+    if (!mounted) return;
+    unawaited(showSetCredentialsSheet(context, onNotice: onNotice));
+  }
+
+  void _askPassword(GithubPasswordAction action) {
+    unawaited(
+      showGithubPasswordSheet(
+        context,
+        action: action,
+        onNotice: widget.onNotice,
       ),
     );
   }
@@ -75,14 +107,24 @@ class _AccountActionsState extends ConsumerState<AccountActions> {
     );
     final site =
         ref.watch(siteCapabilitiesProvider).value ?? SiteCapabilities.unknown;
+    final running = ref.watch(githubControllerProvider);
+    final idle = running == null;
     final rows = <Widget>[
       if (account == null) ...[
         _ActionRow(title: '登录', onPressed: widget.onOpenLogin),
         if (site.registrationOpen)
           _ActionRow(title: '注册账号', onPressed: widget.onOpenRegister),
       ] else ...[
+        _ActionRow(title: '在新设备上登录', onPressed: _showPairingCode),
         if (account.username != null)
-          _ActionRow(title: '修改密码', onPressed: _changePassword),
+          _ActionRow(title: '修改密码', onPressed: _changePassword)
+        else
+          _ActionRow(
+            title: '设置用户名和密码',
+            busy: running == GithubIntent.verify,
+            onPressed: idle ? () => unawaited(_setCredentials()) : null,
+          ),
+        if (site.githubLogin) _githubRow(account, running),
         _ActionRow(
           title: '退出登录',
           busy: _loggingOut,
@@ -110,6 +152,28 @@ class _AccountActionsState extends ConsumerState<AccountActions> {
       ],
     );
   }
+
+  Widget _githubRow(Account account, GithubIntent? running) {
+    if (!account.github) {
+      return _ActionRow(
+        title: '绑定 GitHub',
+        subtitle: '绑定之后，可以用 GitHub 登录这个账号。',
+        busy: running == GithubIntent.bind,
+        onPressed: running == null
+            ? () => _askPassword(GithubPasswordAction.bind)
+            : null,
+      );
+    }
+    // 只绑定了 GitHub 的账号没有密码，服务端不允许解绑。
+    final hasUsername = account.username != null;
+    return _ActionRow(
+      title: '解绑 GitHub',
+      subtitle: hasUsername ? '已绑定，可以用 GitHub 登录这个账号。' : '已绑定。先设置用户名和密码，才能解绑。',
+      onPressed: hasUsername && running == null
+          ? () => _askPassword(GithubPasswordAction.unbind)
+          : null,
+    );
+  }
 }
 
 // 外观与设置页的链接行一致。
@@ -117,11 +181,13 @@ class _ActionRow extends StatelessWidget {
   const _ActionRow({
     required this.title,
     required this.onPressed,
+    this.subtitle,
     this.busy = false,
   });
 
   final String title;
-  final VoidCallback onPressed;
+  final String? subtitle;
+  final VoidCallback? onPressed;
   final bool busy;
 
   @override
@@ -144,11 +210,25 @@ class _ActionRow extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  title,
-                  style: AlistenTypography.bodyStrong.copyWith(
-                    color: colors.onGlass,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AlistenTypography.bodyStrong.copyWith(
+                        color: colors.onGlass,
+                      ),
+                    ),
+                    if (subtitle case final subtitle?) ...[
+                      const SizedBox(height: AlistenSpacing.xxs),
+                      Text(
+                        subtitle,
+                        style: AlistenTypography.secondary.copyWith(
+                          color: colors.onGlassMuted,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(width: AlistenSpacing.sm),

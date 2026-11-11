@@ -40,6 +40,7 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="${linkHost}" android:pathPrefix="/r/"/>
+                <data android:scheme="https" android:host="${linkHost}" android:path="/pair"/>
             </intent-filter>
             <!-- 接收音乐 App 分享的歌曲链接。audio_service 缓存的引擎同时只服务
                  一个 Activity，分享必须交给已运行的实例，因此用 singleTask。 -->
@@ -47,6 +48,19 @@
                 <action android:name="android.intent.action.SEND"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <data android:mimeType="text/plain"/>
+            </intent-filter>
+        </activity>
+        <!-- GitHub 授权后跳回 App 的地址由服务端写死。不写 android:label：系统
+             弹出应用选择框时要显示应用名，才能区分 Lab 包和正式版。 -->
+        <activity
+            android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
+            android:exported="true"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="moe.dihe.alisten"/>
             </intent-filter>
         </activity>
         <service

@@ -201,6 +201,90 @@ void main() {
     });
   });
 
+  group('recoverFromRefusal', () {
+    const network = ApiException(
+      code: LocalErrorCodes.network,
+      message: '网络请求失败，请检查网络后重试。',
+      status: null,
+    );
+
+    Future<void> signedIn() async {
+      credentials.memberToken = 'account-token';
+      api
+        ..me = accountMember
+        ..account = const Account(username: 'mao', github: false);
+      await controller.restore();
+      api
+        ..me = null
+        ..account = null;
+    }
+
+    test('an account refused is signed out and told so', () async {
+      await signedIn();
+
+      final text = await controller.recoverFromRefusal(
+        credentials,
+        'account-token',
+      );
+
+      expect(text, signedOutNotice);
+      expect(credentials.memberToken, 'new-member-token');
+      expect(identity().account, isNull);
+      expect(identity().session, 1);
+    });
+
+    test('a guest refused becomes a new guest and is asked to confirm '
+        'again', () async {
+      credentials.memberToken = 'guest-token';
+      await controller.restore();
+
+      final text = await controller.recoverFromRefusal(
+        credentials,
+        'guest-token',
+      );
+
+      expect(text, identityRenewedNotice);
+      expect(credentials.memberToken, 'new-member-token');
+      expect(api.createMemberCalls, 1);
+    });
+
+    test('a token another operation already replaced keeps the current '
+        'identity', () async {
+      credentials.memberToken = 'current-token';
+      await controller.restore();
+
+      await controller.recoverFromRefusal(credentials, 'older-token');
+
+      expect(api.createMemberCalls, 0);
+      expect(credentials.deleteMemberCalls, 0);
+      expect(credentials.memberToken, 'current-token');
+      expect(identity().member?.id, 'member-id');
+    });
+
+    test('a guest whose replacement cannot be made is told the identity '
+        'is lost, without a throw', () async {
+      credentials.memberToken = 'guest-token';
+      await controller.restore();
+      api.createMemberError = network;
+
+      expect(
+        await controller.recoverFromRefusal(credentials, 'guest-token'),
+        identityLostNotice,
+      );
+    });
+
+    test('an account whose replacement cannot be made is still signed '
+        'out', () async {
+      await signedIn();
+      api.createMemberError = network;
+
+      expect(
+        await controller.recoverFromRefusal(credentials, 'account-token'),
+        signedOutNotice,
+      );
+    });
+  });
+
   group('saveProfile', () {
     test('takes the nickname from the server member', () async {
       credentials.memberToken = 'stored-token';
@@ -616,6 +700,208 @@ void main() {
       expect(api.getMeCalls, 0);
       expect(apiB.getMeCalls, 1);
     });
+
+    test('a refusal reported after the change replaces nothing on either '
+        'server and only drops the refused token of the old one', () async {
+      credentials
+        ..memberToken = 'a'
+        ..tickets['room-id'] = 'ticket-a';
+      await switchToB();
+
+      final text = await identities.recoverFromRefusal(credentials, 'a');
+
+      expect(text, serverChangedNotice);
+      expect(credentials.memberToken, isNull);
+      expect(credentials.tickets, isEmpty);
+      expect(api.createMemberCalls, 0);
+      expect(apiB.createMemberCalls, 0);
+      expect(storeB.memberToken, isNull);
+      expect(storeB.deleteMemberCalls, 0);
+      expect(localEmail.clearCalls, 0);
+      expect(current().notice, isNull);
+      expect(current().session, 0);
+    });
+
+    test('a token of the old server that is no longer the refused one '
+        'stays', () async {
+      credentials.memberToken = 'newer';
+      await switchToB();
+
+      expect(
+        await identities.recoverFromRefusal(credentials, 'a'),
+        serverChangedNotice,
+      );
+      expect(credentials.memberToken, 'newer');
+      expect(credentials.deleteMemberCalls, 0);
+    });
+
+    test('a server change while the replacement waits in line says the '
+        'server changed', () async {
+      credentials.memberToken = 'a';
+      final checking = api.getMeResult = Completer<Member>();
+      final ensuring = identities.ensureMember();
+      await pumpEventQueue();
+      final recovering = identities.recoverFromRefusal(credentials, 'a');
+      await pumpEventQueue();
+
+      await switchToB();
+      checking.complete(FakeAlistenApi.member);
+      await ensuring;
+
+      expect(await recovering, serverChangedNotice);
+      expect(api.createMemberCalls, 0);
+      expect(apiB.createMemberCalls, 0);
+      expect(storeB.memberToken, isNull);
+    });
+
+    test('an old-server token that cannot be read now is not '
+        'deleted', () async {
+      credentials
+        ..memberToken = 'a'
+        ..tickets['room-id'] = 'ticket-a';
+      await switchToB();
+      credentials.readMemberTokenError = PlatformException(code: 'locked');
+
+      expect(
+        await identities.recoverFromRefusal(credentials, 'a'),
+        serverChangedNotice,
+      );
+      expect(credentials.deleteMemberCalls, 0);
+      expect(credentials.deleteTicketsCalls, 0);
+      expect(credentials.tickets, isNotEmpty);
+    });
+
+    test('a refused token that could not be read before sending deletes '
+        'nothing on the old server, even with no token stored there', () async {
+      credentials.tickets['room-id'] = 'ticket-a';
+      await switchToB();
+
+      expect(
+        await identities.recoverFromRefusal(credentials, null),
+        serverChangedNotice,
+      );
+      expect(credentials.deleteMemberCalls, 0);
+      expect(credentials.deleteTicketsCalls, 0);
+      expect(credentials.tickets, isNotEmpty);
+    });
+
+    test('a refusal reported after the change waits for a sign-in still '
+        'running on the old server', () async {
+      credentials.memberToken = 'a';
+      final signingIn = api.loginGate = Completer<void>();
+      final adopting = identities.adoptSession(
+        (api) => api.login(username: 'mao', password: 'password1'),
+      );
+      await pumpEventQueue();
+      await switchToB();
+
+      final recovering = identities.recoverFromRefusal(credentials, 'a');
+      await pumpEventQueue();
+      signingIn.complete();
+      await adopting;
+
+      expect(await recovering, serverChangedNotice);
+      expect(credentials.memberToken, 'account-token');
+      expect(credentials.deleteMemberCalls, 0);
+    });
+
+    test('a server change while the new guest is being created says the '
+        'server changed', () async {
+      credentials.memberToken = 'a';
+      final creating = api.createMemberGate = Completer<void>();
+      final recovering = identities.recoverFromRefusal(credentials, 'a');
+      await pumpEventQueue();
+
+      await switchToB();
+      creating.complete();
+
+      expect(await recovering, serverChangedNotice);
+      expect(credentials.memberToken, 'new-member-token');
+      expect(storeB.memberToken, isNull);
+      expect(apiB.createMemberCalls, 0);
+      expect(current().notice, isNull);
+    });
+
+    test('a new guest that cannot be created after the server changed says '
+        'the server changed', () async {
+      credentials.memberToken = 'a';
+      final creating = api.createMemberGate = Completer<void>();
+      final recovering = identities.recoverFromRefusal(credentials, 'a');
+      await pumpEventQueue();
+
+      await switchToB();
+      creating.completeError(
+        const ApiException(
+          code: LocalErrorCodes.network,
+          message: '网络请求失败，请检查网络后重试。',
+          status: null,
+        ),
+      );
+
+      expect(await recovering, serverChangedNotice);
+      expect(current().notice, isNull);
+    });
+
+    test('a refusal with an unread token that waits in line past a server '
+        'change deletes nothing on the old server', () async {
+      credentials
+        ..memberToken = 'a'
+        ..tickets['room-id'] = 'ticket-a';
+      final checking = api.getMeResult = Completer<Member>();
+      final ensuring = identities.ensureMember();
+      await pumpEventQueue();
+      final recovering = identities.recoverFromRefusal(credentials, null);
+      await pumpEventQueue();
+
+      await switchToB();
+      checking.complete(FakeAlistenApi.member);
+      await ensuring;
+
+      expect(await recovering, serverChangedNotice);
+      expect(credentials.memberToken, 'a');
+      expect(credentials.deleteMemberCalls, 0);
+      expect(credentials.deleteTicketsCalls, 0);
+      expect(api.createMemberCalls, 0);
+    });
+
+    test('an exchange answered after the change changes nothing on the new '
+        'server', () async {
+      credentials.memberToken = 'a';
+      await identities.restore();
+      api.finishGithubGate = Completer<void>();
+      final exchanging = identities.adoptSessionIfIssued(
+        (api) => api.finishGithubLogin(code: 'c-1', nonce: 'n' * 43),
+      );
+      await pumpEventQueue();
+
+      await switchToB();
+      api.finishGithubGate!.complete();
+      await exchanging;
+
+      expect(current().member, isNull);
+      expect(current().account, isNull);
+      expect(credentials.memberToken, 'a');
+      expect(storeB.memberToken, isNull);
+    });
+
+    test('an exchange answered after the change leaves a member with the same '
+        'id on the new server alone', () async {
+      credentials.memberToken = 'a';
+      storeB.memberToken = 'b';
+      await identities.restore();
+      api.finishGithubGate = Completer<void>();
+      final exchanging = identities.adoptSessionIfIssued(
+        (api) => api.finishGithubLogin(code: 'c-1', nonce: 'n' * 43),
+      );
+      await pumpEventQueue();
+
+      await switchToB();
+      expect(current().member?.id, FakeAlistenApi.member.id);
+      api.finishGithubGate!.complete();
+      await exchanging;
+
+      expect(current().account, isNull);
+    });
   });
 
   group('adoptSession', () {
@@ -709,7 +995,9 @@ void main() {
           controller.adoptSession(
             (api) => api.login(username: 'mao', password: 'password1'),
           ),
-          throwsA(isA<ApiException>()),
+          throwsA(
+            isA<ApiException>().having((e) => e.code, 'code', 'UNAUTHORIZED'),
+          ),
         );
 
         expect(credentials.memberToken, 'new-member-token');
@@ -736,6 +1024,177 @@ void main() {
       expect(credentials.memberToken, 'guest-token');
       expect(credentials.tickets, {'room-id': 'guest-ticket'});
       expect(identity().session, 0);
+    });
+  });
+
+  group('adoptSessionIfIssued', () {
+    const issued = GithubExchange(
+      signedIn: SignedIn(
+        memberToken: 'account-token',
+        member: accountMember,
+        account: Account(github: true),
+      ),
+      member: accountMember,
+      account: Account(github: true),
+    );
+
+    Future<GithubExchange> exchange() => controller.adoptSessionIfIssued(
+      (api) => api.finishGithubLogin(code: 'c-1', nonce: 'n' * 43),
+    );
+
+    test('a new session is adopted like a sign-in', () async {
+      credentials
+        ..memberToken = 'guest-token'
+        ..tickets['room-id'] = 'guest-ticket';
+      api.githubExchange = issued;
+
+      final result = await exchange();
+
+      expect(result.signedIn?.memberToken, 'account-token');
+      expect(credentials.memberToken, 'account-token');
+      expect(credentials.tickets, isEmpty);
+      expect(identity().member?.id, 'account-member');
+      expect(identity().account?.github, isTrue);
+      expect(identity().session, 1);
+      expect(localEmail.clearCalls, 1);
+      expect(api.getMeCalls, 1);
+    });
+
+    test('without a new session the token, tickets and session stay, and '
+        'the member and account are updated', () async {
+      credentials
+        ..memberToken = 'guest-token'
+        ..tickets['room-id'] = 'guest-ticket';
+      await controller.restore();
+      const renamed = Member(
+        id: 'member-id',
+        name: 'GitHub 名字',
+        avatarHash: '',
+      );
+      api.githubExchange = const GithubExchange(
+        member: renamed,
+        account: Account(github: true),
+      );
+
+      final result = await exchange();
+
+      expect(result.signedIn, isNull);
+      expect(credentials.memberToken, 'guest-token');
+      expect(credentials.tickets, {'room-id': 'guest-ticket'});
+      expect(identity().session, 0);
+      expect(identity().member?.name, 'GitHub 名字');
+      expect(identity().account?.github, isTrue);
+      expect(localEmail.clearCalls, 0);
+    });
+
+    test('an answer for another member leaves the state alone', () async {
+      credentials.memberToken = 'guest-token';
+      await controller.restore();
+      api.githubExchange = const GithubExchange(
+        member: accountMember,
+        account: Account(github: true),
+      );
+
+      await exchange();
+
+      expect(identity().member?.id, 'member-id');
+      expect(identity().account, isNull);
+    });
+
+    test('without a token no guest is made and the request goes out as it '
+        'is', () async {
+      var sentWithToken = true;
+
+      await expectLater(
+        controller.adoptSessionIfIssued((api) async {
+          sentWithToken = credentials.memberToken != null;
+          throw const ApiException(
+            code: LocalErrorCodes.noToken,
+            message: '缺少身份凭据，请重新进入后再试。',
+            status: null,
+          );
+        }),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.code,
+            'code',
+            LocalErrorCodes.noToken,
+          ),
+        ),
+      );
+
+      expect(sentWithToken, isFalse);
+      expect(api.createMemberCalls, 0);
+      expect(credentials.memberToken, isNull);
+    });
+
+    test('a refused token is replaced and the refusal rethrown', () async {
+      credentials.memberToken = 'guest-token';
+      api.finishGithubError = unauthorized;
+
+      await expectLater(
+        exchange(),
+        throwsA(
+          isA<ApiException>().having((e) => e.code, 'code', 'UNAUTHORIZED'),
+        ),
+      );
+
+      expect(credentials.memberToken, 'new-member-token');
+      expect(identity().session, 1);
+    });
+
+    test('a refusal without a token replaces nothing', () async {
+      await expectLater(
+        controller.adoptSessionIfIssued((api) async => throw unauthorized),
+        throwsA(
+          isA<ApiException>().having((e) => e.code, 'code', 'UNAUTHORIZED'),
+        ),
+      );
+
+      expect(api.createMemberCalls, 0);
+      expect(credentials.memberToken, isNull);
+      expect(identity().session, 0);
+    });
+
+    test('a profile that cannot be read after a new session keeps the new '
+        'token', () async {
+      credentials.memberToken = 'guest-token';
+      api
+        ..githubExchange = issued
+        ..getMeError = const ApiException(
+          code: LocalErrorCodes.network,
+          message: '网络请求失败，请检查网络后重试。',
+          status: null,
+        );
+
+      final result = await exchange();
+
+      expect(result.signedIn?.memberToken, 'account-token');
+      expect(credentials.memberToken, 'account-token');
+      expect(identity().member?.id, 'account-member');
+      expect(identity().account?.github, isTrue);
+      expect(identity().session, 1);
+    });
+
+    test('a refusal of the old token during the exchange waits and replaces '
+        'nothing', () async {
+      credentials.memberToken = 'guest-token';
+      api
+        ..finishGithubGate = Completer<void>()
+        ..githubExchange = issued;
+
+      final exchanging = exchange();
+      await pumpEventQueue();
+      final refused = controller.replaceAfterUnauthorized(
+        rejectedToken: 'guest-token',
+      );
+      api.finishGithubGate!.complete();
+      await exchanging;
+      final member = await refused;
+
+      expect(api.createMemberCalls, 0);
+      expect(member.id, 'account-member');
+      expect(credentials.memberToken, 'account-token');
     });
   });
 

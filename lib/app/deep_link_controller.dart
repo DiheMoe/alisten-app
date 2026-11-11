@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:alisten/app/room/room_mode.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/logging/app_log.dart';
+import 'package:alisten/domain/member/github.dart';
 import 'package:alisten/domain/room/room_route.dart';
 import 'package:app_links/app_links.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -64,6 +65,16 @@ final class DeepLinkController {
     return roomRoute(uri.pathSegments, sections: linkRoomSections);
   }
 
+  /// 配对码在片段里，不进入请求和 Referer。
+  ({String authority, String fragment})? pairLinkFor(Uri uri) {
+    if (uri.scheme != 'https' ||
+        uri.path != '/pair' ||
+        uri.userInfo.isNotEmpty) {
+      return null;
+    }
+    return (authority: uri.authority, fragment: uri.fragment);
+  }
+
   // App Links 只为构建时的域名验证；切换服务器后，打开的仍是该域名的链接。
   bool _isOtherServerRoom(Uri uri) {
     return uri.scheme == 'https' &&
@@ -72,17 +83,31 @@ final class DeepLinkController {
   }
 
   /// 返回应用是否由房间链接（包括其他服务器的）启动；为 true 时由该链接决定
-  /// 进入哪个房间。
+  /// 进入哪个房间。配对链接不算：用它启动时照常恢复上次的房间。
   Future<bool> start(
     void Function(String route) onRoute, {
     void Function()? onInvalid,
     void Function(Uri uri)? onOtherServer,
+    void Function(String fragment)? onPair,
+    void Function(String authority)? onOtherServerPair,
   }) async {
     final linkSource = source ?? PluginAppLinkSource();
     await _subscription?.cancel();
     bool toOtherServer(Uri uri) =>
         onOtherServer != null && _isOtherServerRoom(uri);
     _subscription = linkSource.uriLinkStream.listen((uri) {
+      // MainActivity 是导出的，其他 App 可以把 GitHub 回调地址直接发过来；回调只由
+      // 授权会话接收，这里不处理，也不算无效链接。
+      if (uri.scheme == githubCallbackScheme) return;
+      // 配对码只对签发它的服务器有效：其他服务器的链接只交出 authority。
+      if (pairLinkFor(uri) case (:final authority, :final fragment)) {
+        if (authority == host) {
+          onPair?.call(fragment);
+        } else {
+          onOtherServerPair?.call(authority);
+        }
+        return;
+      }
       final route = routeFor(uri);
       if (route != null) {
         onRoute(route);

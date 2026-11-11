@@ -25,4 +25,26 @@ void main() {
       );
     }
   });
+
+  group('rateLimitedText', () {
+    ApiException limited(Duration? retryAfter) => ApiException(
+      code: 'RATE_LIMITED',
+      message: '请求太频繁，请稍后再试。',
+      status: 429,
+      retryAfter: retryAfter,
+    );
+
+    test('says how many seconds to wait when the server told', () {
+      expect(
+        rateLimitedText(limited(const Duration(seconds: 30))),
+        '请求太频繁，请 30 秒后再试',
+      );
+    });
+
+    test('falls back to the transport message without a wait', () {
+      for (final wait in [null, Duration.zero, const Duration(seconds: -1)]) {
+        expect(rateLimitedText(limited(wait)), '请求太频繁，请稍后再试。', reason: '$wait');
+      }
+    });
+  });
 }

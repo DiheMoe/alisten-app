@@ -11,6 +11,7 @@ import 'package:alisten/core/avatar/avatar_cache.dart';
 import 'package:alisten/core/cache/cover_cache.dart';
 import 'package:alisten/core/realtime/connectivity.dart';
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/lyrics/index.dart';
@@ -33,6 +34,7 @@ import 'package:go_router/go_router.dart';
 import '../core/avatar/avatar_test_doubles.dart';
 import '../core/cache/cover_cache_test_doubles.dart';
 import '../domain/room/room_fixtures.dart';
+import '../features/account/account_test_doubles.dart';
 import '../features/admin/admin_test_doubles.dart';
 import '../features/history/history_test_doubles.dart';
 import '../features/lobby/lobby_test_doubles.dart';
@@ -69,6 +71,7 @@ Future<List<Override>> alistenAppOverrides({
   FakeImageGallery? gallery,
   FakeReleaseSource? releases,
   FakeReleaseOpener? releaseOpener,
+  FakeGithubAuthorizer? githubAuthorizer,
   Map<String, Object> preferences = const {},
 }) async {
   final stores = credentialStores ?? FakeCredentialStores();
@@ -126,6 +129,9 @@ Future<List<Override>> alistenAppOverrides({
     releaseOpenerProvider.overrideWithValue(
       releaseOpener ?? FakeReleaseOpener(),
     ),
+    githubAuthorizerProvider.overrideWithValue(
+      githubAuthorizer ?? FakeGithubAuthorizer(),
+    ),
   ];
 }
 
@@ -153,6 +159,7 @@ Future<void> pumpAlistenApp(
   FakeImageGallery? gallery,
   FakeReleaseSource? releases,
   FakeReleaseOpener? releaseOpener,
+  FakeGithubAuthorizer? githubAuthorizer,
   Map<String, Object> preferences = const {},
   List<Override> overrides = const [],
 }) async {
@@ -180,6 +187,7 @@ Future<void> pumpAlistenApp(
           gallery: gallery,
           releases: releases,
           releaseOpener: releaseOpener,
+          githubAuthorizer: githubAuthorizer,
           preferences: preferences,
         ),
         ...overrides,

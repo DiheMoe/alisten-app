@@ -67,12 +67,9 @@ class _UpdateSheetState extends ConsumerState<UpdateSheet> {
     _close();
   }
 
-  // 等待期间面板可能已被关闭：收起动画结束前组件仍挂载，但栈顶已是下方页面，
-  // 此时 pop 会把那个页面弹掉。
+  // 等待期间面板可能已被关闭，或者已被别的页面盖住。
   void _close() {
-    if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
-      Navigator.of(context).pop();
-    }
+    if (mounted) dismissSheet(context);
   }
 
   @override

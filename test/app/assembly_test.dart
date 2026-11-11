@@ -21,6 +21,8 @@ import 'package:alisten/core/storage/preferences.dart';
 import 'package:alisten/domain/history/search_record.dart';
 import 'package:alisten/domain/release/release_version.dart';
 import 'package:alisten/domain/track/track.dart';
+import 'package:alisten/features/account/data/web_auth_github_authorizer.dart';
+import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/data/dio_qr_image_loader.dart';
 import 'package:alisten/features/admin/data/gal_image_gallery.dart';
 import 'package:alisten/features/admin/data/platform_sensitive_clipboard.dart';
@@ -107,6 +109,10 @@ void main() {
     expect(container.read(imageGalleryProvider), isA<GalImageGallery>());
     expect(container.read(releaseSourceProvider), isA<GitHubReleaseSource>());
     expect(container.read(releaseOpenerProvider), isA<PlatformReleaseOpener>());
+    expect(
+      container.read(githubAuthorizerProvider),
+      isA<WebAuthGithubAuthorizer>(),
+    );
   });
 
   test('update checks keep their time and skipped version in the ordinary '
@@ -120,6 +126,8 @@ void main() {
     );
     // 发布源属于平台适配器，共用接线不得自带会联网的实现。
     expect(() => container.read(releaseSourceProvider), throwsA(anything));
+    // 系统浏览器会话属于平台适配器。
+    expect(() => container.read(githubAuthorizerProvider), throwsA(anything));
   });
 
   test('the shared wiring ends the site admin session when asked', () async {

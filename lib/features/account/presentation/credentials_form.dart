@@ -25,6 +25,7 @@ class CredentialsForm extends StatefulWidget {
     required this.newAccount,
     required this.onSubmit,
     required this.onDone,
+    this.enabled = true,
     super.key,
   });
 
@@ -39,6 +40,7 @@ class CredentialsForm extends StatefulWidget {
   )
   onSubmit;
   final VoidCallback onDone;
+  final bool enabled;
 
   @override
   State<CredentialsForm> createState() => _CredentialsFormState();
@@ -61,7 +63,7 @@ class _CredentialsFormState extends State<CredentialsForm> {
   }
 
   Future<void> _submit() async {
-    if (_busy) return;
+    if (_busy || !widget.enabled) return;
     if (widget.newAccount && _password.text != _again.text) {
       setState(() => _problem = passwordsDifferText);
       return;
@@ -162,7 +164,9 @@ class _CredentialsFormState extends State<CredentialsForm> {
             icon: Icons.check_rounded,
             expand: true,
             busy: _busy,
-            onPressed: _busy ? null : () => unawaited(_submit()),
+            onPressed: _busy || !widget.enabled
+                ? null
+                : () => unawaited(_submit()),
           ),
         ],
       ),

@@ -226,4 +226,145 @@ void main() {
       'https://listen.example/r/$testRoomId',
     );
   });
+
+  test('a pairing link is https to /pair, its fragment kept apart', () {
+    final controller = DeepLinkController(config: () => listen);
+
+    expect(controller.pairLinkFor(Uri.parse('https://listen.example/pair#X')), (
+      authority: 'listen.example',
+      fragment: 'X',
+    ));
+    expect(
+      controller.pairLinkFor(Uri.parse('http://listen.example/pair#X')),
+      isNull,
+    );
+    expect(
+      controller.pairLinkFor(Uri.parse('https://listen.example/pair/x#X')),
+      isNull,
+    );
+    expect(
+      controller.pairLinkFor(Uri.parse('https://listen.example/r/pair')),
+      isNull,
+    );
+  });
+
+  test('a pairing link of this server hands on its fragment, and one of '
+      'another server only its authority', () async {
+    final source = FakeAppLinkSource();
+    final controller = DeepLinkController(
+      config: () => _config('https://example.com:8443'),
+      source: source,
+    );
+    final pairs = <String>[];
+    final others = <String>[];
+    var invalid = 0;
+
+    await controller.start(
+      (_) {},
+      onInvalid: () => invalid++,
+      onPair: pairs.add,
+      onOtherServerPair: others.add,
+    );
+    source
+      ..open(Uri.parse('https://example.com:8443/pair#abcd-2345'))
+      ..open(Uri.parse('https://other.example/pair#ABCD2345'))
+      ..open(Uri.parse('https://example.com:8443/pair'));
+    await pumpEventQueue();
+
+    expect(pairs, ['abcd-2345', '']);
+    expect(others, ['other.example']);
+    expect(invalid, 0);
+  });
+
+  test('the same host on another port is another server', () async {
+    final source = FakeAppLinkSource();
+    final controller = DeepLinkController(
+      config: () => _config('https://example.com:8443'),
+      source: source,
+    );
+    final pairs = <String>[];
+    final others = <String>[];
+    await controller.start(
+      (_) {},
+      onPair: pairs.add,
+      onOtherServerPair: others.add,
+    );
+
+    source.open(Uri.parse('https://example.com/pair#X'));
+    await pumpEventQueue();
+
+    expect(pairs, isEmpty);
+    expect(others, ['example.com']);
+  });
+
+  test(
+    'a pairing link with user info is no pairing link and is invalid',
+    () async {
+      final source = FakeAppLinkSource();
+      final controller = DeepLinkController(
+        config: () => listen,
+        source: source,
+      );
+      final pairs = <String>[];
+      var invalid = 0;
+      await controller.start(
+        (_) {},
+        onInvalid: () => invalid++,
+        onPair: pairs.add,
+      );
+
+      final uri = Uri.parse('https://user@listen.example/pair#ABCD2345');
+      source.open(uri);
+      await pumpEventQueue();
+
+      expect(controller.pairLinkFor(uri), isNull);
+      expect(pairs, isEmpty);
+      expect(invalid, 1);
+    },
+  );
+
+  test('the fragment is handed on as it is, decoded only by the page', () {
+    final controller = DeepLinkController(config: () => listen);
+
+    expect(
+      controller
+          .pairLinkFor(Uri.parse('https://listen.example/pair#ABCD%202345'))
+          ?.fragment,
+      'ABCD%202345',
+    );
+  });
+
+  test('a pairing link that launches the app is not a room launch', () async {
+    final source = FakeAppLinkSource(
+      initial: Uri.parse('https://listen.example/pair#ABCD2345'),
+    );
+    final controller = DeepLinkController(config: () => listen, source: source);
+    final pairs = <String>[];
+
+    final launched = await controller.start((_) {}, onPair: pairs.add);
+    await pumpEventQueue();
+
+    expect(launched, isFalse);
+    expect(pairs, ['ABCD2345']);
+  });
+
+  test(
+    'the GitHub callback scheme is left to the auth plugin, silently',
+    () async {
+      final source = FakeAppLinkSource();
+      final controller = DeepLinkController(
+        config: () => listen,
+        source: source,
+      );
+      var invalid = 0;
+      final routes = <String>[];
+
+      await controller.start(routes.add, onInvalid: () => invalid++);
+      source.open(Uri.parse('moe.dihe.alisten:/auth/github?code=x'));
+      await pumpEventQueue();
+
+      expect(invalid, 0);
+      expect(routes, isEmpty);
+    },
+  );
 }

@@ -82,6 +82,34 @@ void main() {
     expect(find.text('第二页'), findsOneWidget);
   });
 
+  testWidgets('a check ending under another page closes the sheet with '
+      'its result, leaving the page', (tester) async {
+    final page = await pumpPages(tester);
+    final (:check, result: showing) = open(page);
+    bool? result;
+    unawaited(showing.then((value) => result = value));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('添加'));
+    await tester.pump();
+    unawaited(
+      navigator.currentState!.push(
+        MaterialPageRoute<void>(builder: (_) => const Text('邀请确认')),
+      ),
+    );
+    // 等待检查时的忙碌指示一直在动，不能 pumpAndSettle。
+    await tester.pump(const Duration(seconds: 1));
+
+    check.complete(true);
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(result, isTrue);
+    expect(find.text('邀请确认'), findsOneWidget);
+    navigator.currentState!.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('添加 新站？'), findsNothing);
+    expect(find.text('第二页'), findsOneWidget);
+  });
+
   for (final (moment, wait) in [
     ('while the sheet is closing', const Duration(milliseconds: 40)),
     ('after the sheet closed', const Duration(seconds: 1)),

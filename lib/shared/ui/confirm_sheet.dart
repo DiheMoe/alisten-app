@@ -71,11 +71,8 @@ class _ConfirmSheetState extends State<ConfirmSheet> {
     }
     setState(() => _busy = true);
     final confirmed = await onConfirm();
-    // 等待期间用户可能已取消：收起动画结束前组件仍挂载，但栈顶已是下方页面，
-    // 此时 pop 会把那个页面弹掉。
-    if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
-      Navigator.of(context).pop(confirmed);
-    }
+    // 等待期间用户可能已取消，或者面板已被别的页面盖住。
+    if (mounted) dismissSheet(context, confirmed);
   }
 
   @override

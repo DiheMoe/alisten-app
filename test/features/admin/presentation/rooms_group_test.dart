@@ -455,6 +455,35 @@ void main() {
       expect(notices, [(ToastKind.success, '已保存')]);
       expect(_field('房间名称'), findsNothing);
     });
+
+    testWidgets('a save that ends under another page still closes the '
+        'sheet', (tester) async {
+      final gate = api.createRoomGate = Completer();
+      await open(tester);
+      await tap(tester, find.text('新建常驻房间'));
+      await tester.enterText(_field('房间名称'), '小厅');
+      await tester.ensureVisible(_save);
+      await tester.pumpAndSettle();
+      await tester.tap(_save);
+      await tester.pump();
+      final navigator = Navigator.of(tester.element(_field('房间名称')));
+      unawaited(
+        navigator.push(
+          MaterialPageRoute<void>(builder: (_) => const Text('邀请确认')),
+        ),
+      );
+      // 保存中的忙碌指示一直在动，不能 pumpAndSettle。
+      await tester.pump(const Duration(seconds: 1));
+
+      gate.complete();
+      await tester.pump(const Duration(seconds: 1));
+      navigator.pop();
+      await tester.pumpAndSettle();
+
+      expect(find.text('邀请确认'), findsNothing);
+      expect(_field('房间名称'), findsNothing);
+      expect(notices, [(ToastKind.success, '已保存')]);
+    });
   });
 
   testWidgets('a room is deleted only after a confirmation that says who '

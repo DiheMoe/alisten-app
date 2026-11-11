@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/app_config.dart';
@@ -8,7 +9,9 @@ import 'package:alisten/core/protocol/domain_mapper.dart';
 import 'package:alisten/core/protocol/http.gen.dart' as http;
 import 'package:alisten/core/protocol/protocol.gen.dart' as protocol;
 import 'package:alisten/domain/member/account.dart';
+import 'package:alisten/domain/member/github.dart';
 import 'package:alisten/domain/member/member.dart';
+import 'package:alisten/domain/member/pairing_code.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/domain/server/site_capabilities.dart';
 import 'package:dio/dio.dart';
@@ -195,6 +198,20 @@ final class SignedIn {
   final String? device;
 }
 
+final class GithubExchange {
+  const GithubExchange({
+    this.signedIn,
+    required this.member,
+    required this.account,
+  });
+
+  /// 只有登录了已经绑定这个 GitHub 的账号时才有：游客的会话已经换成这个账号的
+  /// 新会话，要像密码登录一样采用。
+  final SignedIn? signedIn;
+  final Member member;
+  final Account account;
+}
+
 abstract interface class AlistenApi {
   Future<({Member member, String memberToken})> createMember();
 
@@ -219,6 +236,24 @@ abstract interface class AlistenApi {
   });
 
   Future<SiteCapabilities> getSite();
+
+  Future<PairingCode> createPairingCode();
+
+  Future<SignedIn> redeemPairingCode(String code);
+
+  /// 只返回 https 地址；[currentPassword] 只在绑定时需要。
+  Future<Uri> startGithubLogin({
+    required GithubIntent intent,
+    required String nonce,
+    String? currentPassword,
+  });
+
+  Future<GithubExchange> finishGithubLogin({
+    required String code,
+    required String nonce,
+  });
+
+  Future<void> unbindGithub({required String currentPassword});
 
   Future<Member> updateMe({String? name, String? email});
 
@@ -348,6 +383,105 @@ final class RestAlistenApi implements AlistenApi {
     );
   }
 
+  @override
+  Future<PairingCode> createPairingCode() {
+    return _request(
+      http.RestEndpoints.createPairingCode,
+      body: const protocol.CreatePairingCodeRequest().toJson(),
+      decode: (json) {
+        final response = protocol.CreatePairingCodeResponse.fromJson(json);
+        return PairingCode(
+          code: response.code,
+          expiresAtMs: response.expiresAtMs,
+          qrPng: _dataUriBytes(response.qrImage),
+        );
+      },
+    );
+  }
+
+  @override
+  Future<SignedIn> redeemPairingCode(String code) {
+    return _request(
+      http.RestEndpoints.redeemPairingCode,
+      body: protocol.RedeemPairingCodeRequest(code: code).toJson(),
+      decode: (json) {
+        final response = protocol.RedeemPairingCodeResponse.fromJson(json);
+        return SignedIn(
+          memberToken: response.memberToken,
+          member: toDomainMember(response.member),
+          account: toDomainAccount(response.account),
+        );
+      },
+    );
+  }
+
+  @override
+  Future<Uri> startGithubLogin({
+    required GithubIntent intent,
+    required String nonce,
+    String? currentPassword,
+  }) {
+    return _request(
+      http.RestEndpoints.startGithubLogin,
+      body: protocol.StartGithubLoginRequest(
+        client: protocol.GitHubClient.app,
+        currentPassword: currentPassword,
+        intent: switch (intent) {
+          GithubIntent.login => protocol.GitHubIntent.login,
+          GithubIntent.bind => protocol.GitHubIntent.bind,
+          GithubIntent.verify => protocol.GitHubIntent.verify,
+        },
+        nonce: nonce,
+      ).toJson(),
+      decode: (json) {
+        final url = Uri.tryParse(
+          protocol.StartGithubLoginResponse.fromJson(json).url,
+        );
+        // 授权页交给系统浏览器打开，只接受 https。
+        if (url == null || url.scheme != 'https' || url.host.isEmpty) {
+          throw const FormatException('GitHub authorization must be https');
+        }
+        return url;
+      },
+    );
+  }
+
+  @override
+  Future<GithubExchange> finishGithubLogin({
+    required String code,
+    required String nonce,
+  }) {
+    return _request(
+      http.RestEndpoints.finishGithubLogin,
+      body: protocol.FinishGithubLoginRequest(
+        code: code,
+        nonce: nonce,
+      ).toJson(),
+      decode: (json) {
+        final response = protocol.FinishGithubLoginResponse.fromJson(json);
+        final member = toDomainMember(response.member);
+        final account = toDomainAccount(response.account);
+        final token = response.memberToken;
+        return GithubExchange(
+          signedIn: token == null
+              ? null
+              : SignedIn(memberToken: token, member: member, account: account),
+          member: member,
+          account: account,
+        );
+      },
+    );
+  }
+
+  @override
+  Future<void> unbindGithub({required String currentPassword}) {
+    return _send(
+      http.RestEndpoints.unbindGithub,
+      body: protocol.UnbindGithubRequest(currentPassword: currentPassword)
+          .toJson(),
+    );
+  }
+
   // 成功时没有回复体（204）的接口。
   Future<void> _send(
     http.RestEndpoint endpoint, {
@@ -446,5 +580,16 @@ final class RestAlistenApi implements AlistenApi {
       );
       throw ApiException.protocolMismatch(endpoint.successStatus);
     }
+  }
+}
+
+// 只在本机解码 data: 地址，不为二维码发任何请求。
+Uint8List? _dataUriBytes(String uri) {
+  if (!uri.startsWith('data:')) return null;
+  try {
+    final bytes = UriData.parse(uri).contentAsBytes();
+    return bytes.isEmpty ? null : bytes;
+  } on FormatException {
+    return null;
   }
 }

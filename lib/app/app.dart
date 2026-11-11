@@ -120,11 +120,13 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
             _openRoute,
             onInvalid: _onInvalidLink,
             onOtherServer: (uri) => unawaited(_followOtherServerLink(uri)),
+            onPair: _openPairing,
+            onOtherServerPair: _onOtherServerPair,
           );
     } on Object {
       AppLog.warn(_logSource, 'links not followed');
     }
-    // 启动链接（即使尚未送达）优先于上次的房间。
+    // 房间的启动链接（即使尚未送达）优先于上次的房间。
     if (!mounted || launchedByLink || _roomOpened) return;
     unawaited(ref.read(roomControllerProvider.notifier).restoreLastRoom());
   }
@@ -150,6 +152,26 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
   void _onInvalidLink() {
     ref.read(routerProvider).go('/');
     ref.read(toastControllerProvider).show(ToastKind.warning, invalidLinkText);
+  }
+
+  // 配对码经 extra 传递、不进路由地址：在它有效的几分钟里它就是登录凭据。
+  // 不算打开了房间，启动流程照常恢复上次的房间。
+  void _openPairing(String fragment) {
+    ref
+        .read(routerProvider)
+        .go(
+          '/settings/account/pair',
+          extra: (
+            serverId: ref.read(currentServerProvider).id,
+            fragment: fragment,
+          ),
+        );
+  }
+
+  void _onOtherServerPair(String authority) {
+    ref
+        .read(toastControllerProvider)
+        .show(ToastKind.warning, '这个配对码属于 $authority，先切换到这个服务器再输入。');
   }
 
   // 仅凭路径无法判断是否为 Alisten（如 reddit 的 `/r/<名字>`），

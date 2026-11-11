@@ -255,4 +255,65 @@ void main() {
     expect(permissions, hasLength(1));
     expect(permissions.single, contains('android:maxSdkVersion="29"'));
   });
+
+  // 回调地址 `moe.dihe.alisten:/auth/github` 没有 host，Android 在没有 host 的
+  // 过滤器上不比较 path，所以只写 scheme。
+  test('the GitHub callback scheme is declared only on the callback activity, '
+      'without a label', () {
+    final manifest = File('android/app/src/main/AndroidManifest.xml')
+        .readAsStringSync();
+    final activity = RegExp(
+      r'<activity\s+android:name="com\.linusu\.flutter_web_auth_2\.'
+      r'CallbackActivity".*?</activity>',
+      dotAll: true,
+    ).firstMatch(manifest)?.group(0);
+
+    expect(activity, isNotNull);
+    expect(activity, contains('android:exported="true"'));
+    expect(activity, contains('android:taskAffinity=""'));
+    expect(
+      activity,
+      contains('<action android:name="android.intent.action.VIEW"/>'),
+    );
+    expect(
+      activity,
+      contains('<category android:name="android.intent.category.DEFAULT"/>'),
+    );
+    expect(
+      activity,
+      contains('<category android:name="android.intent.category.BROWSABLE"/>'),
+    );
+    expect(activity, contains('<data android:scheme="moe.dihe.alisten"/>'));
+    expect(activity, isNot(contains('android:label')));
+    expect(activity, isNot(contains('android:host')));
+    expect(
+      RegExp('android:scheme="moe\\.dihe\\.alisten"').allMatches(manifest),
+      hasLength(1),
+    );
+  });
+
+  test('App Links open room links and pairing links of the build host', () {
+    final manifest = File('android/app/src/main/AndroidManifest.xml')
+        .readAsStringSync();
+    final filter = RegExp(
+      r'<intent-filter android:autoVerify="true">(.*?)</intent-filter>',
+      dotAll: true,
+    ).firstMatch(manifest)!.group(1)!;
+
+    expect(
+      filter,
+      contains(
+        r'<data android:scheme="https" android:host="${linkHost}" '
+        r'android:pathPrefix="/r/"/>',
+      ),
+    );
+    expect(
+      filter,
+      contains(
+        r'<data android:scheme="https" android:host="${linkHost}" '
+        r'android:path="/pair"/>',
+      ),
+    );
+    expect(RegExp('<data ').allMatches(filter), hasLength(2));
+  });
 }

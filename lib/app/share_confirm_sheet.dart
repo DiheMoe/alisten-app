@@ -119,10 +119,8 @@ class ShareConfirmSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen(pendingShareControllerProvider, (_, next) {
-      // 分享已点或在别处被丢弃时关闭面板；面板正在关闭时不再重复关闭。
-      if (next == null && (ModalRoute.of(context)?.isCurrent ?? false)) {
-        Navigator.of(context).pop();
-      }
+      // 分享已点或在别处被丢弃时关闭面板。
+      if (next == null) dismissSheet(context);
     });
     final pending = ref.watch(pendingShareControllerProvider);
     final roomName = ref.watch(

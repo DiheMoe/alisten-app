@@ -30,6 +30,7 @@ void main() {
       ('/settings', '/settings/admin', AdminScreen),
       ('/settings', '/settings/account/login', LoginScreen),
       ('/settings', '/settings/account/register', RegisterScreen),
+      ('/settings', '/settings/account/pair', PairScreen),
     ]) {
       testWidgets('$to slides in from $from and slides back out', (
         tester,

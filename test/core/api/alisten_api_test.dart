@@ -5,6 +5,7 @@ import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/protocol/http.gen.dart';
+import 'package:alisten/domain/member/github.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:dio/dio.dart';
 import 'package:fake_async/fake_async.dart';
@@ -583,6 +584,187 @@ void main() {
     expect(adapter.requests.single.authorization, isNull);
     expect(site.registrationOpen, isFalse);
     expect(site.githubLogin, isTrue);
+  });
+
+  group('pairing', () {
+    test('a pairing code decodes its QR image on the device and fetches '
+        'nothing else', () async {
+      adapter.respond(201, {
+        'code': 'ABCD2345',
+        'expiresAtMs': 1700000300000,
+        'qrImage': 'data:image/png;base64,iVBORw0KGgo=',
+      });
+
+      final pairing = await api.createPairingCode();
+
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '/api/account/pairing-codes');
+      expect(request.authorization, 'Bearer member-token');
+      expect(request.jsonBody, <String, Object?>{});
+      expect(pairing.code, 'ABCD2345');
+      expect(pairing.expiresAtMs, 1700000300000);
+      expect(pairing.qrPng, base64Decode('iVBORw0KGgo='));
+    });
+
+    for (final qrImage in [
+      'https://example.com/qr.png',
+      'data:image/png;base64,!!!',
+      'data:image/png;base64,',
+    ]) {
+      test('a QR image "$qrImage" is left out without a request', () async {
+        adapter.respond(201, {
+          'code': 'ABCD2345',
+          'expiresAtMs': 1700000300000,
+          'qrImage': qrImage,
+        });
+
+        final pairing = await api.createPairingCode();
+
+        expect(pairing.qrPng, isNull);
+        expect(adapter.requests, hasLength(1));
+      });
+    }
+
+    test('redeeming a pairing code signs in without a device '
+        'credential', () async {
+      adapter.respond(201, {
+        'memberToken': 'paired-token',
+        'member': _memberJson(id: 'account-member', name: '账号听众'),
+        'account': {'username': 'mao', 'github': false},
+      });
+
+      final signedIn = await api.redeemPairingCode('ABCD2345');
+
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '/api/sessions/pairing');
+      expect(request.authorization, 'Bearer member-token');
+      expect(request.jsonBody, {'code': 'ABCD2345'});
+      expect(signedIn.memberToken, 'paired-token');
+      expect(signedIn.member.id, 'account-member');
+      expect(signedIn.account.username, 'mao');
+      expect(signedIn.device, isNull);
+    });
+  });
+
+  group('GitHub', () {
+    test('starting always says it is the app, and sends the current '
+        'password only when given', () async {
+      adapter.respond(201, {
+        'url': 'https://github.com/login/oauth/authorize?state=s',
+      });
+
+      final url = await api.startGithubLogin(
+        intent: GithubIntent.login,
+        nonce: 'n' * 43,
+      );
+
+      expect(
+        url,
+        Uri.parse('https://github.com/login/oauth/authorize?state=s'),
+      );
+      expect(adapter.requests.last.method, 'POST');
+      expect(adapter.requests.last.path, '/api/auth/github');
+      expect(adapter.requests.last.authorization, 'Bearer member-token');
+      expect(adapter.requests.last.jsonBody, {
+        'client': 'app',
+        'intent': 'login',
+        'nonce': 'n' * 43,
+      });
+
+      adapter.respond(201, {
+        'url': 'https://github.com/login/oauth/authorize?state=t',
+      });
+      await api.startGithubLogin(
+        intent: GithubIntent.bind,
+        nonce: 'm' * 43,
+        currentPassword: 'password1',
+      );
+
+      expect(adapter.requests.last.jsonBody, {
+        'client': 'app',
+        'currentPassword': 'password1',
+        'intent': 'bind',
+        'nonce': 'm' * 43,
+      });
+    });
+
+    for (final url in [
+      'http://github.com/login/oauth/authorize',
+      'moe.dihe.alisten:/auth/github',
+      '',
+    ]) {
+      test('an authorization address "$url" is never opened', () async {
+        adapter.respond(201, {'url': url});
+
+        await expectLater(
+          api.startGithubLogin(intent: GithubIntent.verify, nonce: 'n' * 43),
+          throwsA(
+            isA<ApiException>().having(
+              (e) => e.code,
+              'code',
+              LocalErrorCodes.protocolMismatch,
+            ),
+          ),
+        );
+      });
+    }
+
+    test('an exchange that signs in to the account the GitHub is bound to '
+        'carries its new session', () async {
+      adapter.respond(200, {
+        'memberToken': 'account-token',
+        'member': _memberJson(id: 'account-member', name: '账号听众'),
+        'account': {'github': true},
+      });
+
+      final exchange = await api.finishGithubLogin(
+        code: 'c-1',
+        nonce: 'n' * 43,
+      );
+
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '/api/auth/github/exchange');
+      expect(request.authorization, 'Bearer member-token');
+      expect(request.jsonBody, {'code': 'c-1', 'nonce': 'n' * 43});
+      expect(exchange.signedIn?.memberToken, 'account-token');
+      expect(exchange.signedIn?.device, isNull);
+      expect(exchange.member.id, 'account-member');
+      expect(exchange.account.github, isTrue);
+      expect(exchange.account.username, isNull);
+    });
+
+    test('an exchange that binds, verifies or registers keeps the '
+        'session', () async {
+      adapter.respond(200, {
+        'member': _memberJson(id: 'member-1', name: 'Listener'),
+        'account': {'username': 'mao', 'github': true},
+      });
+
+      final exchange = await api.finishGithubLogin(
+        code: 'c-1',
+        nonce: 'n' * 43,
+      );
+
+      expect(exchange.signedIn, isNull);
+      expect(exchange.member.id, 'member-1');
+      expect(exchange.account.username, 'mao');
+    });
+
+    test('unbinding sends the current password and accepts an empty 204 '
+        'answer', () async {
+      adapter.respondRaw(204, '', null);
+
+      await api.unbindGithub(currentPassword: 'password1');
+
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '/api/account/github/removals');
+      expect(request.authorization, 'Bearer member-token');
+      expect(request.jsonBody, {'currentPassword': 'password1'});
+    });
   });
 }
 

@@ -164,8 +164,7 @@ class _ApiKeySheetState extends ConsumerState<ApiKeySheet> {
     );
     _askingToClose = false;
     if (!confirmed || !mounted) return;
-    final route = ModalRoute.of(context);
-    if (route != null && route.isCurrent) Navigator.of(context).pop();
+    dismissSheet(context);
   }
 
   @override
