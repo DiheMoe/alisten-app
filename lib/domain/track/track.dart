@@ -7,6 +7,8 @@ final class Track {
   final String id;
 }
 
+String trackKey(Track track) => '${track.source.name}:${track.id}';
+
 final class TrackMeta {
   const TrackMeta({
     required this.title,

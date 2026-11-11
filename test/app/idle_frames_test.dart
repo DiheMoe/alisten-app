@@ -1,12 +1,10 @@
-import 'dart:convert';
-
 import 'package:alisten/app/room/room_mode.dart';
 import 'package:alisten/app/router.dart';
-import 'package:alisten/domain/history/play_record.dart';
-import 'package:alisten/domain/track/track.dart';
+import 'package:alisten/domain/history/listen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../features/history/history_test_doubles.dart';
 import '../features/lobby/lobby_test_doubles.dart';
 import '../features/search/search_test_doubles.dart';
 import '../features/search/share_test_doubles.dart';
@@ -25,8 +23,10 @@ void main() {
     addTearDown(tester.view.reset);
     await pumpAlistenApp(
       tester,
-      api: FakeAlistenApi()..rooms = [roomListing(id: _roomId, slug: 'listen')],
-      preferences: {'alisten.play-history': _history()},
+      api: FakeAlistenApi()
+        ..rooms = [roomListing(id: _roomId, slug: 'listen')]
+        ..listens = _history(),
+      credentials: FakeCredentialStore()..memberToken = 'member-token',
     );
     final router = appContainer(tester).read(routerProvider);
 
@@ -119,23 +119,9 @@ void main() {
   });
 }
 
-String _history() {
-  return jsonEncode([
+List<Listen> _history() {
+  return [
     for (var index = 0; index < 5; index++)
-      PlayRecord(
-        roomId: 'room',
-        roomName: '一起听',
-        serverOrigin: 'https://livehouse.dihe.moe',
-        track: Track(source: TrackSource.netease, id: '$index'),
-        meta: TrackMeta(
-          title: '歌 $index',
-          artist: '歌手',
-          album: '专辑',
-          coverUrl: '',
-          pageUrl: '',
-          durationMs: 180000,
-        ),
-        playedAtMs: DateTime(2026, 11, 1).millisecondsSinceEpoch,
-      ).toJson(),
-  ]);
+      heard('歌 $index', at: DateTime(2026, 11, 1).millisecondsSinceEpoch),
+  ];
 }

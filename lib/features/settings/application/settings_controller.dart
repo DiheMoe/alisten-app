@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/api_error.dart';
+import 'package:alisten/core/api/credential_store.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/domain/history/search_record.dart';
 import 'package:alisten/domain/member/member.dart';
@@ -13,6 +15,10 @@ import 'package:alisten/features/settings/application/system_settings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const _logSource = 'settings';
+
+const _unauthorized = 'UNAUTHORIZED';
+
+const _notSavedText = '没有保存，再试一次。';
 
 final settingsControllerProvider =
     NotifierProvider<SettingsController, SettingsState>(SettingsController.new);
@@ -144,11 +150,60 @@ final class SettingsController extends Notifier<SettingsState> {
     }
   }
 
-  Future<void> setRecordHistory(bool enabled) {
-    return _change(
-      (value) => value.copyWith(recordHistory: enabled),
-      (store) => store.setRecordHistory(enabled),
-    );
+  /// 记录开关只保存在服务端的成员上，本机不写；还没有成员时先建游客。
+  Future<MutationResult<void>> setRecordListens(bool on) async {
+    final identity = ref.read(identityControllerProvider.notifier);
+    // 先取定凭据和 API：建游客期间换了服务器，写入也不会发给新服务器。
+    final credentials = ref.read(credentialStoreProvider);
+    final api = ref.read(alistenApiProvider);
+    final known = ref.read(identityControllerProvider).member;
+    final Member member;
+    try {
+      member = known ?? await identity.ensureMember();
+    } on ApiException catch (error) {
+      return MutationNotSent(error.message);
+    } on Object catch (error) {
+      AppLog.warn(
+        _logSource,
+        'member not ready for listen recording',
+        type: '${error.runtimeType}',
+      );
+      return const MutationNotSent(identityUnreadableText);
+    }
+    final token = await credentials.readMemberTokenOrNull();
+    try {
+      await api.setListenRecording(on);
+    } on ApiException catch (error) {
+      // 成员是这次才取得的（通常是刚建的游客）时，被拒并不说明已保存的身份
+      // 有问题。
+      if (error.code == _unauthorized && known != null) {
+        final text = await identity.recoverFromRefusal(credentials, token);
+        // 换成了新游客时再试一次就能保存；账号被下线、换了服务器或没取到新身份
+        // 时照实说。
+        return MutationFailed(
+          _unauthorized,
+          text == identityRenewedNotice ? _notSavedText : text,
+        );
+      }
+      if (error.answerLost) {
+        if (ref.mounted) unawaited(loadProfile());
+        return const MutationUnknown();
+      }
+      if (error.code == LocalErrorCodes.noToken) {
+        return MutationNotSent(error.message);
+      }
+      return MutationFailed(error.code, rateLimitedText(error));
+    } on Object catch (error) {
+      AppLog.error(
+        _logSource,
+        'listen recording change ended unexpectedly',
+        type: '${error.runtimeType}',
+      );
+      if (ref.mounted) unawaited(loadProfile());
+      return const MutationUnknown();
+    }
+    identity.updateRecordListens(member.id, on);
+    return const MutationSucceeded(null);
   }
 
   /// [volume] 取 0 到 100。拖动滑块期间 [persist] 传 false，只生效不写入，松开
@@ -175,18 +230,19 @@ final class SettingsController extends Notifier<SettingsState> {
     );
   }
 
-  /// 取回启动时没取到的成员；[refresh] 为 true 时已有成员也重新读取。不会创建
-  /// 成员，失败时资料保持原样。
-  Future<void> loadProfile({bool refresh = false}) async {
-    if (!refresh && ref.read(identityControllerProvider).member != null) return;
+  /// 重新读取成员，不会创建成员，失败时资料保持原样。读取失败时返回 false；返回
+  /// true 而仍然没有成员，说明这个服务器上还没有身份。
+  Future<bool> loadProfile() async {
     try {
       await ref.read(identityControllerProvider.notifier).restore();
+      return true;
     } on Object catch (error) {
       AppLog.debug(
         _logSource,
         'profile not restored',
         code: error is ApiException ? error.code : null,
       );
+      return false;
     }
   }
 
@@ -227,7 +283,7 @@ final class SettingsController extends Notifier<SettingsState> {
         'profile save ended unexpectedly',
         type: '${error.runtimeType}',
       );
-      if (ref.mounted) unawaited(loadProfile(refresh: true));
+      if (ref.mounted) unawaited(loadProfile());
       return const MutationUnknown();
     }
     if (!ref.mounted || result is! MutationSucceeded<Member> || !emailChanged) {

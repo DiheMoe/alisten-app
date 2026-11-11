@@ -26,7 +26,6 @@ void main() {
       expect(settings.systemNotifications, isFalse);
       expect(settings.recordSearch, isTrue);
       expect(settings.searchHistoryLimit, 10);
-      expect(settings.recordHistory, isTrue);
       expect(settings.volume, 75);
       expect(settings.muted, isFalse);
       expect(settings.email, '');
@@ -89,7 +88,6 @@ void main() {
           store.setSystemNotifications(true),
       'alisten.search-history.enabled': (store) => store.setRecordSearch(false),
       'alisten.search-history.limit': (store) => store.setSearchHistoryLimit(5),
-      'alisten.play-history.enabled': (store) => store.setRecordHistory(false),
       'alisten.volume': (store) => store.setVolume(30),
       'alisten.muted': (store) => store.setMuted(true),
       'alisten.email': (store) => store.setEmail('listener@example.com'),

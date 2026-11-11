@@ -5,7 +5,6 @@ import 'package:alisten/app/router.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/features/admin/index.dart';
-import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/settings/index.dart';
@@ -102,13 +101,12 @@ void main() {
     expect(container.read(appVisibleProvider), isTrue);
   });
 
-  testWidgets('playback and the play history follow the room for as long as '
-      'the app runs, with no page showing them', (tester) async {
+  testWidgets('playback follows the room for as long as the app runs, with '
+      'no page showing it', (tester) async {
     await pumpAlistenApp(tester);
     final container = appContainer(tester);
 
     expect(container.exists(playbackControllerProvider), isTrue);
-    expect(container.exists(historyRecorderProvider), isTrue);
   });
 
   testWidgets('back in the foreground, the room connection and the '

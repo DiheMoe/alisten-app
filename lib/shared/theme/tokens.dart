@@ -106,9 +106,6 @@ abstract final class AlistenDurations {
   static const theme = Duration(milliseconds: 600);
   static const backdrop = Duration(milliseconds: 800);
   static const toast = Duration(seconds: 3);
-
-  /// 带操作（如撤销）的提示要留出读完再点按的时间。
-  static const actionToast = Duration(seconds: 6);
   static const auroraLoop = Duration(seconds: 24);
 
   static Duration of(BuildContext context, Duration duration) {

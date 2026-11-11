@@ -64,6 +64,8 @@ const _fateMotif = [
   TapBeat.long,
 ];
 
+enum _ProfileRead { reading, read, failed }
+
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({
     required this.appVersion,
@@ -96,6 +98,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _saving = false;
   bool _clearingImages = false;
 
+  // 设置页自己发起的成员读取。没有成员时据此区分正在读取、没有读到和这个服务器
+  // 上还没有身份。
+  _ProfileRead _profileRead = _ProfileRead.reading;
+
+  // 请求期间开关显示的新值；结束后丢掉，开关回到身份状态里的值，失败时自然
+  // 回滚。
+  bool? _recordListens;
+
   SettingsController get _settings =>
       ref.read(settingsControllerProvider.notifier);
 
@@ -106,10 +116,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       text: ref.read(identityControllerProvider).member?.name ?? '',
     );
     _email = TextEditingController(text: ref.read(profileEmailProvider));
-    // 启动时可能因离线没取到成员，这里再取一次。
+    // 每次打开都重新读取：启动时可能因离线没取到成员，记录开关也可能已在别处
+    // 改过。
     unawaited(
       Future.microtask(() async {
-        if (mounted) await _settings.loadProfile();
+        if (mounted) await _readProfile();
       }),
     );
   }
@@ -119,6 +130,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _nickname.dispose();
     _email.dispose();
     super.dispose();
+  }
+
+  Future<void> _readProfile() async {
+    if (_profileRead != _ProfileRead.reading) {
+      setState(() => _profileRead = _ProfileRead.reading);
+    }
+    final read = await _settings.loadProfile();
+    if (!mounted) return;
+    setState(
+      () => _profileRead = read ? _ProfileRead.read : _ProfileRead.failed,
+    );
   }
 
   // 用户改过的输入框不再跟随存储的值，以免覆盖正在编辑的内容。
@@ -164,6 +186,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _setRecordListens(bool on) async {
+    if (_recordListens != null) return;
+    setState(() => _recordListens = on);
+    final result = await _settings.setRecordListens(on);
+    if (mounted) setState(() => _recordListens = null);
+    switch (result) {
+      case MutationSucceeded():
+        break;
+      case MutationFailed(:final message) || MutationNotSent(:final message):
+        widget.onNotice(ToastKind.failure, message);
+      case MutationUnknown():
+        widget.onNotice(ToastKind.warning, '结果未知，已重新读取这项设置。');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(
@@ -173,6 +210,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ref.listen(
       profileEmailProvider,
       (previous, next) => _follow(_email, previous, next),
+    );
+    // 登录页等是设置页的子页面，返回时不会重新打开设置页；身份换了就重新读取，
+    // 登录后没读到的记录开关才不会一直显示默认值。
+    ref.listen(
+      identityControllerProvider.select((state) => state.session),
+      (_, _) => unawaited(_readProfile()),
     );
     final state = ref.watch(settingsControllerProvider);
     final settings = state.value;
@@ -289,15 +332,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                 ),
               ),
-              _SettingRow(
-                title: '记录播放历史',
-                description: '关闭后不再记录，已有的记录不会删除',
-                trailing: AlistenToggle(
-                  value: settings.recordHistory,
-                  semanticLabel: '记录播放历史',
-                  onChanged: _settings.setRecordHistory,
-                ),
-              ),
+              _recordListensRow(identity),
             ],
           ),
           _Group(
@@ -341,6 +376,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  // 正在读取或没有读到时不显示开关，以免显示一个没读到的值。没有身份时按新游客
+  // 的默认值显示；切换要保存在成员上，这时才建游客。
+  Widget _recordListensRow(IdentityState identity) {
+    const title = '记录播放历史';
+    if (identity.member == null && _profileRead != _ProfileRead.read) {
+      final reading = _profileRead == _ProfileRead.reading;
+      return _SettingRow(
+        title: title,
+        description: reading ? '正在读取…' : '没有读到这项设置',
+        labelled: false,
+        trailing: reading
+            // 占住开关的宽度，读到之后说明不会重新折行。
+            ? SizedBox(width: AlistenSizes.toggleTrack.width)
+            : PillButton(
+                label: '重试',
+                icon: Icons.refresh_rounded,
+                style: PillButtonStyle.secondary,
+                onPressed: () => unawaited(_readProfile()),
+              ),
+      );
+    }
+    return _SettingRow(
+      title: title,
+      description: identity.account == null ? '保存在服务器上' : '保存在服务器上，登录这个账号的设备共用',
+      trailing: AlistenToggle(
+        value: _recordListens ?? identity.recordListens,
+        semanticLabel: title,
+        onChanged: (on) => unawaited(_setRecordListens(on)),
       ),
     );
   }
@@ -496,17 +563,20 @@ class _RowTitle extends StatelessWidget {
   }
 }
 
-// 可见标题不进语义树：[trailing] 控件已以标题为名，否则读屏会读两遍。
+// [labelled] 时可见标题不进语义树：[trailing] 控件已以标题为名，否则读屏会读
+// 两遍。不是时标题和说明合成一个节点读出。
 class _SettingRow extends StatelessWidget {
   const _SettingRow({
     required this.title,
     required this.description,
     required this.trailing,
+    this.labelled = true,
   });
 
   final String title;
   final String description;
   final Widget trailing;
+  final bool labelled;
 
   @override
   Widget build(BuildContext context) {
@@ -524,18 +594,23 @@ class _SettingRow extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ExcludeSemantics(child: _RowTitle(title)),
-                  const SizedBox(height: AlistenSpacing.xxs / 2),
-                  Text(
-                    description,
-                    style: AlistenTypography.secondary.copyWith(
-                      color: AlistenColors.of(context).onGlassMuted,
+              child: MergeSemantics(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ExcludeSemantics(
+                      excluding: labelled,
+                      child: _RowTitle(title),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: AlistenSpacing.xxs / 2),
+                    Text(
+                      description,
+                      style: AlistenTypography.secondary.copyWith(
+                        color: AlistenColors.of(context).onGlassMuted,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: AlistenSpacing.sm),

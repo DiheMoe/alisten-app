@@ -1346,6 +1346,17 @@ void main() {
     expect(identity().account?.username, 'mao');
   });
 
+  test('updateRecordListens applies only to the member that asked', () async {
+    credentials.memberToken = 'stored-token';
+    await controller.restore();
+
+    controller.updateRecordListens('someone-else', false);
+    expect(identity().recordListens, isTrue);
+
+    controller.updateRecordListens('member-id', false);
+    expect(identity().recordListens, isFalse);
+  });
+
   test('saving an email for an account keeps it on the account', () async {
     credentials.memberToken = 'account-token';
     api.account = const Account(username: 'mao', github: false);

@@ -13,7 +13,6 @@ final class LocalSettingsStore implements SettingsStore {
   static const _systemNotifications = 'alisten.reminder.system-notifications';
   static const _recordSearch = 'alisten.search-history.enabled';
   static const _searchHistoryLimit = 'alisten.search-history.limit';
-  static const _recordHistory = 'alisten.play-history.enabled';
   static const _volume = 'alisten.volume';
   static const _muted = 'alisten.muted';
   static const _email = 'alisten.email';
@@ -39,7 +38,6 @@ final class LocalSettingsStore implements SettingsStore {
       searchHistoryLimit: searchHistoryLimits.contains(limit)
           ? limit
           : defaults.searchHistoryLimit,
-      recordHistory: _read(_recordHistory, defaults.recordHistory),
       volume: _read(_volume, defaults.volume).clamp(0, 100),
       muted: _read(_muted, defaults.muted),
       email: _read(_email, defaults.email),
@@ -74,14 +72,6 @@ final class LocalSettingsStore implements SettingsStore {
     return _check(
       _searchHistoryLimit,
       _preferences.setInt(_searchHistoryLimit, limit),
-    );
-  }
-
-  @override
-  Future<void> setRecordHistory(bool enabled) {
-    return _check(
-      _recordHistory,
-      _preferences.setBool(_recordHistory, enabled),
     );
   }
 

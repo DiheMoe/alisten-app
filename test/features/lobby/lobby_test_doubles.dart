@@ -5,12 +5,14 @@ import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/credential_store.dart';
 import 'package:alisten/core/storage/preferences.dart';
+import 'package:alisten/domain/history/listen.dart';
 import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/domain/member/github.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/member/pairing_code.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/domain/server/site_capabilities.dart';
+import 'package:alisten/domain/track/track.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -139,6 +141,27 @@ final class FakeAlistenApi implements AlistenApi {
   Future<List<RoomListing>> Function()? listRoomsHandler;
 
   void Function()? onCreateTicket;
+
+  List<Listen> listens = [];
+  int listMyListensCalls = 0;
+  Exception? listMyListensError;
+
+  /// 有剩余时，每次读取按顺序取出一个并以它的结果为准，不读 [listens]。
+  final List<Completer<List<Listen>>> listMyListensResults = [];
+
+  /// 历史请求按到达的顺序记下：`list`、`remove`、`clear`。
+  final List<String> listenRequests = [];
+
+  final List<Track> removedListens = [];
+  Exception? removeMyListenError;
+  Completer<void>? removeMyListenGate;
+
+  int clearMyListensCalls = 0;
+  Exception? clearMyListensError;
+
+  final List<bool> listenRecordingWrites = [];
+  Exception? setListenRecordingError;
+  Completer<void>? setListenRecordingGate;
 
   @override
   Future<({Member member, String memberToken})> createMember() async {
@@ -361,6 +384,49 @@ final class FakeAlistenApi implements AlistenApi {
     final error = ticketError;
     if (error != null) throw error;
     return 'ticket-for-$id';
+  }
+
+  @override
+  Future<List<Listen>> listMyListens() async {
+    listMyListensCalls++;
+    listenRequests.add('list');
+    final error = listMyListensError;
+    if (error != null) throw error;
+    if (listMyListensResults.isNotEmpty) {
+      return listMyListensResults.removeAt(0).future;
+    }
+    return List.of(listens);
+  }
+
+  @override
+  Future<void> removeMyListen(Track track) async {
+    listenRequests.add('remove');
+    removedListens.add(track);
+    await removeMyListenGate?.future;
+    final error = removeMyListenError;
+    if (error != null) throw error;
+    listens = [
+      for (final listen in listens)
+        if (trackKey(listen.track) != trackKey(track)) listen,
+    ];
+  }
+
+  @override
+  Future<void> clearMyListens() async {
+    clearMyListensCalls++;
+    listenRequests.add('clear');
+    final error = clearMyListensError;
+    if (error != null) throw error;
+    listens = [];
+  }
+
+  @override
+  Future<void> setListenRecording(bool on) async {
+    listenRecordingWrites.add(on);
+    await setListenRecordingGate?.future;
+    final error = setListenRecordingError;
+    if (error != null) throw error;
+    recordListens = on;
   }
 }
 

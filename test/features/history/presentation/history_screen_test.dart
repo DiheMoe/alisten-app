@@ -2,17 +2,20 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:alisten/app/router.dart';
-import 'package:alisten/domain/history/play_record.dart';
+import 'package:alisten/core/api/api_error.dart';
+import 'package:alisten/domain/history/listen.dart';
 import 'package:alisten/domain/room/room.dart';
-import 'package:alisten/domain/server/server_profile.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/history/index.dart';
+import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/index.dart' show PickControl;
 import 'package:alisten/features/server/data/preferences_server_store.dart';
+import 'package:alisten/features/server/index.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/track_row.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,7 +25,8 @@ import '../../../domain/room/room_fixtures.dart';
 import '../../lobby/lobby_test_doubles.dart';
 import '../../room/room_test_doubles.dart';
 import '../../search/search_test_doubles.dart' show entryJson;
-import '../../server/server_test_doubles.dart' show serverB;
+import '../../server/server_test_doubles.dart'
+    show FakeCredentialStores, serverB;
 import '../history_test_doubles.dart';
 
 const _roomId = '123e4567-e89b-42d3-a456-426614174000';
@@ -31,29 +35,15 @@ const _day = 24 * 60 * 60 * 1000;
 
 final _now = DateTime(2026, 11, 2, 21).millisecondsSinceEpoch;
 
-// 歌名同时用作曲目 ID，使列表行与记录可按歌名对应。
-PlayRecord _played(
-  String title, {
-  required int at,
-  String roomName = '一起听',
-  String serverOrigin = 'https://livehouse.dihe.moe',
-}) {
-  return PlayRecord(
-    roomId: 'room',
-    roomName: roomName,
-    serverOrigin: serverOrigin,
-    track: Track(source: TrackSource.netease, id: title),
-    meta: TrackMeta(
-      title: title,
-      artist: '歌手',
-      album: '专辑',
-      coverUrl: '',
-      pageUrl: '',
-      durationMs: 180000,
-    ),
-    playedAtMs: at,
-  );
-}
+const _refused = ApiException(code: 'INTERNAL', message: '服务器出错了', status: 500);
+
+const _clearWarning = '将清空你的全部播放记录，登录同一个账号的其他设备上也会一起清空。';
+
+typedef _Opened = ({
+  FakeAlistenApi api,
+  ProviderContainer container,
+  FakeRoomTransportFactory rooms,
+});
 
 Finder get _filter => find.descendant(
   of: find.byType(AlistenTextField),
@@ -72,48 +62,59 @@ Finder get _list => find
     )
     .first;
 
-Future<({FakeRoomTransportFactory rooms, ProviderContainer container})>
-_openHistory(
+Future<_Opened> _openHistory(
   WidgetTester tester,
-  List<PlayRecord> records, {
-  List<Object?>? stored,
+  List<Listen> listens, {
+  FakeAlistenApi? api,
   FakeHistoryExporter? exporter,
-  ServerProfile? currentServer,
+  FakeCredentialStores? credentialStores,
+  Map<String, Object> preferences = const {},
 }) async {
   tester.view
     ..physicalSize = const Size(360, 780) * 3
     ..devicePixelRatio = 3;
   addTearDown(tester.view.reset);
   final rooms = FakeRoomTransportFactory();
+  final server = (api ?? FakeAlistenApi())
+    ..rooms = [roomListing(id: _roomId, slug: 'listen')]
+    ..listens = listens;
   await pumpAlistenApp(
     tester,
-    api: FakeAlistenApi()..rooms = [roomListing(id: _roomId, slug: 'listen')],
-    credentials: FakeCredentialStore()..tickets[_roomId] = 'saved-ticket',
+    api: server,
+    credentials: FakeCredentialStore()
+      ..memberToken = 'member-token'
+      ..tickets[_roomId] = 'saved-ticket',
+    credentialStores: credentialStores,
     rooms: rooms,
     exporter: exporter,
-    preferences: {
-      'alisten.play-history': jsonEncode(
-        stored ?? [for (final record in records) record.toJson()],
-      ),
-      if (currentServer != null) ...{
-        PreferencesServerStore.profilesKey: jsonEncode([
-          currentServer.toJson(),
-        ]),
-        PreferencesServerStore.currentKey: currentServer.id,
-      },
-    },
+    preferences: preferences,
     overrides: [historyNowProvider.overrideWithValue(() => _now)],
   );
   final container = appContainer(tester);
   container.read(routerProvider).go('/history');
   await _settle(tester);
-  return (rooms: rooms, container: container);
+  return (api: server, container: container, rooms: rooms);
 }
 
 Future<void> _settle(WidgetTester tester) async {
   await tester.pump();
   await tester.pump();
   await tester.pump(const Duration(seconds: 1));
+}
+
+void _emitRoom(FakeRoomTransportFactory rooms) {
+  rooms.last.emitHello(
+    testRoomSnapshot().copyWith(
+      term: 1,
+      seq: 1,
+      room: const RoomInfo(
+        id: _roomId,
+        name: '一起听',
+        description: '',
+        kind: RoomKind.ephemeral,
+      ),
+    ),
+  );
 }
 
 void main() {
@@ -123,7 +124,7 @@ void main() {
       await _openHistory(tester, [
         for (var day = 0; day < days; day++)
           for (var index = 0; index < perDay; index++)
-            _played('$day-$index', at: _now - day * _day - index * 60000),
+            heard('$day-$index', at: _now - day * _day - index * 60000),
       ]);
 
       final built = find
@@ -139,7 +140,7 @@ void main() {
       'starts again from the latest', (tester) async {
     await _openHistory(tester, [
       for (var day = 0; day < 30; day++)
-        _played('day-$day', at: _now - day * _day),
+        heard('day-$day', at: _now - day * _day),
     ]);
     expect(find.text('day-29', skipOffstage: false), findsNothing);
 
@@ -156,14 +157,14 @@ void main() {
     expect(find.text('day-29', skipOffstage: false), findsNothing);
   });
 
-  testWidgets('records are grouped by day under headings that tell how many '
+  testWidgets('listens are grouped by day under headings that tell how many '
       'played, stay on top and get a floor once rows pass beneath', (
     tester,
   ) async {
     await _openHistory(tester, [
       for (var index = 0; index < 30; index++)
-        _played('today-$index', at: _now - index * 60000),
-      _played('yesterday', at: _now - _day),
+        heard('today-$index', at: _now - index * 60000),
+      heard('yesterday', at: _now - _day),
     ]);
     expect(find.text('今天'), findsOneWidget);
     expect(find.text('30 首'), findsOneWidget);
@@ -188,7 +189,7 @@ void main() {
     expect(floorOf('今天').a, greaterThan(0.9));
   });
 
-  testWidgets('long pressing a record copies its title', (tester) async {
+  testWidgets('long pressing a row copies its title', (tester) async {
     String? copied;
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
       SystemChannels.platform,
@@ -205,7 +206,7 @@ void main() {
         null,
       ),
     );
-    await _openHistory(tester, [_played('一首歌', at: _now)]);
+    await _openHistory(tester, [heard('一首歌', at: _now)]);
 
     await tester.longPress(find.text('一首歌'));
     await tester.pump();
@@ -214,116 +215,295 @@ void main() {
     expect(find.text('已复制歌名'), findsOneWidget);
   });
 
-  testWidgets('a row swiped away is deleted once and leaves the list', (
+  testWidgets('the page says it is loading until the history is read', (
     tester,
   ) async {
-    final (:rooms, :container) = await _openHistory(tester, [
-      _played('swiped', at: _now),
-      _played('kept', at: _now - 60000),
+    final semantics = tester.ensureSemantics();
+    final api = FakeAlistenApi();
+    final read = Completer<List<Listen>>();
+    api.listMyListensResults.add(read);
+    await _openHistory(tester, const [], api: api);
+
+    expect(find.bySemanticsLabel('加载中'), findsOneWidget);
+    expect(find.text('你的音乐足迹，从这里开始'), findsNothing);
+
+    read.complete([heard('晴天', at: _now)]);
+    await _settle(tester);
+
+    expect(find.bySemanticsLabel('加载中'), findsNothing);
+    expect(find.text('晴天'), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('export and clear wait for a history to act on', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final api = FakeAlistenApi();
+    final read = Completer<List<Listen>>();
+    api.listMyListensResults.add(read);
+    await _openHistory(tester, const [], api: api);
+    void expectDisabled() {
+      for (final label in ['导出播放历史', '清空播放历史']) {
+        expect(
+          tester.getSemantics(find.bySemanticsLabel(label)),
+          isSemantics(hasEnabledState: true, isEnabled: false),
+          reason: label,
+        );
+      }
+    }
+
+    expectDisabled();
+    read.complete(const []);
+    await _settle(tester);
+    expect(find.text('你的音乐足迹，从这里开始'), findsOneWidget);
+    expectDisabled();
+    semantics.dispose();
+  });
+
+  testWidgets('a history that cannot be read says why and is read again from '
+      'the retry button', (tester) async {
+    final api = FakeAlistenApi()
+      ..listMyListensError = const ApiException(
+        code: LocalErrorCodes.network,
+        message: '网络请求失败，请检查网络后重试。',
+        status: null,
+      );
+    await _openHistory(tester, [heard('晴天', at: _now)], api: api);
+
+    expect(find.text('播放历史没有读出来'), findsOneWidget);
+    expect(find.text('网络请求失败，请检查网络后重试。'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('播放历史没有读出来'),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics && widget.properties.liveRegion == true,
+        ),
+      ),
+      findsOneWidget,
+    );
+
+    api.listMyListensError = null;
+    await tester.tap(find.text('重试'));
+    await _settle(tester);
+
+    expect(find.text('播放历史没有读出来'), findsNothing);
+    expect(find.text('晴天'), findsOneWidget);
+  });
+
+  testWidgets('an empty history invites to listen, in the words of the '
+      'web', (tester) async {
+    await _openHistory(tester, const []);
+
+    expect(find.text('你的音乐足迹，从这里开始'), findsOneWidget);
+    expect(find.text('你在房间里听过的歌会记在这里。'), findsOneWidget);
+    expect(_filter, findsNothing);
+  });
+
+  testWidgets('a filter that matches nothing says so and can be cleared', (
+    tester,
+  ) async {
+    await _openHistory(tester, [heard('晴天', at: _now)]);
+
+    await tester.enterText(_filter, '不存在');
+    await _settle(tester);
+    expect(find.text('没有找到相关记录'), findsOneWidget);
+    expect(find.text('换个关键词，再找找看。'), findsOneWidget);
+
+    await tester.tap(find.text('清除筛选'));
+    await _settle(tester);
+    expect(find.text('晴天'), findsOneWidget);
+  });
+
+  testWidgets('a row swiped away waits for the server, then leaves the list '
+      'and says so', (tester) async {
+    final opened = await _openHistory(tester, [
+      heard('swiped', at: _now),
+      heard('kept', at: _now - 60000),
     ]);
-    expect(find.text('swiped'), findsOneWidget);
+    final gate = opened.api.removeMyListenGate = Completer<void>();
     var changes = 0;
-    final history = container.listen(
+    final history = opened.container.listen(
       historyControllerProvider,
       (_, _) => changes++,
     );
     addTearDown(history.close);
+    final left = tester.getTopLeft(find.text('swiped')).dx;
 
     await tester.drag(find.text('swiped'), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+    expect(
+      opened.container.read(historyControllerProvider).listens,
+      hasLength(2),
+      reason: 'held aside until the server answers',
+    );
+    expect(tester.getTopLeft(find.text('swiped')).dx, lessThan(left));
+
+    gate.complete();
     await tester.pumpAndSettle();
 
     expect(find.text('swiped'), findsNothing);
     expect(find.text('kept'), findsOneWidget);
+    expect(find.text('已删除播放记录'), findsOneWidget);
     expect(changes, 1, reason: 'deleted once, and nothing else changed');
-    String titles(List<PlayRecord> records) =>
-        records.map((record) => record.meta.title).join();
-    expect(titles(container.read(historyControllerProvider).records), 'kept');
+    expect(opened.api.removedListens.map(trackKey), ['netease:swiped']);
     expect(
-      titles(container.read(playHistoryStoreProvider).loadPlays()),
-      'kept',
+      opened.container
+          .read(historyControllerProvider)
+          .listens!
+          .map((listen) => listen.meta.title),
+      ['kept'],
     );
   });
 
-  testWidgets('a row swiped away comes back where it was from the toast', (
-    tester,
-  ) async {
-    final (:rooms, :container) = await _openHistory(tester, [
-      _played('newest', at: _now),
-      _played('middle', at: _now - 60000),
-      _played('oldest', at: _now - 120000),
+  testWidgets('a row waiting for the server stays slid open when a new song '
+      'comes in above it', (tester) async {
+    final opened = await _openHistory(tester, [
+      heard('swiped', at: _now),
+      heard('kept', at: _now - 60000),
     ]);
+    final gate = opened.api.removeMyListenGate = Completer<void>();
+    final left = tester.getTopLeft(find.text('swiped')).dx;
 
-    await tester.drag(find.text('middle'), const Offset(-500, 0));
+    await tester.drag(find.text('swiped'), const Offset(-500, 0));
     await tester.pumpAndSettle();
-    expect(find.text('middle'), findsNothing);
-    expect(find.text('已删除《middle》'), findsOneWidget);
+    opened.api.listens = [heard('新歌', at: _now + 1000), ...opened.api.listens];
+    await opened.container.read(historyControllerProvider.notifier).load();
+    await tester.pumpAndSettle();
 
-    await tester.tap(find.text('撤销'));
+    expect(find.text('新歌'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('swiped')).dx, lessThan(left));
+
+    gate.complete();
     await tester.pumpAndSettle();
-    double top(String title) => tester.getTopLeft(find.text(title)).dy;
-    expect(top('newest'), lessThan(top('middle')));
-    expect(top('middle'), lessThan(top('oldest')));
-    expect(
-      container
-          .read(playHistoryStoreProvider)
-          .loadPlays()
-          .map((record) => record.meta.title),
-      ['newest', 'middle', 'oldest'],
-    );
+    expect(find.text('swiped'), findsNothing);
+    expect(find.text('已删除播放记录'), findsOneWidget);
   });
 
-  testWidgets('exporting hands every stored record to the exporter', (
+  testWidgets('a row the server would not delete slides back and says why', (
     tester,
   ) async {
+    final opened = await _openHistory(tester, [heard('swiped', at: _now)]);
+    opened.api.removeMyListenError = _refused;
+    final left = tester.getTopLeft(find.text('swiped')).dx;
+
+    await tester.drag(find.text('swiped'), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(find.text('swiped')).dx, left);
+    expect(find.text('服务器出错了'), findsOneWidget);
+  });
+
+  testWidgets('a delete with an unknown result slides back and says the '
+      'history was read again', (tester) async {
+    final opened = await _openHistory(tester, [heard('swiped', at: _now)]);
+    opened.api.removeMyListenError = const ApiException(
+      code: LocalErrorCodes.network,
+      message: '网络请求失败，请检查网络后重试。',
+      status: null,
+    );
+    final left = tester.getTopLeft(find.text('swiped')).dx;
+    final reads = opened.api.listMyListensCalls;
+
+    await tester.drag(find.text('swiped'), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.text('swiped'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('swiped')).dx, left);
+    expect(find.text('结果未知，已重新读取播放历史。'), findsOneWidget);
+    expect(opened.api.listMyListensCalls, reads + 1);
+  });
+
+  testWidgets('the delete action of a screen reader waits for the server the '
+      'same way, and a row being deleted can be neither swiped nor deleted '
+      'again', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final opened = await _openHistory(tester, [heard('晴天', at: _now)]);
+    final gate = opened.api.removeMyListenGate = Completer<void>();
+    final left = tester.getTopLeft(find.text('晴天')).dx;
+
+    // 只有一行，带自定义动作的语义节点就是这一行。
+    tester.semantics.customAction(
+      find.semantics.byAction(SemanticsAction.customAction),
+      const CustomSemanticsAction(label: '删除'),
+    );
+    await tester.pump();
+    expect(find.semantics.byAction(SemanticsAction.customAction), findsNothing);
+
+    await tester.drag(find.text('晴天'), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.text('晴天')).dx, left);
+    expect(opened.api.removedListens, hasLength(1));
+
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('晴天'), findsNothing);
+    expect(find.text('已删除播放记录'), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('exporting hands every listen to the exporter', (tester) async {
     final semantics = tester.ensureSemantics();
     final exporter = FakeHistoryExporter();
     await _openHistory(tester, [
-      _played('晴天', at: _now),
-      _played('七里香', at: _now - _day),
+      heard('晴天', at: _now),
+      heard('七里香', at: _now - _day),
     ], exporter: exporter);
 
     await tester.tap(find.bySemanticsLabel('导出播放历史'));
     await _settle(tester);
 
     expect(
-      exporter.records.map((record) => record.meta.title),
+      exporter.listens.map((listen) => listen.meta.title),
       unorderedEquals(['晴天', '七里香']),
     );
     expect(find.text('导出失败，请稍后重试。'), findsNothing);
     semantics.dispose();
   });
 
-  testWidgets('clearing the history takes back the offer to undo a delete', (
+  testWidgets('clearing asks first, warns that other devices lose the '
+      'history too, and leaves it empty', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final opened = await _openHistory(tester, [heard('晴天', at: _now)]);
+
+    await tester.tap(find.bySemanticsLabel('清空播放历史'));
+    await tester.pumpAndSettle();
+    expect(find.text(_clearWarning), findsOneWidget);
+    await tester.tap(find.text('清空').last);
+    await tester.pumpAndSettle();
+
+    expect(opened.api.clearMyListensCalls, 1);
+    expect(find.text(_clearWarning), findsNothing);
+    expect(find.text('你的音乐足迹，从这里开始'), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('a clear the server refuses keeps the history and says why', (
     tester,
   ) async {
     final semantics = tester.ensureSemantics();
-    final (:rooms, :container) = await _openHistory(tester, [
-      _played('swiped', at: _now),
-      _played('kept', at: _now - 60000),
-    ]);
-    await tester.drag(find.text('swiped'), const Offset(-500, 0));
-    await tester.pumpAndSettle();
-    expect(find.text('撤销'), findsOneWidget);
+    final opened = await _openHistory(tester, [heard('晴天', at: _now)]);
+    opened.api.clearMyListensError = _refused;
 
     await tester.tap(find.bySemanticsLabel('清空播放历史'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('清空').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('已删除《swiped》'), findsNothing);
-    expect(find.text('撤销'), findsNothing);
-    expect(container.read(historyControllerProvider).records, isEmpty);
+    expect(find.text(_clearWarning), findsNothing);
+    expect(find.text('晴天'), findsOneWidget);
+    expect(find.text('服务器出错了'), findsOneWidget);
     semantics.dispose();
   });
 
   testWidgets('the filter shows the words it filters by when the page opens '
       'again', (tester) async {
-    final (:rooms, :container) = await _openHistory(tester, [
-      _played('晴天', at: _now),
-      _played('七里香', at: _now - 60000),
+    final opened = await _openHistory(tester, [
+      heard('晴天', at: _now),
+      heard('七里香', at: _now - 60000),
     ]);
-    container.read(historyControllerProvider.notifier).filter('晴');
-    final router = container.read(routerProvider);
+    opened.container.read(historyControllerProvider.notifier).filter('晴');
+    final router = opened.container.read(routerProvider);
 
     router.go('/');
     await _settle(tester);
@@ -340,8 +520,8 @@ void main() {
   ) async {
     final semantics = tester.ensureSemantics();
     await _openHistory(tester, [
-      _played('晴天', at: _now),
-      _played('七里香', at: _now - 60000),
+      heard('晴天', at: _now),
+      heard('七里香', at: _now - 60000),
     ]);
     Future<void> type() async {
       await tester.tap(_filter);
@@ -361,10 +541,10 @@ void main() {
     await type();
     tester.semantics.tap(find.semantics.byLabel('清空播放历史'));
     await tester.pumpAndSettle();
-    expect(find.text('清空播放历史？'), findsOneWidget);
+    expect(find.text('清空播放历史'), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('清空播放历史？'), findsNothing);
+    expect(find.text('清空播放历史'), findsNothing);
     expect(_focused, findsNothing);
 
     await type();
@@ -387,9 +567,7 @@ void main() {
   testWidgets('playing a song again waits for a room, then adds it to the '
       'room and says so', (tester) async {
     final semantics = tester.ensureSemantics();
-    final (:rooms, :container) = await _openHistory(tester, [
-      _played('晴天', roomName: '老房间', at: _now),
-    ]);
+    final opened = await _openHistory(tester, [heard('晴天', at: _now)]);
     final again = find.bySemanticsLabel('再点一次《晴天》');
     expect(find.text('进入房间后可点歌'), findsOneWidget);
     expect(tester.widget<PickControl>(find.byType(PickControl)).subtle, isTrue);
@@ -397,32 +575,20 @@ void main() {
       tester.getSemantics(again),
       isSemantics(hasEnabledState: true, isEnabled: false, hasTapAction: false),
     );
-    expect(find.textContaining('老房间'), findsOneWidget);
 
     unawaited(
-      container.read(roomControllerProvider.notifier).openRoom('listen'),
+      opened.container.read(roomControllerProvider.notifier).openRoom('listen'),
     );
     await _settle(tester);
-    rooms.last.emitHello(
-      testRoomSnapshot().copyWith(
-        term: 1,
-        seq: 1,
-        room: const RoomInfo(
-          id: _roomId,
-          name: '一起听',
-          description: '',
-          kind: RoomKind.ephemeral,
-        ),
-      ),
-    );
+    _emitRoom(opened.rooms);
     await _settle(tester);
     expect(find.text('进入房间后可点歌'), findsNothing);
-    rooms.last.responses['queue.add'] = {'entry': entryJson('晴天')};
+    opened.rooms.last.responses['queue.add'] = {'entry': entryJson('晴天')};
 
     await tester.tap(again);
     await _settle(tester);
     final adds = [
-      for (final request in rooms.last.requests)
+      for (final request in opened.rooms.last.requests)
         if (request['type'] == 'queue.add') request,
     ];
     expect(adds, hasLength(1));
@@ -430,113 +596,136 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('a record from another server names that server after the '
-      'room, one from the current server does not', (tester) async {
+  testWidgets('a row names the singer, the source only for bilibili, and the '
+      'album, leaving out what is empty', (tester) async {
     await _openHistory(tester, [
-      _played('晴天', roomName: '大厅', at: _now),
-      _played(
-        '七里香',
-        roomName: '大厅',
-        serverOrigin: 'https://example.com:8443',
-        at: _now - 60000,
-      ),
+      heard('网易云的歌', at: _now),
+      heard('B 站的歌', at: _now - 60000, source: TrackSource.bilibili),
+      heard('无名的歌', at: _now - 120000, artist: ''),
+      heard('单曲', at: _now - 180000, album: ''),
     ]);
 
-    expect(find.text('歌手 · 大厅'), findsOneWidget);
-    expect(find.text('歌手 · 大厅 · example.com:8443'), findsOneWidget);
+    expect(find.text('歌手 · 专辑'), findsOneWidget);
+    expect(find.text('歌手 · 哔哩哔哩 · 专辑'), findsOneWidget);
+    expect(find.text('未知艺术家 · 专辑'), findsOneWidget);
+    expect(find.text('歌手'), findsOneWidget);
   });
 
-  testWidgets('with another server current, the records of the default '
-      'server name theirs', (tester) async {
-    await _openHistory(tester, [
-      _played('晴天', roomName: '大厅', at: _now),
-      _played(
-        '七里香',
-        roomName: '大厅',
-        serverOrigin: 'https://example.com:8443',
-        at: _now - 60000,
-      ),
-    ], currentServer: serverB);
-
-    expect(find.text('歌手 · 大厅 · livehouse.dihe.moe'), findsOneWidget);
-    expect(find.text('歌手 · 大厅'), findsOneWidget);
-  });
-
-  testWidgets('a record stored before servers were kept belongs to the '
-      'default server', (tester) async {
-    final old = Map<String, Object?>.of(
-      _played('晴天', roomName: '大厅', at: _now).toJson(),
-    )..remove('serverOrigin');
-
-    await _openHistory(tester, const [], stored: [old]);
-
-    expect(find.text('歌手 · 大厅'), findsOneWidget);
-  });
-
-  testWidgets('with another server current, a record stored before servers '
-      'were kept still belongs to the default server', (tester) async {
-    final old = Map<String, Object?>.of(
-      _played('晴天', roomName: '大厅', at: _now).toJson(),
-    )..remove('serverOrigin');
-
-    await _openHistory(tester, const [], stored: [old], currentServer: serverB);
-
-    expect(find.text('歌手 · 大厅 · livehouse.dihe.moe'), findsOneWidget);
-  });
-
-  testWidgets('a record without a room name still names its other '
-      'server', (tester) async {
-    await _openHistory(tester, [
-      _played(
-        '晴天',
-        roomName: '',
-        serverOrigin: 'https://example.com:8443',
-        at: _now,
-      ),
-    ]);
-
-    expect(find.text('歌手 · example.com:8443'), findsOneWidget);
-  });
-
-  testWidgets('playing a song of another server again adds it to the room '
-      'that is open now', (tester) async {
-    final semantics = tester.ensureSemantics();
-    final (:rooms, :container) = await _openHistory(tester, [
-      _played(
-        '七里香',
-        roomName: '大厅',
-        serverOrigin: 'https://example.com:8443',
-        at: _now,
-      ),
-    ]);
+  testWidgets('a new song in the room comes in on top while the page is '
+      'open', (tester) async {
+    final opened = await _openHistory(tester, [heard('旧歌', at: _now - 60000)]);
     unawaited(
-      container.read(roomControllerProvider.notifier).openRoom('listen'),
+      opened.container.read(roomControllerProvider.notifier).openRoom('listen'),
     );
     await _settle(tester);
-    rooms.last.emitHello(
-      testRoomSnapshot().copyWith(
-        term: 1,
-        seq: 1,
-        room: const RoomInfo(
-          id: _roomId,
-          name: '一起听',
-          description: '',
-          kind: RoomKind.ephemeral,
-        ),
-      ),
+    opened.api.listens = [heard('新歌', at: _now), heard('旧歌', at: _now - 60000)];
+
+    _emitRoom(opened.rooms);
+    await _settle(tester);
+
+    expect(find.text('新歌'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('新歌')).dy,
+      lessThan(tester.getTopLeft(find.text('旧歌')).dy),
     );
-    await _settle(tester);
-    rooms.last.responses['queue.add'] = {'entry': entryJson('七里香')};
+  });
 
-    await tester.tap(find.bySemanticsLabel('再点一次《七里香》'));
+  testWidgets('switching servers with the page open empties the list, then '
+      'shows the history on the new server', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final stores = FakeCredentialStores();
+    stores(serverB.id).memberToken = 'token-b';
+    final opened = await _openHistory(
+      tester,
+      [heard('旧服务器的歌', at: _now)],
+      credentialStores: stores,
+      preferences: {
+        PreferencesServerStore.profilesKey: jsonEncode([serverB.toJson()]),
+      },
+    );
+    expect(find.text('旧服务器的歌'), findsOneWidget);
+    final read = Completer<List<Listen>>();
+    opened.api.listMyListensResults.add(read);
+
+    final switched = opened.container
+        .read(serverSwitcherProvider)
+        .switchTo(serverB);
+    await _settle(tester);
+    expect(await switched, isA<SwitchSucceeded>());
+    expect(find.text('旧服务器的歌'), findsNothing);
+    expect(find.bySemanticsLabel('加载中'), findsOneWidget);
+
+    read.complete([heard('新服务器的歌', at: _now)]);
+    await _settle(tester);
+    expect(find.text('新服务器的歌'), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('switching servers while the page is closed shows the history '
+      'on the new server when it opens again', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final stores = FakeCredentialStores();
+    stores(serverB.id).memberToken = 'token-b';
+    final opened = await _openHistory(
+      tester,
+      [heard('旧服务器的歌', at: _now)],
+      credentialStores: stores,
+      preferences: {
+        PreferencesServerStore.profilesKey: jsonEncode([serverB.toJson()]),
+      },
+    );
+    final router = opened.container.read(routerProvider);
+    router.go('/');
     await _settle(tester);
 
-    final adds = [
-      for (final request in rooms.last.requests)
-        if (request['type'] == 'queue.add') request,
-    ];
-    expect(adds, hasLength(1));
-    expect(find.text('已点歌《七里香》'), findsOneWidget);
+    final switched = opened.container
+        .read(serverSwitcherProvider)
+        .switchTo(serverB);
+    await _settle(tester);
+    expect(await switched, isA<SwitchSucceeded>());
+    expect(opened.container.read(historyControllerProvider).listens, isNull);
+    final read = Completer<List<Listen>>();
+    opened.api.listMyListensResults.add(read);
+    router.go('/history');
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('旧服务器的歌'), findsNothing);
+    expect(find.bySemanticsLabel('加载中'), findsOneWidget);
+    read.complete([heard('新服务器的歌', at: _now)]);
+    await _settle(tester);
+
+    expect(find.text('旧服务器的歌'), findsNothing);
+    expect(find.text('新服务器的歌'), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('signing in while the page is closed shows the history of the '
+      'account when it opens again', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final opened = await _openHistory(tester, [heard('游客的歌', at: _now)]);
+    final router = opened.container.read(routerProvider);
+    router.go('/');
+    await _settle(tester);
+
+    await opened.container
+        .read(identityControllerProvider.notifier)
+        .adoptSession(
+          (server) => server.login(username: 'mao', password: 'password1'),
+        );
+    await _settle(tester);
+    expect(opened.container.read(historyControllerProvider).listens, isNull);
+    final read = Completer<List<Listen>>();
+    opened.api.listMyListensResults.add(read);
+    router.go('/history');
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('游客的歌'), findsNothing);
+    expect(find.bySemanticsLabel('加载中'), findsOneWidget);
+    read.complete([heard('账号的歌', at: _now)]);
+    await _settle(tester);
+
+    expect(find.text('游客的歌'), findsNothing);
+    expect(find.text('账号的歌'), findsOneWidget);
     semantics.dispose();
   });
 }

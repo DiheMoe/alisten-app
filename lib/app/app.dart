@@ -12,7 +12,6 @@ import 'package:alisten/core/avatar/avatar_image.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/index.dart';
-import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/playback/data/reminder_notifier.dart';
 import 'package:alisten/features/playback/index.dart';
@@ -60,13 +59,12 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
   @override
   void initState() {
     super.initState();
-    // 播放控制和播放历史记录常驻，不依赖当前显示的页面。
+    // 播放控制常驻，不依赖当前显示的页面。
     ref.listenManual(
       playbackControllerProvider,
       (_, _) {},
       fireImmediately: true,
     );
-    ref.listenManual(historyRecorderProvider, (_, _) {});
     listenForNotices(ref);
     listenForShares(ref);
     listenForInvites(ref, openRoute: _openRoute);

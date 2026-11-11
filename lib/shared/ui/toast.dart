@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
-import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -12,55 +11,27 @@ enum ToastKind { info, success, warning, failure }
 
 /// 按对象标识区分：文字相同的两条提示仍是不同的提示，重复的消息会再次显示。
 final class ToastMessage {
-  ToastMessage(this.kind, this.text, {this.action});
+  ToastMessage(this.kind, this.text);
 
   final ToastKind kind;
   final String text;
-  final ToastAction? action;
-}
-
-final class ToastAction {
-  const ToastAction({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
 }
 
 final class ToastController extends ChangeNotifier {
-  ToastController({
-    this.duration = AlistenDurations.toast,
-    this.actionDuration = AlistenDurations.actionToast,
-  });
+  ToastController({this.duration = AlistenDurations.toast});
 
   final Duration duration;
-  final Duration actionDuration;
 
   ToastMessage? _current;
   Timer? _timer;
 
   ToastMessage? get current => _current;
 
-  ToastMessage show(ToastKind kind, String text, {ToastAction? action}) {
+  void show(ToastKind kind, String text) {
     _timer?.cancel();
-    final message = _current = ToastMessage(kind, text, action: action);
-    _timer = Timer(action == null ? duration : actionDuration, dismiss);
+    _current = ToastMessage(kind, text);
+    _timer = Timer(duration, dismiss);
     notifyListeners();
-    return message;
-  }
-
-  void withdraw(ToastMessage message) {
-    if (identical(_current, message)) dismiss();
-  }
-
-  void keep(ToastMessage message) {
-    if (!identical(_current, message)) return;
-    _timer?.cancel();
-    _timer = null;
-  }
-
-  void release(ToastMessage message) {
-    if (!identical(_current, message) || _timer != null) return;
-    _timer = Timer(message.action == null ? duration : actionDuration, dismiss);
   }
 
   void dismiss() {
@@ -126,24 +97,8 @@ class _ToastHostState extends State<ToastHost>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _motion.duration = AlistenDurations.of(context, AlistenDurations.medium);
-    _accessible = MediaQuery.accessibleNavigationOf(context);
-    _followScreenReader();
     if (_shown != null && !_motion.isAnimating && _motion.value == 0) {
       unawaited(_motion.forward());
-    }
-  }
-
-  bool _accessible = false;
-
-  // 读屏用户找到并点按操作所需的时间无法预估，读屏开启时带操作的提示不自动
-  // 消失，关闭读屏后重新计时。
-  void _followScreenReader() {
-    final current = widget.controller.current;
-    if (current == null || current.action == null) return;
-    if (_accessible) {
-      widget.controller.keep(current);
-    } else {
-      widget.controller.release(current);
     }
   }
 
@@ -169,7 +124,6 @@ class _ToastHostState extends State<ToastHost>
   void _onToast() {
     final next = widget.controller.current;
     if (next != null) {
-      _followScreenReader();
       setState(() => _shown = next);
       unawaited(_motion.forward());
     } else {
@@ -201,13 +155,6 @@ class _ToastHostState extends State<ToastHost>
       ..ensureVisualUpdate();
   }
 
-  void _act(ToastMessage message) {
-    // 正在离开或已被替换的提示不再执行操作，避免重复执行。
-    if (!identical(widget.controller.current, message)) return;
-    widget.controller.dismiss();
-    message.action?.onPressed();
-  }
-
   @override
   Widget build(BuildContext context) {
     final shown = _shown;
@@ -225,10 +172,8 @@ class _ToastHostState extends State<ToastHost>
               top: top,
               left: AlistenSpacing.page,
               right: AlistenSpacing.page,
-              // 不带操作的提示不挡住下方页面。IgnorePointer 也会屏蔽读屏的
-              // 关闭操作，但这类提示会自行消失。
+              // 提示不挡住下方页面，到时自行消失。
               child: IgnorePointer(
-                ignoring: shown.action == null,
                 child: FadeTransition(
                   opacity: _fade,
                   child: SlideTransition(
@@ -238,11 +183,7 @@ class _ToastHostState extends State<ToastHost>
                         constraints: const BoxConstraints(
                           maxWidth: AlistenSizes.toastMaxWidth,
                         ),
-                        child: _ToastCapsule(
-                          message: shown,
-                          onAction: () => _act(shown),
-                          onDismiss: () => widget.controller.withdraw(shown),
-                        ),
+                        child: _ToastCapsule(message: shown),
                       ),
                     ),
                   ),
@@ -256,20 +197,13 @@ class _ToastHostState extends State<ToastHost>
 }
 
 class _ToastCapsule extends StatelessWidget {
-  const _ToastCapsule({
-    required this.message,
-    required this.onAction,
-    required this.onDismiss,
-  });
+  const _ToastCapsule({required this.message});
 
   final ToastMessage message;
-  final VoidCallback onAction;
-  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
-    final action = message.action;
     final (icon, ink) = switch (message.kind) {
       ToastKind.info => (Icons.info_rounded, colors.onGlass),
       ToastKind.success => (Icons.check_circle_rounded, colors.success),
@@ -279,7 +213,6 @@ class _ToastCapsule extends StatelessWidget {
     return Semantics(
       container: true,
       liveRegion: true,
-      onDismiss: onDismiss,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: colors.raised,
@@ -295,11 +228,11 @@ class _ToastCapsule extends StatelessWidget {
           ],
         ),
         child: Padding(
-          padding: EdgeInsets.fromLTRB(
+          padding: const EdgeInsets.fromLTRB(
             AlistenSpacing.xs,
-            action == null ? AlistenSpacing.xs : 0,
-            action == null ? AlistenSpacing.lg : AlistenSpacing.xxs,
-            action == null ? AlistenSpacing.xs : 0,
+            AlistenSpacing.xs,
+            AlistenSpacing.lg,
+            AlistenSpacing.xs,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -326,34 +259,6 @@ class _ToastCapsule extends StatelessWidget {
                   child: Text(message.text),
                 ),
               ),
-              if (action != null) ...[
-                const SizedBox(width: AlistenSpacing.xs),
-                Pressable(
-                  onPressed: onAction,
-                  focusRadius: BorderRadius.circular(AlistenRadii.pill),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      minWidth: AlistenSizes.minTouchTarget,
-                      minHeight: AlistenSizes.minTouchTarget,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AlistenSpacing.sm,
-                      ),
-                      child: Center(
-                        widthFactor: 1,
-                        child: Text(
-                          action.label,
-                          style: AlistenTypography.weighted(
-                            AlistenTypography.bodyStrong,
-                            FontWeight.w800,
-                          ).copyWith(color: colors.onGlass),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         ),

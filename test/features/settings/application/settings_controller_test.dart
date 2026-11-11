@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:alisten/app/assembly.dart';
 import 'package:alisten/core/api/alisten_api.dart';
+import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/credential_store.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/domain/history/search_record.dart';
@@ -518,28 +519,235 @@ void main() {
       expect(preferences.getString('alisten.email'), '');
     });
 
-    test(
-      'opening the profile restores a member that is not known yet',
-      () async {
-        credentials.memberToken = 'valid-token';
-        final settings = controllerOf(container);
+    test('loading the profile reads the member every time', () async {
+      credentials.memberToken = 'valid-token';
+      final settings = controllerOf(container);
 
-        await settings.loadProfile();
-        await settings.loadProfile();
+      expect(await settings.loadProfile(), isTrue);
+      expect(await settings.loadProfile(), isTrue);
 
-        expect(api.getMeCalls, 1);
-        expect(container.read(identityControllerProvider).member?.name, '听众');
-      },
-    );
+      expect(api.getMeCalls, 2);
+      expect(container.read(identityControllerProvider).member?.name, '听众');
+    });
 
     test('a profile that cannot be restored is not an error', () async {
       credentials.memberToken = 'valid-token';
       api.getMeError = Exception('offline');
       final settings = controllerOf(container);
 
-      await settings.loadProfile();
+      expect(await settings.loadProfile(), isFalse);
 
       expect(container.read(identityControllerProvider).member, isNull);
+    });
+
+    test('a profile with no identity on this server is read, and stays '
+        'without a member', () async {
+      expect(await controllerOf(container).loadProfile(), isTrue);
+
+      expect(container.read(identityControllerProvider).member, isNull);
+      expect(api.getMeCalls, 0);
+      expect(api.createMemberCalls, 0);
+    });
+  });
+
+  group('record listens', () {
+    IdentityState identity() => container.read(identityControllerProvider);
+
+    Future<void> restored() async {
+      credentials.memberToken = 'stored-token';
+      await container.read(identityControllerProvider.notifier).restore();
+    }
+
+    test('a switch the server took is the new value of the identity, and '
+        'nothing is kept on this device', () async {
+      await restored();
+
+      final result = await controllerOf(container).setRecordListens(false);
+
+      expect(result, isA<MutationSucceeded<void>>());
+      expect(api.listenRecordingWrites, [false]);
+      expect(identity().recordListens, isFalse);
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getKeys(), isEmpty);
+    });
+
+    test('a stored identity not read yet is read back, not replaced, before '
+        'the switch is saved', () async {
+      credentials.memberToken = 'stored-token';
+
+      final result = await controllerOf(container).setRecordListens(false);
+
+      expect(result, isA<MutationSucceeded<void>>());
+      expect(api.getMeCalls, 1);
+      expect(api.createMemberCalls, 0);
+      expect(api.listenRecordingWrites, [false]);
+      expect(credentials.memberToken, 'stored-token');
+      expect(identity().recordListens, isFalse);
+    });
+
+    test('a switch the server refuses leaves the identity as it '
+        'was', () async {
+      await restored();
+      api.setListenRecordingError = const ApiException(
+        code: 'INTERNAL',
+        message: '服务器出错了',
+        status: 500,
+      );
+
+      final result = await controllerOf(container).setRecordListens(false);
+
+      expect((result as MutationFailed<void>).message, '服务器出错了');
+      expect(identity().recordListens, isTrue);
+    });
+
+    test('a refused guest token replaces the identity and asks to try '
+        'again', () async {
+      await restored();
+      api.setListenRecordingError = unauthorized;
+
+      final result = await controllerOf(container).setRecordListens(false);
+
+      expect((result as MutationFailed<void>).message, '没有保存，再试一次。');
+      expect(result.code, 'UNAUTHORIZED');
+      expect(credentials.memberToken, 'new-member-token');
+      expect(identity().recordListens, isTrue);
+    });
+
+    test('a refused account token says the account was signed out', () async {
+      credentials.memberToken = 'account-token';
+      api.account = const Account(username: 'mao', github: false);
+      await container.read(identityControllerProvider.notifier).restore();
+      api.setListenRecordingError = unauthorized;
+
+      final result = await controllerOf(container).setRecordListens(false);
+
+      expect((result as MutationFailed<void>).message, signedOutNotice);
+      expect(credentials.memberToken, 'new-member-token');
+    });
+
+    test('an unknown result reads the identity again', () async {
+      await restored();
+      final reads = api.getMeCalls;
+      api.setListenRecordingError = const ApiException(
+        code: LocalErrorCodes.network,
+        message: '网络请求失败，请检查网络后重试。',
+        status: null,
+      );
+
+      final result = await controllerOf(container).setRecordListens(false);
+      await pumpEventQueue();
+
+      expect(result, isA<MutationUnknown<void>>());
+      expect(api.getMeCalls, reads + 1);
+    });
+
+    test('a switch made for a member who has since changed is not given to '
+        'the new one', () async {
+      await restored();
+      final gate = api.setListenRecordingGate = Completer<void>();
+      final pending = controllerOf(container).setRecordListens(false);
+      await pumpEventQueue();
+      api.createdMember = const Member(
+        id: 'new-id',
+        name: '新听众',
+        avatarHash: '',
+      );
+      await container
+          .read(identityControllerProvider.notifier)
+          .signOut((_) async {});
+
+      gate.complete();
+
+      expect(await pending, isA<MutationSucceeded<void>>());
+      expect(identity().member?.id, 'new-id');
+      expect(identity().recordListens, isTrue);
+    });
+
+    test('without an identity the switch creates the guest it is saved '
+        'on', () async {
+      final result = await controllerOf(container).setRecordListens(false);
+
+      expect(result, isA<MutationSucceeded<void>>());
+      expect(api.createMemberCalls, 1);
+      expect(api.listenRecordingWrites, [false]);
+      expect(credentials.memberToken, 'new-member-token');
+      expect(identity().member?.id, 'member-id');
+      expect(identity().recordListens, isFalse);
+    });
+
+    test('without an identity a guest that cannot be created sends '
+        'nothing', () async {
+      api.createMemberError = Exception('offline');
+
+      final result = await controllerOf(container).setRecordListens(false);
+
+      expect((result as MutationNotSent<void>).message, '身份凭据暂时无法读取，请稍后重试。');
+      expect(api.listenRecordingWrites, isEmpty);
+    });
+
+    test('without an identity a guest the server does not create says '
+        'why', () async {
+      api.createMemberError = const ApiException(
+        code: LocalErrorCodes.network,
+        message: '网络请求失败，请检查网络后重试。',
+        status: null,
+      );
+
+      final result = await controllerOf(container).setRecordListens(false);
+
+      expect((result as MutationNotSent<void>).message, '网络请求失败，请检查网络后重试。');
+      expect(api.listenRecordingWrites, isEmpty);
+    });
+
+    test('a guest created for the switch and refused at once is not '
+        'replaced', () async {
+      api.setListenRecordingError = unauthorized;
+
+      final result = await controllerOf(container).setRecordListens(false);
+
+      expect((result as MutationFailed<void>).message, '身份已失效');
+      expect(api.createMemberCalls, 1);
+      expect(credentials.memberToken, 'new-member-token');
+    });
+
+    test('a refused guest token that cannot be replaced says the identity is '
+        'lost', () async {
+      await restored();
+      api
+        ..setListenRecordingError = unauthorized
+        ..createMemberError = Exception('offline');
+
+      final result = await controllerOf(container).setRecordListens(false);
+
+      expect((result as MutationFailed<void>).code, 'UNAUTHORIZED');
+      expect(result.message, identityLostNotice);
+    });
+
+    test('a switch that breaks unexpectedly has an unknown result and reads '
+        'the identity again', () async {
+      await restored();
+      final reads = api.getMeCalls;
+      api.setListenRecordingError = Exception('boom');
+
+      final result = await controllerOf(container).setRecordListens(false);
+      await pumpEventQueue();
+
+      expect(result, isA<MutationUnknown<void>>());
+      expect(api.getMeCalls, reads + 1);
+    });
+
+    test('a member token gone before sending is not sent', () async {
+      await restored();
+      api.setListenRecordingError = const ApiException(
+        code: LocalErrorCodes.noToken,
+        message: '缺少身份凭据，请重新进入后再试。',
+        status: null,
+      );
+
+      final result = await controllerOf(container).setRecordListens(false);
+
+      expect((result as MutationNotSent<void>).message, '缺少身份凭据，请重新进入后再试。');
+      expect(identity().recordListens, isTrue);
     });
   });
 }
@@ -562,9 +770,6 @@ final class _FailingStore implements SettingsStore {
 
   @override
   Future<void> setSearchHistoryLimit(int limit) => _fail();
-
-  @override
-  Future<void> setRecordHistory(bool enabled) => _fail();
 
   @override
   Future<void> setVolume(int volume) => _fail();

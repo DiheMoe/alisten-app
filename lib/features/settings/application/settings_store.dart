@@ -19,8 +19,6 @@ abstract interface class SettingsStore {
 
   Future<void> setSearchHistoryLimit(int limit);
 
-  Future<void> setRecordHistory(bool enabled);
-
   Future<void> setVolume(int volume);
 
   Future<void> setMuted(bool muted);

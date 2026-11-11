@@ -1,52 +1,58 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/history/data/share_history_exporter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../domain/history/records_test.dart' show playRecord;
+import '../history_test_doubles.dart';
 
 void main() {
   final exportedAt = DateTime.utc(2026, 11, 1, 9, 5, 7);
 
-  test('the export names the second it was made in UTC', () {
-    final decoded =
-        jsonDecode(historyExportJson([playRecord('track')], exportedAt))!
-            as Map<String, Object?>;
+  test('the file is named after the local date of the export, like the '
+      'web', () {
+    final local = exportedAt.toLocal();
+    String two(int value) => value.toString().padLeft(2, '0');
 
-    expect(decoded['exportedAt'], endsWith('Z'));
-    expect(DateTime.parse(decoded['exportedAt']! as String), exportedAt);
-    expect(decoded['history'], hasLength(1));
+    expect(
+      historyExportFileName(exportedAt),
+      'alisten-history-${local.year}-${two(local.month)}-${two(local.day)}'
+      '.json',
+    );
   });
 
-  test('every exported record names the server it was played on', () {
+  test('the export holds the time in UTC and every listen the way the '
+      'server sends it', () {
     final decoded =
         jsonDecode(
               historyExportJson([
-                playRecord('a'),
-                playRecord('b', serverOrigin: 'https://example.com:8443'),
+                heard(
+                  '晴天',
+                  at: 1782864000000,
+                  source: TrackSource.bilibili,
+                  coverUrl: 'https://i0.hdslb.com/cover.jpg',
+                ),
               ], exportedAt),
             )!
             as Map<String, Object?>;
 
-    expect(
-      (decoded['history']! as List<Object?>).map(
-        (record) => (record! as Map<String, Object?>)['serverOrigin'],
-      ),
-      ['https://livehouse.dihe.moe', 'https://example.com:8443'],
-    );
-  });
-
-  test('the file name includes the time, so exports do not overwrite '
-      'each other', () {
-    expect(
-      historyExportFileName(exportedAt),
-      'alisten-history-20261101-090507Z.json',
-    );
-    expect(
-      historyExportFileName(exportedAt.add(const Duration(seconds: 1))),
-      isNot(historyExportFileName(exportedAt)),
-    );
+    expect(decoded.keys, unorderedEquals(['exportedAt', 'history']));
+    expect(decoded['exportedAt'], '2026-11-01T09:05:07.000Z');
+    expect(decoded['history'], [
+      {
+        'track': {'source': 'bilibili', 'id': '晴天'},
+        'meta': {
+          'title': '晴天',
+          'artist': '歌手',
+          'album': '专辑',
+          'coverUrl': 'https://i0.hdslb.com/cover.jpg',
+          'pageUrl': '',
+          'durationMs': 180000,
+        },
+        'heardAtMs': 1782864000000,
+      },
+    ]);
   });
 
   group('export file', () {
@@ -72,16 +78,13 @@ void main() {
       await exporter((path) async {
         sharedPath = path;
         sharedContent = await File(path).readAsString();
-      }).export([playRecord('track')], exportedAt);
+      }).export([heard('track')], exportedAt);
 
       expect(
         sharedPath,
         '${temporary.path}/${historyExportFileName(exportedAt)}',
       );
-      expect(
-        sharedContent,
-        historyExportJson([playRecord('track')], exportedAt),
-      );
+      expect(sharedContent, historyExportJson([heard('track')], exportedAt));
       expect(File(sharedPath!).existsSync(), isFalse);
       expect(temporary.listSync(), isEmpty);
     });
@@ -95,7 +98,7 @@ void main() {
           exporter((path) async {
             sharedPath = path;
             throw const FileSystemException('no share target');
-          }).export([playRecord('track')], exportedAt),
+          }).export([heard('track')], exportedAt),
           throwsA(isA<FileSystemException>()),
         );
 

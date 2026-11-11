@@ -15,7 +15,6 @@ import 'package:alisten/core/cache/disk_cover_cache.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/core/realtime/connectivity.dart';
 import 'package:alisten/core/storage/preferences.dart';
-import 'package:alisten/features/history/data/local_history_store.dart';
 import 'package:alisten/features/history/data/share_history_exporter.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/identity/index.dart';
@@ -158,7 +157,6 @@ void main() {
     final reminders = container.read(reminderNotifierProvider);
     expect(container.read(trackStartReminderProvider), same(reminders));
     expect(container.read(notificationAccessProvider), same(reminders));
-    expect(container.read(playHistoryStoreProvider), isA<LocalHistoryStore>());
     expect(
       container.read(historyExporterProvider),
       isA<ShareHistoryExporter>(),

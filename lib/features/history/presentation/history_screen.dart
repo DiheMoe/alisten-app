@@ -1,12 +1,11 @@
 import 'dart:async';
 
-import 'package:alisten/domain/history/play_record.dart';
-import 'package:alisten/domain/server/server_origin.dart';
+import 'package:alisten/domain/history/listen.dart';
+import 'package:alisten/domain/mutation/mutation_result.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/history/application/history_controller.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/search/index.dart';
-import 'package:alisten/features/server/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
@@ -24,7 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const _notSaved = '这次修改没能保存，重新打开 App 后可能还在。';
+const _unknownText = '结果未知，已重新读取播放历史。';
 
 const _weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
 
@@ -35,8 +34,6 @@ const _dayBatch = 8;
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({
     required this.onResult,
-    required this.onDeleted,
-    required this.onCleared,
     required this.onNotice,
     required this.onCopyTitle,
     super.key,
@@ -44,13 +41,8 @@ class HistoryScreen extends ConsumerStatefulWidget {
 
   final QueueResultCallback onResult;
 
-  /// [undo] 可能在页面关闭之后才被调用。
-  final void Function(String message, VoidCallback undo) onDeleted;
-
-  /// 清空后之前的删除已无法撤销，调用方应收回仍在显示的撤销提示。
-  final VoidCallback onCleared;
-
-  final ValueChanged<String> onNotice;
+  /// 删除和清空的结果可能在页面关闭之后才提示。
+  final void Function(ToastKind kind, String text) onNotice;
   final ValueChanged<String> onCopyTitle;
 
   @override
@@ -62,6 +54,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   final _filterFocus = FocusNode(debugLabel: 'history filter');
   late final AppLifecycleListener _lifecycle;
   final _scroll = ScrollController();
+
+  // 正在删除的曲目键，值表示是否由左滑发起。左滑发起时，Dismissible 在等待
+  // confirmDismiss 期间自己会拦住新的拖动；把它改成不可滑动会让滑开的行丢掉
+  // 红色背景，所以只关掉读屏发起的那一行的左滑。
+  final _deleting = <String, bool>{};
+  void Function()? _close;
   bool _exporting = false;
   int _dayWindow = _dayBatch;
 
@@ -75,10 +73,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       text: ref.read(historyControllerProvider).query,
     );
     _lifecycle = AppLifecycleListener(onHide: _releaseFocus);
+    // 读取会修改 provider 状态，不能在构建期间开始。
+    unawaited(
+      Future.microtask(() {
+        if (mounted) _close = _history.open();
+      }),
+    );
   }
 
   @override
   void dispose() {
+    _close?.call();
     _lifecycle.dispose();
     _filterFocus.dispose();
     _filter.dispose();
@@ -114,21 +119,32 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     return false;
   }
 
-  // 撤销可能在页面关闭后才触发，所以先取出控制器和回调，之后不再访问 ref。
-  void _delete(PlayRecord record) {
+  // 控制器和回调先取出：结果可能在页面关闭之后才返回。
+  Future<bool> _delete(Listen listen, {required bool swiped}) async {
+    final key = trackKey(listen.track);
+    if (_deleting.containsKey(key)) return false;
     final history = _history;
     final notice = widget.onNotice;
-    _saving(history.delete(record), notice);
-    final title = record.meta.title;
-    widget.onDeleted(
-      title.isEmpty ? '已删除这条记录' : '已删除《$title》',
-      () => _saving(history.restore(record), notice),
-    );
+    setState(() => _deleting[key] = swiped);
+    final result = await history.remove(listen);
+    if (mounted) setState(() => _deleting.remove(key));
+    _report(notice, result, success: '已删除播放记录');
+    return result is MutationSucceeded<void>;
   }
 
-  // 状态已经更新，写入失败只提示，不回滚界面。
-  static void _saving(Future<void> change, ValueChanged<String> notice) {
-    unawaited(change.catchError((Object _) => notice(_notSaved)));
+  static void _report(
+    void Function(ToastKind kind, String text) notice,
+    MutationResult<void> result, {
+    String? success,
+  }) {
+    switch (result) {
+      case MutationSucceeded():
+        if (success != null) notice(ToastKind.success, success);
+      case MutationFailed(:final message) || MutationNotSent(:final message):
+        notice(ToastKind.failure, message);
+      case MutationUnknown():
+        notice(ToastKind.warning, _unknownText);
+    }
   }
 
   Future<void> _export() async {
@@ -137,35 +153,37 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     try {
       await _history.exportHistory();
     } on Object {
-      if (mounted) widget.onNotice('导出失败，请稍后重试。');
+      if (mounted) widget.onNotice(ToastKind.failure, '导出失败，请稍后重试。');
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
   }
 
+  // 请求期间面板保持打开；用户中途取消时结果照样提示。
   Future<void> _clear() async {
     _releaseFocus();
-    final confirmed = await showConfirmSheet(
+    final history = _history;
+    final notice = widget.onNotice;
+    await showConfirmSheet(
       context,
-      title: '清空播放历史？',
-      message: '这台设备上的播放记录会全部删除，无法恢复。',
+      title: '清空播放历史',
+      message: '将清空你的全部播放记录，登录同一个账号的其他设备上也会一起清空。',
       confirmLabel: '清空',
       confirmIcon: Icons.delete_sweep_rounded,
+      onConfirm: () async {
+        final result = await history.clear();
+        _report(notice, result);
+        return result is MutationSucceeded<void>;
+      },
     );
-    if (!confirmed || !mounted) return;
-    _saving(_history.clear(), widget.onNotice);
-    widget.onCleared();
   }
 
   @override
   Widget build(BuildContext context) {
     final history = ref.watch(historyControllerProvider);
-    final currentOrigin = ref.watch(
-      currentServerProvider.select((server) => server.origin),
-    );
-    final records = history.filteredRecords;
-    final empty = history.records.isEmpty;
-    final days = _days(records).toList(growable: false);
+    final listens = history.listens;
+    final empty = listens == null || listens.isEmpty;
+    final days = _days(history.filteredListens).toList(growable: false);
     final now = DateTime.fromMillisecondsSinceEpoch(
       ref.read(historyNowProvider)(),
     );
@@ -237,21 +255,47 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           ],
         ),
       ),
-      // 内容不足一屏时不会滚动，只有尺寸变化通知，两种都要监听才能放宽窗口。
-      body: NotificationListener<ScrollMetricsNotification>(
-        onNotification: (notification) =>
-            _onScroll(notification.depth, notification.metrics, days.length),
-        child: NotificationListener<ScrollUpdateNotification>(
-          onNotification: (notification) =>
-              _onScroll(notification.depth, notification.metrics, days.length),
-          child: _list(
-            history,
-            records,
-            days,
-            now,
-            headingExtent,
-            bottom,
-            currentOrigin,
+      body: listens == null
+          ? _pending(history.error, bottom)
+          // 内容不足一屏时不会滚动，只有尺寸变化通知，两种都要监听才能放宽
+          // 窗口。
+          : NotificationListener<ScrollMetricsNotification>(
+              onNotification: (notification) => _onScroll(
+                notification.depth,
+                notification.metrics,
+                days.length,
+              ),
+              child: NotificationListener<ScrollUpdateNotification>(
+                onNotification: (notification) => _onScroll(
+                  notification.depth,
+                  notification.metrics,
+                  days.length,
+                ),
+                child: _list(listens, days, now, headingExtent, bottom),
+              ),
+            ),
+    );
+  }
+
+  Widget _pending(String? error, double bottom) {
+    if (error == null) {
+      return const Center(
+        child: BusyIndicator(size: AlistenSizes.iconLg, semanticLabel: '加载中'),
+      );
+    }
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottom),
+      child: Semantics(
+        liveRegion: true,
+        child: EmptyState(
+          icon: Icons.cloud_off_rounded,
+          title: '播放历史没有读出来',
+          message: error,
+          action: PillButton(
+            label: '重试',
+            icon: Icons.refresh_rounded,
+            style: PillButtonStyle.secondary,
+            onPressed: () => unawaited(_history.load()),
           ),
         ),
       ),
@@ -259,36 +303,35 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   Widget _list(
-    HistoryState history,
-    List<PlayRecord> records,
-    List<MapEntry<DateTime, List<PlayRecord>>> days,
+    List<Listen> listens,
+    List<MapEntry<DateTime, List<Listen>>> days,
     DateTime now,
     double headingExtent,
     double bottom,
-    String currentOrigin,
   ) {
     return CustomScrollView(
       controller: _scroll,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
-        if (history.records.isEmpty)
+        if (listens.isEmpty)
           SliverFillRemaining(
             child: Padding(
               padding: EdgeInsets.only(bottom: bottom),
               child: const EmptyState(
                 icon: Icons.history_rounded,
-                title: '还没有播放记录',
-                message: '在房间里听过的歌会记在这里，只保存在这台设备上。',
+                title: '你的音乐足迹，从这里开始',
+                message: '你在房间里听过的歌会记在这里。',
               ),
             ),
           )
-        else if (records.isEmpty)
+        else if (days.isEmpty)
           SliverFillRemaining(
             child: Padding(
               padding: EdgeInsets.only(bottom: bottom),
               child: EmptyState(
                 icon: Icons.search_off_rounded,
-                title: '没有匹配“${history.query.trim()}”的记录',
+                title: '没有找到相关记录',
+                message: '换个关键词，再找找看。',
                 action: PillButton(
                   label: '清除筛选',
                   style: PillButtonStyle.secondary,
@@ -309,33 +352,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             ),
           ),
           for (final day in days.take(_dayWindow))
-            SliverMainAxisGroup(
-              key: ValueKey(day.key),
-              slivers: [
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _DayHeading(
-                    label: _dayLabel(day.key, now),
-                    count: day.value.length,
-                    extent: headingExtent,
-                  ),
-                ),
-                SliverList.builder(
-                  itemCount: day.value.length,
-                  itemBuilder: (context, index) {
-                    final record = day.value[index];
-                    return _PlayRow(
-                      key: ValueKey(_identityOf(record)),
-                      record: record,
-                      currentOrigin: currentOrigin,
-                      onPick: _pick,
-                      onDelete: () => _delete(record),
-                      onCopyTitle: widget.onCopyTitle,
-                    );
-                  },
-                ),
-              ],
-            ),
+            _day(day.key, day.value, now, headingExtent),
           SliverPadding(
             padding: EdgeInsets.only(bottom: bottom + AlistenSpacing.xl),
           ),
@@ -343,16 +360,62 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       ],
     );
   }
+
+  Widget _day(
+    DateTime day,
+    List<Listen> listens,
+    DateTime now,
+    double headingExtent,
+  ) {
+    final indexOf = {
+      for (final (index, listen) in listens.indexed)
+        trackKey(listen.track): index,
+    };
+    return SliverMainAxisGroup(
+      key: ValueKey(day),
+      slivers: [
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _DayHeading(
+            label: _dayLabel(day, now),
+            count: listens.length,
+            extent: headingExtent,
+          ),
+        ),
+        SliverList.builder(
+          itemCount: listens.length,
+          // 按曲目找回原来的行：上方进来新歌时，等待删除结果、停在滑开位置的
+          // 那一行不会被换成新的行。
+          findChildIndexCallback: (key) =>
+              key is ValueKey<String> ? indexOf[key.value] : null,
+          itemBuilder: (context, index) {
+            final listen = listens[index];
+            final key = trackKey(listen.track);
+            return _PlayRow(
+              key: ValueKey(key),
+              listen: listen,
+              deleting: _deleting.containsKey(key),
+              swipeable: _deleting[key] != false,
+              onPick: _pick,
+              onDelete: ({required bool swiped}) =>
+                  _delete(listen, swiped: swiped),
+              onCopyTitle: widget.onCopyTitle,
+            );
+          },
+        ),
+      ],
+    );
+  }
 }
 
-// 按本地日期分组，组按首次出现的顺序排列；时钟回拨时同一天也只有一组。
-Iterable<MapEntry<DateTime, List<PlayRecord>>> _days(List<PlayRecord> records) {
-  final days = <DateTime, List<PlayRecord>>{};
-  for (final record in records) {
-    final time = DateTime.fromMillisecondsSinceEpoch(record.playedAtMs);
+// 按本地日期分组，组按首次出现的顺序排列。
+Iterable<MapEntry<DateTime, List<Listen>>> _days(List<Listen> listens) {
+  final days = <DateTime, List<Listen>>{};
+  for (final listen in listens) {
+    final time = DateTime.fromMillisecondsSinceEpoch(listen.heardAtMs);
     days
         .putIfAbsent(DateTime(time.year, time.month, time.day), () => [])
-        .add(record);
+        .add(listen);
   }
   return days.entries;
 }
@@ -366,11 +429,19 @@ String _dayLabel(DateTime day, DateTime now) {
   return '$date ${_weekdays[day.weekday - 1]}';
 }
 
-// 同一房间的同一首歌再次播放会得到新的记录，所以要带上播放时间。
-String _identityOf(PlayRecord record) {
-  return '${record.serverOrigin}/${record.roomId}/'
-      '${record.track.source.name}:${record.track.id}@${record.playedAtMs}';
+String _subtitle(Listen listen) {
+  final meta = listen.meta;
+  return [
+    meta.artist.isEmpty ? '未知艺术家' : meta.artist,
+    ?_sourceLabel(listen.track),
+    meta.album,
+  ].where((part) => part.isNotEmpty).join(' · ');
 }
+
+// 与 Web 的 sourceName 一致，只为哔哩哔哩的歌显示来源。search 的 _sourceName
+// 给每个来源都起了名字，不能复用。
+String? _sourceLabel(Track track) =>
+    track.source == TrackSource.bilibili ? '哔哩哔哩' : null;
 
 final class _DayHeading extends SliverPersistentHeaderDelegate {
   _DayHeading({required this.label, required this.count, required this.extent});
@@ -452,30 +523,39 @@ final class _DayHeading extends SliverPersistentHeaderDelegate {
 // 左滑删除对读屏不可用，所以同时提供“删除”自定义动作。
 class _PlayRow extends StatelessWidget {
   const _PlayRow({
-    required this.record,
-    required this.currentOrigin,
+    required this.listen,
+    required this.deleting,
+    required this.swipeable,
     required this.onPick,
     required this.onDelete,
     required this.onCopyTitle,
     super.key,
   });
 
-  final PlayRecord record;
-  final String currentOrigin;
+  final Listen listen;
+
+  /// 删除还没有结果：不再提供“删除”动作。
+  final bool deleting;
+  final bool swipeable;
   final PickSong onPick;
-  final VoidCallback onDelete;
+
+  /// 服务端确认删除时返回 true。
+  final Future<bool> Function({required bool swiped}) onDelete;
   final ValueChanged<String> onCopyTitle;
 
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
-    final meta = record.meta;
+    final meta = listen.meta;
     return Dismissible(
-      key: ValueKey(_identityOf(record)),
-      direction: DismissDirection.endToStart,
+      key: ValueKey(trackKey(listen.track)),
+      direction: swipeable
+          ? DismissDirection.endToStart
+          : DismissDirection.none,
       movementDuration: AlistenDurations.of(context, AlistenDurations.short),
       resizeDuration: AlistenDurations.of(context, AlistenDurations.short),
-      onDismissed: (_) => onDelete(),
+      // 等服务端确认再收起：成功时这一行已随列表重建离开，失败时滑回原处。
+      confirmDismiss: (_) => onDelete(swiped: true),
       background: ColoredBox(
         color: colors.danger.withValues(alpha: AlistenTint.fill),
         child: Padding(
@@ -502,16 +582,16 @@ class _PlayRow extends StatelessWidget {
       ),
       child: TrackRow(
         title: meta.title,
-        subtitle: [
-          meta.artist,
-          record.roomName,
-          if (record.serverOrigin != currentOrigin)
-            originAuthority(record.serverOrigin),
-        ].where((part) => part.isNotEmpty).join(' · '),
+        subtitle: _subtitle(listen),
         coverUrl: meta.coverUrl,
         onLongPress: () => onCopyTitle(meta.title),
         longPressHint: copyTitleHint,
-        semanticActions: {const CustomSemanticsAction(label: '删除'): onDelete},
+        semanticActions: deleting
+            ? null
+            : {
+                const CustomSemanticsAction(label: '删除'): () =>
+                    unawaited(onDelete(swiped: false)),
+              },
         padding: const EdgeInsets.fromLTRB(
           AlistenSpacing.page,
           AlistenSpacing.xxs,
@@ -519,7 +599,7 @@ class _PlayRow extends StatelessWidget {
           AlistenSpacing.xxs,
         ),
         trailing: PickControl(
-          track: record.track,
+          track: listen.track,
           title: meta.title,
           label: '再点一次《${meta.title}》',
           subtle: true,

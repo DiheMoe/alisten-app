@@ -16,6 +16,7 @@ import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
+import 'package:alisten/shared/ui/alisten_toggle.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -112,6 +113,13 @@ Future<void> _show(WidgetTester tester, Finder finder) async {
   );
   await tester.pumpAndSettle();
 }
+
+Finder get _recordToggle => find.byWidgetPredicate(
+  (widget) => widget is AlistenToggle && widget.semanticLabel == '记录播放历史',
+);
+
+AlistenToggle _recordSwitch(WidgetTester tester) =>
+    tester.widget<AlistenToggle>(_recordToggle);
 
 void main() {
   testWidgets('the settings leave out what follows the system or the player, '
@@ -225,6 +233,308 @@ void main() {
       '用 GitHub 登录的账号',
       account: const Account(github: true),
     );
+  });
+
+  testWidgets('the play history switch shows the value the server keeps, '
+      'and one the server takes stays', (tester) async {
+    final api = FakeAlistenApi()..recordListens = false;
+    await _openSettings(
+      tester,
+      api: api,
+      credentials: FakeCredentialStore()..memberToken = 'stored-token',
+    );
+    await _show(tester, _recordToggle);
+    expect(_recordSwitch(tester).value, isFalse);
+    expect(find.text('保存在服务器上'), findsOneWidget);
+
+    await tester.tap(_recordToggle);
+    await tester.pumpAndSettle();
+
+    expect(api.listenRecordingWrites, [true]);
+    expect(_recordSwitch(tester).value, isTrue);
+  });
+
+  testWidgets('the play history switch of an account says the devices of the '
+      'account share it', (tester) async {
+    await _openSettings(
+      tester,
+      api: FakeAlistenApi()
+        ..account = const Account(username: 'mao', github: false),
+      credentials: FakeCredentialStore()..memberToken = 'account-token',
+    );
+    await _show(tester, _recordToggle);
+
+    expect(find.text('保存在服务器上，登录这个账号的设备共用'), findsOneWidget);
+    expect(find.text('保存在服务器上'), findsNothing);
+  });
+
+  testWidgets('a play history switch the server refuses goes back and says '
+      'why', (tester) async {
+    final api = FakeAlistenApi()
+      ..setListenRecordingError = const ApiException(
+        code: 'INTERNAL',
+        message: '服务器出错了',
+        status: 500,
+      );
+    await _openSettings(
+      tester,
+      api: api,
+      credentials: FakeCredentialStore()..memberToken = 'stored-token',
+    );
+    await _show(tester, _recordToggle);
+    expect(_recordSwitch(tester).value, isTrue);
+
+    await tester.tap(_recordToggle);
+    await tester.pumpAndSettle();
+
+    expect(_recordSwitch(tester).value, isTrue);
+    expect(find.text('服务器出错了'), findsOneWidget);
+  });
+
+  testWidgets('a play history switch with an unknown result goes back and '
+      'says it was read again', (tester) async {
+    final api = FakeAlistenApi()
+      ..setListenRecordingError = const ApiException(
+        code: LocalErrorCodes.network,
+        message: '网络请求失败，请检查网络后重试。',
+        status: null,
+      );
+    await _openSettings(
+      tester,
+      api: api,
+      credentials: FakeCredentialStore()..memberToken = 'stored-token',
+    );
+    await _show(tester, _recordToggle);
+    // 服务端其实已经保存，只是答复丢了。
+    api.recordListens = false;
+
+    await tester.tap(_recordToggle);
+    await tester.pumpAndSettle();
+
+    expect(find.text('结果未知，已重新读取这项设置。'), findsOneWidget);
+    expect(_recordSwitch(tester).value, isFalse);
+  });
+
+  testWidgets('a play history switch takes no second change while the server '
+      'answers the first', (tester) async {
+    final api = FakeAlistenApi();
+    final gate = api.setListenRecordingGate = Completer<void>();
+    await _openSettings(
+      tester,
+      api: api,
+      credentials: FakeCredentialStore()..memberToken = 'stored-token',
+    );
+    await _show(tester, _recordToggle);
+
+    await tester.tap(_recordToggle);
+    await tester.pump();
+    expect(_recordSwitch(tester).value, isFalse);
+    await tester.tap(_recordToggle);
+    await tester.pump();
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(api.listenRecordingWrites, [false]);
+    expect(_recordSwitch(tester).value, isFalse);
+  });
+
+  testWidgets('without an identity the play history switch shows the default '
+      'of a new guest, and a change creates the guest it is saved on', (
+    tester,
+  ) async {
+    final api = FakeAlistenApi();
+    final credentials = FakeCredentialStore();
+    await _openSettings(tester, api: api, credentials: credentials);
+    await _show(tester, _recordToggle);
+
+    expect(_recordSwitch(tester).value, isTrue);
+    expect(_recordSwitch(tester).onChanged, isNotNull);
+    expect(find.text('保存在服务器上'), findsOneWidget);
+    expect(find.text('没有读到这项设置'), findsNothing);
+    expect(find.text('重试'), findsNothing);
+    expect(api.createMemberCalls, 0);
+
+    await tester.tap(_recordToggle);
+    await tester.pumpAndSettle();
+
+    expect(api.createMemberCalls, 1);
+    expect(api.listenRecordingWrites, [false]);
+    expect(credentials.memberToken, 'new-member-token');
+    expect(_recordSwitch(tester).value, isFalse);
+  });
+
+  testWidgets('opening the settings reads the play history switch again, '
+      'even for a member already known', (tester) async {
+    final api = FakeAlistenApi();
+    tester.view
+      ..physicalSize = const Size(360, 780) * 3
+      ..devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await pumpAlistenApp(
+      tester,
+      api: api,
+      credentials: FakeCredentialStore()..memberToken = 'stored-token',
+    );
+    expect(api.getMeCalls, 1);
+    expect(
+      appContainer(tester).read(identityControllerProvider).member,
+      isNotNull,
+    );
+    // 例如在 Web 上关掉了。
+    api.recordListens = false;
+
+    appContainer(tester).read(routerProvider).go('/settings');
+    await tester.pumpAndSettle();
+    await _show(tester, _recordToggle);
+
+    expect(api.getMeCalls, 2);
+    expect(_recordSwitch(tester).value, isFalse);
+  });
+
+  testWidgets('without a member the play history row has no switch: it says '
+      'it is reading, then that it could not, and reads again on retry', (
+    tester,
+  ) async {
+    final api = FakeAlistenApi()..getMeResult = Completer<Member>();
+    await pumpDirect(
+      tester,
+      api: api,
+      credentials: FakeCredentialStore()..memberToken = 'stored-token',
+    );
+    await _show(tester, find.text('记录播放历史'));
+    expect(find.text('正在读取…'), findsOneWidget);
+    expect(_recordToggle, findsNothing);
+    expect(find.text('重试'), findsNothing);
+
+    api.getMeResult!.completeError(
+      const ApiException(
+        code: LocalErrorCodes.network,
+        message: '网络请求失败，请检查网络后重试。',
+        status: null,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('没有读到这项设置'), findsOneWidget);
+    expect(find.text('正在读取…'), findsNothing);
+    expect(_recordToggle, findsNothing);
+
+    final reads = api.getMeCalls;
+    api
+      ..recordListens = false
+      ..getMeResult = Completer<Member>();
+    await tester.tap(find.text('重试'));
+    await tester.pump();
+
+    expect(api.getMeCalls, reads + 1);
+    expect(find.text('正在读取…'), findsOneWidget);
+    expect(find.text('重试'), findsNothing);
+
+    api.getMeResult!.complete(FakeAlistenApi.member);
+    await tester.pumpAndSettle();
+
+    expect(find.text('保存在服务器上'), findsOneWidget);
+    expect(_recordSwitch(tester).value, isFalse);
+    expect(_recordSwitch(tester).onChanged, isNotNull);
+  });
+
+  testWidgets('the play history row reads its title together with what it '
+      'says while there is no switch', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final api = FakeAlistenApi()..getMeError = Exception('offline');
+    await pumpDirect(
+      tester,
+      api: api,
+      credentials: FakeCredentialStore()..memberToken = 'stored-token',
+    );
+    await _show(tester, find.text('记录播放历史'));
+
+    expect(
+      tester.getSemantics(find.text('记录播放历史')).label,
+      allOf(contains('记录播放历史'), contains('没有读到这项设置')),
+    );
+    semantics.dispose();
+  });
+
+  testWidgets('signing out while the profile could not be read does not '
+      'leave the row saying the setting was not read', (tester) async {
+    final api = FakeAlistenApi()..getMeError = Exception('offline');
+    await _openSettings(
+      tester,
+      api: api,
+      credentials: FakeCredentialStore()..memberToken = 'stored-token',
+    );
+    await _show(tester, find.text('记录播放历史'));
+    expect(find.text('没有读到这项设置'), findsOneWidget);
+
+    api
+      ..getMeError = null
+      ..createMemberGate = Completer<void>();
+    unawaited(
+      appContainer(tester)
+          .read(identityControllerProvider.notifier)
+          .signOut((server) => server.logout()),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('没有读到这项设置'), findsNothing);
+    expect(find.text('正在读取…'), findsOneWidget);
+
+    api.createMemberGate!.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('signing in on a child page reads the play history switch '
+      'again when the first read failed', (tester) async {
+    final api = FakeAlistenApi();
+    await _openSettings(tester, api: api);
+    await _show(tester, _recordToggle);
+    final reads = api.getMeCalls;
+    api.getMeResult = Completer<Member>();
+
+    final adopting = appContainer(tester)
+        .read(identityControllerProvider.notifier)
+        .adoptSession(
+          (server) => server.login(username: 'mao', password: 'password1'),
+        );
+    await tester.pump();
+    expect(api.getMeCalls, reads + 1);
+    api.recordListens = false;
+    api.getMeResult!.completeError(Exception('offline'));
+    api.getMeResult = null;
+    await adopting;
+    await tester.pumpAndSettle();
+
+    expect(api.getMeCalls, reads + 2);
+    expect(_recordSwitch(tester).value, isFalse);
+  });
+
+  testWidgets('the history and switch a former version kept on the device '
+      'are neither read, changed nor removed', (tester) async {
+    const history = '[{"title":"旧歌"}]';
+    final api = FakeAlistenApi();
+    await _openSettings(
+      tester,
+      api: api,
+      preferences: {
+        'alisten.play-history': history,
+        'alisten.play-history.enabled': false,
+      },
+    );
+    appContainer(tester).read(routerProvider).go('/history');
+    await tester.pumpAndSettle();
+    appContainer(tester).read(routerProvider).go('/settings');
+    await tester.pumpAndSettle();
+    await _show(tester, _recordToggle);
+
+    await tester.tap(_recordToggle);
+    await tester.pumpAndSettle();
+
+    expect(api.listenRecordingWrites, [false]);
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getString('alisten.play-history'), history);
+    expect(preferences.getBool('alisten.play-history.enabled'), isFalse);
   });
 
   testWidgets('long long short long long short on the version row opens the '

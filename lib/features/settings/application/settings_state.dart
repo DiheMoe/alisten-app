@@ -14,7 +14,6 @@ final class LocalSettings {
     this.systemNotifications = false,
     this.recordSearch = true,
     this.searchHistoryLimit = 10,
-    this.recordHistory = true,
     this.volume = 75,
     this.muted = false,
     this.email = '',
@@ -25,7 +24,6 @@ final class LocalSettings {
   final bool systemNotifications;
   final bool recordSearch;
   final int searchHistoryLimit;
-  final bool recordHistory;
   final int volume;
   final bool muted;
 
@@ -38,7 +36,6 @@ final class LocalSettings {
     bool? systemNotifications,
     bool? recordSearch,
     int? searchHistoryLimit,
-    bool? recordHistory,
     int? volume,
     bool? muted,
     String? email,
@@ -49,7 +46,6 @@ final class LocalSettings {
       systemNotifications: systemNotifications ?? this.systemNotifications,
       recordSearch: recordSearch ?? this.recordSearch,
       searchHistoryLimit: searchHistoryLimit ?? this.searchHistoryLimit,
-      recordHistory: recordHistory ?? this.recordHistory,
       volume: volume ?? this.volume,
       muted: muted ?? this.muted,
       email: email ?? this.email,

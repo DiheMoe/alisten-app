@@ -8,12 +8,14 @@ import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/core/protocol/domain_mapper.dart';
 import 'package:alisten/core/protocol/http.gen.dart' as http;
 import 'package:alisten/core/protocol/protocol.gen.dart' as protocol;
+import 'package:alisten/domain/history/listen.dart';
 import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/domain/member/github.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/member/pairing_code.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/domain/server/site_capabilities.dart';
+import 'package:alisten/domain/track/track.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -268,6 +270,15 @@ abstract interface class AlistenApi {
   });
 
   Future<String> createTicket(String id, {String? password});
+
+  /// 最近听到的在前，与服务端的顺序相同。
+  Future<List<Listen>> listMyListens();
+
+  Future<void> removeMyListen(Track track);
+
+  Future<void> clearMyListens();
+
+  Future<void> setListenRecording(bool on);
 }
 
 final alistenApiProvider = Provider<AlistenApi>((ref) {
@@ -548,6 +559,38 @@ final class RestAlistenApi implements AlistenApi {
       pathParameters: {'id': id},
       body: protocol.CreateTicketRequest(password: password).toJson(),
       decode: (json) => protocol.CreateTicketResponse.fromJson(json).ticket,
+    );
+  }
+
+  @override
+  Future<List<Listen>> listMyListens() {
+    return _request(
+      http.RestEndpoints.listMyListens,
+      decode: (json) =>
+          protocol.ListMyListensResponse.fromJson(json).items
+              .map(toDomainListen)
+              .toList(growable: false),
+    );
+  }
+
+  @override
+  Future<void> removeMyListen(Track track) {
+    return _send(
+      http.RestEndpoints.removeMyListen,
+      body: protocol.RemoveMyListenRequest(track: toProtocolTrack(track))
+          .toJson(),
+    );
+  }
+
+  @override
+  Future<void> clearMyListens() => _send(http.RestEndpoints.clearMyListens);
+
+  @override
+  Future<void> setListenRecording(bool on) {
+    if (!on) return _send(http.RestEndpoints.disableListenRecording);
+    return _send(
+      http.RestEndpoints.enableListenRecording,
+      body: const protocol.EnableListenRecordingRequest().toJson(),
     );
   }
 

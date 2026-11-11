@@ -52,9 +52,6 @@ final routerProvider = Provider<GoRouter>((ref) {
   }
 
   void notice(String text) => toasts.show(ToastKind.warning, text);
-  void failed(String text) => toasts.show(ToastKind.failure, text);
-  // 撤销提示可能比播放历史页存活更久，由这里持有，清空历史时收回。
-  ToastMessage? undoOffer;
   final router = GoRouter(
     navigatorKey: rootNavigator,
     redirect: (context, state) {
@@ -95,15 +92,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 pageBuilder: _page(
                   (context, state) => HistoryScreen(
                     onResult: reportPick,
-                    onDeleted: (message, undo) => undoOffer = toasts.show(
-                      ToastKind.info,
-                      message,
-                      action: ToastAction(label: '撤销', onPressed: undo),
-                    ),
-                    onCleared: () {
-                      if (undoOffer case final offer?) toasts.withdraw(offer);
-                    },
-                    onNotice: failed,
+                    onNotice: toasts.show,
                     onCopyTitle: (title) => copySongTitle(toasts, title),
                   ),
                 ),

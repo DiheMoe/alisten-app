@@ -157,6 +157,12 @@ final class IdentityController extends Notifier<IdentityState> {
     state = state.copyWith(account: account);
   }
 
+  /// [memberId] 是发起写入时的成员：期间身份变了就不改状态。
+  void updateRecordListens(String memberId, bool on) {
+    if (state.member?.id != memberId) return;
+    state = state.copyWith(recordListens: on);
+  }
+
   void clearNotice() {
     if (state.notice != null) state = state.copyWith(notice: null);
   }

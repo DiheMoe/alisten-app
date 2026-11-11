@@ -21,7 +21,6 @@ import 'package:alisten/features/admin/data/gal_image_gallery.dart';
 import 'package:alisten/features/admin/data/platform_sensitive_clipboard.dart';
 import 'package:alisten/features/admin/data/rest_admin_api.dart';
 import 'package:alisten/features/admin/index.dart';
-import 'package:alisten/features/history/data/local_history_store.dart';
 import 'package:alisten/features/history/data/share_history_exporter.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/identity/index.dart';
@@ -125,12 +124,6 @@ List<Override> alistenWiring(
     searchHistoryStoreProvider.overrideWith(
       (ref) =>
           PreferencesSearchHistoryStore(ref.watch(sharedPreferencesProvider)),
-    ),
-    playHistoryStoreProvider.overrideWith(
-      (ref) => LocalHistoryStore(
-        ref.watch(sharedPreferencesProvider),
-        legacyServerOrigin: ref.watch(buildEnvironmentProvider).defaultOrigin,
-      ),
     ),
     reminderNotifierProvider.overrideWith(
       (ref) => ReminderNotifier(

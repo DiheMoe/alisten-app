@@ -1,4 +1,5 @@
 import 'package:alisten/core/protocol/protocol.gen.dart' as protocol;
+import 'package:alisten/domain/history/listen.dart';
 import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/room/room.dart';
@@ -106,6 +107,30 @@ TrackMeta toDomainTrackMeta(protocol.TrackMeta meta) {
     coverUrl: secureCoverUrl(meta.coverUrl),
     pageUrl: meta.pageUrl,
     durationMs: meta.durationMs,
+  );
+}
+
+Listen toDomainListen(protocol.MyListen listen) {
+  return Listen(
+    track: toDomainTrack(listen.track),
+    meta: toDomainTrackMeta(listen.meta),
+    heardAtMs: listen.heardAtMs,
+  );
+}
+
+protocol.MyListen toProtocolListen(Listen listen) {
+  final meta = listen.meta;
+  return protocol.MyListen(
+    track: toProtocolTrack(listen.track),
+    meta: protocol.TrackMeta(
+      title: meta.title,
+      artist: meta.artist,
+      album: meta.album,
+      coverUrl: meta.coverUrl,
+      pageUrl: meta.pageUrl,
+      durationMs: meta.durationMs,
+    ),
+    heardAtMs: listen.heardAtMs,
   );
 }
 

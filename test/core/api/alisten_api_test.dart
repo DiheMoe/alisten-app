@@ -7,6 +7,7 @@ import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/protocol/http.gen.dart';
 import 'package:alisten/domain/member/github.dart';
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/domain/track/track.dart';
 import 'package:dio/dio.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -766,6 +767,122 @@ void main() {
       expect(request.jsonBody, {'currentPassword': 'password1'});
     });
   });
+
+  test(
+    'listMyListens keeps the order of the server and secures covers',
+    () async {
+      adapter.respond(200, {
+        'items': [
+          {
+            'track': {'source': 'bilibili', 'id': 'BV1xx'},
+            'meta': _trackMetaJson(
+              title: '新歌',
+              coverUrl: 'http://i0.hdslb.com/new.jpg',
+            ),
+            'heardAtMs': 2000,
+          },
+          {
+            'track': {'source': 'netease', 'id': '1'},
+            'meta': _trackMetaJson(
+              title: '旧歌',
+              coverUrl: 'https://p1.music.126.net/old.jpg',
+            ),
+            'heardAtMs': 1000,
+          },
+        ],
+      });
+
+      final listens = await api.listMyListens();
+
+      final request = adapter.requests.single;
+      expect(request.method, 'GET');
+      expect(request.path, '/api/me/listens');
+      expect(request.authorization, 'Bearer member-token');
+      expect(listens.map((listen) => listen.meta.title), ['新歌', '旧歌']);
+      expect(listens.map((listen) => listen.heardAtMs), [2000, 1000]);
+      expect(listens.first.track.source, TrackSource.bilibili);
+      expect(listens.first.track.id, 'BV1xx');
+      expect(listens.first.meta.coverUrl, 'https://i0.hdslb.com/new.jpg');
+    },
+  );
+
+  test('a history the client cannot read is a protocol mismatch', () async {
+    adapter.respond(200, {
+      'items': [
+        {
+          'track': {'source': 'bilibili'},
+        },
+      ],
+    });
+    await expectLater(
+      api.listMyListens(),
+      throwsA(
+        isA<ApiException>()
+            .having((e) => e.code, 'code', LocalErrorCodes.protocolMismatch)
+            .having((e) => e.message, 'message', '服务器返回了无法识别的数据，请升级 Alisten。'),
+      ),
+    );
+  });
+
+  test('removeMyListen names the track to take off', () async {
+    adapter.respondRaw(204, '', null);
+
+    await api.removeMyListen(const Track(source: TrackSource.qq, id: '001'));
+
+    final request = adapter.requests.single;
+    expect(request.method, 'POST');
+    expect(request.path, '/api/me/listens/removals');
+    expect(request.authorization, 'Bearer member-token');
+    expect(request.jsonBody, {
+      'track': {'source': 'qq', 'id': '001'},
+    });
+  });
+
+  test('clearMyListens deletes the whole history', () async {
+    adapter.respondRaw(204, '', null);
+
+    await api.clearMyListens();
+
+    final request = adapter.requests.single;
+    expect(request.method, 'DELETE');
+    expect(request.path, '/api/me/listens');
+    expect(request.authorization, 'Bearer member-token');
+  });
+
+  test('setListenRecording turns recording on with an empty object and off '
+      'with a delete', () async {
+    adapter.respondRaw(204, '', null);
+    await api.setListenRecording(true);
+    expect(adapter.requests.last.method, 'PUT');
+    expect(adapter.requests.last.path, '/api/me/listen-recording');
+    expect(adapter.requests.last.jsonBody, <String, Object?>{});
+
+    adapter.respondRaw(204, '', null);
+    await api.setListenRecording(false);
+    expect(adapter.requests.last.method, 'DELETE');
+    expect(adapter.requests.last.path, '/api/me/listen-recording');
+  });
+
+  test('a refused member token reaches the caller of every history '
+      'request', () async {
+    for (final call in <Future<void> Function()>[
+      api.listMyListens,
+      () =>
+          api.removeMyListen(const Track(source: TrackSource.netease, id: '1')),
+      api.clearMyListens,
+      () => api.setListenRecording(true),
+    ]) {
+      adapter.respond(401, {
+        'error': {'code': 'UNAUTHORIZED', 'message': '身份已失效'},
+      });
+      await expectLater(
+        call(),
+        throwsA(
+          isA<ApiException>().having((e) => e.code, 'code', 'UNAUTHORIZED'),
+        ),
+      );
+    }
+  });
 }
 
 Map<String, Object?> _memberJson({required String id, required String name}) {
@@ -781,5 +898,19 @@ Map<String, Object?> _roomListingJson() {
     'kind': 'ephemeral',
     'hasPassword': true,
     'onlineCount': 7,
+  };
+}
+
+Map<String, Object?> _trackMetaJson({
+  required String title,
+  required String coverUrl,
+}) {
+  return {
+    'title': title,
+    'artist': '歌手',
+    'album': '专辑',
+    'coverUrl': coverUrl,
+    'pageUrl': 'https://example.com/$title',
+    'durationMs': 180000,
   };
 }
