@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -139,4 +140,69 @@ void main() {
       semantics.dispose();
     });
   }
+
+  testWidgets('without labels each icon is named by its label, announced with '
+      'its choice and still a full touch target', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final chosen = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(3)),
+          child: child!,
+        ),
+        home: Center(
+          child: SegmentedPills(
+            segments: const [
+              PillSegment(
+                value: 'grid',
+                label: '网格',
+                icon: Icons.grid_view_rounded,
+              ),
+              PillSegment(
+                value: 'list',
+                label: '列表',
+                icon: Icons.view_list_rounded,
+              ),
+            ],
+            selected: 'grid',
+            onChanged: chosen.add,
+            showLabels: false,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('网格'), findsNothing);
+    expect(find.text('列表'), findsNothing);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('网格')),
+      isSemantics(
+        label: '网格',
+        isButton: true,
+        isSelected: true,
+        isInMutuallyExclusiveGroup: true,
+      ),
+    );
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('列表')),
+      isSemantics(
+        label: '列表',
+        isButton: true,
+        isSelected: false,
+        isInMutuallyExclusiveGroup: true,
+      ),
+    );
+    for (final label in ['网格', '列表']) {
+      final size = tester.getSize(find.bySemanticsLabel(label));
+      expect(size.width, greaterThanOrEqualTo(AlistenSizes.minTouchTarget));
+      expect(size.height, greaterThanOrEqualTo(AlistenSizes.minTouchTarget));
+    }
+
+    await tester.tap(find.bySemanticsLabel('列表'));
+    expect(chosen, ['list']);
+    semantics.dispose();
+  });
 }

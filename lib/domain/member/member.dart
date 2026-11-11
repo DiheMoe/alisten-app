@@ -13,12 +13,14 @@ final class Member {
 
   final String avatarHash;
 
-  /// 固定按 [size] 的两倍取图：在大多数屏幕上足够清晰，
-  /// 各台设备请求的也是同一张图片。
-  String? avatarUrl(double size) {
-    if (avatarHash.isEmpty) return null;
-    final pixels = (size * 2).round().clamp(1, _gravatarMaxSize);
-    // 没设头像时要 404 而不是生成的图案：各镜像生成的图案不同，界面改显示首字。
-    return 'https://www.gravatar.com/avatar/$avatarHash?d=404&s=$pixels';
-  }
+  String? avatarUrl(double size) => avatarUrlFor(avatarHash, size);
+}
+
+/// 固定按 [size] 的两倍取图：在大多数屏幕上足够清晰，各台设备请求的也是同一张
+/// 图片。
+String? avatarUrlFor(String avatarHash, double size) {
+  if (avatarHash.isEmpty) return null;
+  final pixels = (size * 2).round().clamp(1, _gravatarMaxSize);
+  // 没设头像时要 404 而不是生成的图案：各镜像生成的图案不同，界面改显示首字。
+  return 'https://www.gravatar.com/avatar/$avatarHash?d=404&s=$pixels';
 }

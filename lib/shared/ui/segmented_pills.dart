@@ -18,12 +18,16 @@ class SegmentedPills<T> extends StatelessWidget {
     required this.segments,
     required this.selected,
     required this.onChanged,
+    this.showLabels = true,
     super.key,
   });
 
   final List<PillSegment<T>> segments;
   final T selected;
   final ValueChanged<T>? onChanged;
+
+  /// 为 false 时只显示图标，每段都必须有图标，文字只给读屏。
+  final bool showLabels;
 
   /// 按各段文字只占一行计算。
   static double heightOf(BuildContext context) {
@@ -38,6 +42,10 @@ class SegmentedPills<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    assert(
+      showLabels || segments.every((segment) => segment.icon != null),
+      '只显示图标时每段都要有图标',
+    );
     final colors = AlistenColors.of(context);
     final count = segments.length;
     final chosen = segments.indexWhere((segment) => segment.value == selected);
@@ -92,6 +100,7 @@ class SegmentedPills<T> extends StatelessWidget {
                   child: _Segment(
                     segment: segments[index],
                     selected: index == chosen,
+                    showLabel: showLabels,
                     onPressed: onChanged == null
                         ? null
                         : () => onChanged(segments[index].value),
@@ -113,11 +122,13 @@ class _Segment<T> extends StatelessWidget {
   const _Segment({
     required this.segment,
     required this.selected,
+    required this.showLabel,
     required this.onPressed,
   });
 
   final PillSegment<T> segment;
   final bool selected;
+  final bool showLabel;
   final VoidCallback? onPressed;
 
   static TextStyle labelStyle({required bool selected}) =>
@@ -137,9 +148,11 @@ class _Segment<T> extends StatelessWidget {
       onPressed: onPressed,
       selected: selected,
       inMutuallyExclusiveGroup: true,
+      semanticLabel: showLabel ? null : segment.label,
       focusRadius: BorderRadius.circular(AlistenRadii.pill),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
+        constraints: BoxConstraints(
+          minWidth: showLabel ? 0 : AlistenSizes.minTouchTarget,
           minHeight: AlistenSizes.minTouchTarget,
         ),
         child: Padding(
@@ -152,23 +165,24 @@ class _Segment<T> extends StatelessWidget {
             children: [
               if (icon != null) ...[
                 Icon(icon, size: AlistenSizes.iconSm, color: ink),
-                const SizedBox(width: AlistenSpacing.xxs),
+                if (showLabel) const SizedBox(width: AlistenSpacing.xxs),
               ],
-              Flexible(
-                child: AnimatedDefaultTextStyle(
-                  duration: AlistenDurations.of(
-                    context,
-                    AlistenDurations.short,
-                  ),
-                  style: labelStyle(selected: selected).copyWith(color: ink),
-                  child: Text(
-                    segment.label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
+              if (showLabel)
+                Flexible(
+                  child: AnimatedDefaultTextStyle(
+                    duration: AlistenDurations.of(
+                      context,
+                      AlistenDurations.short,
+                    ),
+                    style: labelStyle(selected: selected).copyWith(color: ink),
+                    child: Text(
+                      segment.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

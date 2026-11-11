@@ -12,6 +12,7 @@ class CoverArt extends StatelessWidget {
     this.radius = AlistenRadii.sm,
     this.glow = false,
     this.heroTag,
+    this.placeholderIcon = Icons.music_note_rounded,
     super.key,
   });
 
@@ -23,6 +24,7 @@ class CoverArt extends StatelessWidget {
   final double radius;
   final bool glow;
   final Object? heroTag;
+  final IconData placeholderIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +35,7 @@ class CoverArt extends StatelessWidget {
       decoration: BoxDecoration(gradient: colors.brandGradient),
       child: Center(
         child: Icon(
-          Icons.music_note_rounded,
+          placeholderIcon,
           size: size <= 64 ? AlistenSizes.iconSm : AlistenSizes.iconLg,
           color: colors.onBrand,
         ),

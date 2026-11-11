@@ -1,3 +1,4 @@
+import 'package:alisten/app/mini_player.dart';
 import 'package:alisten/app/room/room_mode.dart';
 import 'package:alisten/app/router.dart';
 import 'package:alisten/domain/history/listen.dart';
@@ -92,13 +93,14 @@ void main() {
       'refreshes', (tester) async {
     final room = await enterBusyRoom(tester);
 
-    for (final path in ['/', '/history', '/settings']) {
+    for (final path in ['/', '/history', '/settings', '/playlists']) {
       room.router.go(path);
       expect(
         await idleFrames(tester),
         lessThanOrEqualTo(periodicFrames),
         reason: path,
       );
+      expect(find.byType(MiniPlayer), findsOneWidget, reason: path);
     }
   });
 

@@ -24,6 +24,7 @@ class PlaylistScreen extends ConsumerWidget {
     required this.id,
     required this.onResult,
     required this.onNotice,
+    this.saveAsMine,
     super.key,
   });
 
@@ -35,6 +36,9 @@ class PlaylistScreen extends ConsumerWidget {
 
   /// 在比页面存活更久的地方报告出错信息。
   final ValueChanged<String> onNotice;
+
+  /// 歌单功能依赖点歌，这里反过来依赖它会形成循环，所以按钮由 app 层传入。
+  final Widget Function(String name)? saveAsMine;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -103,7 +107,15 @@ class PlaylistScreen extends ConsumerWidget {
           CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
-                child: _Header(summary: summary, songs: detail?.tracks.length),
+                child: _Header(
+                  summary: summary,
+                  songs: detail?.tracks.length,
+                  saveAsMine: saveAsMine?.call(
+                    summary == null || summary.name.trim().isEmpty
+                        ? '导入的歌单'
+                        : summary.name,
+                  ),
+                ),
               ),
               const SliverToBoxAdapter(child: PickUnavailableNotice()),
               content,
@@ -136,12 +148,17 @@ class PlaylistScreen extends ConsumerWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.summary, required this.songs});
+  const _Header({
+    required this.summary,
+    required this.songs,
+    required this.saveAsMine,
+  });
 
   final PlaylistSummary? summary;
 
   // 已加载的歌曲数，用于只知道 id 的歌单。
   final int? songs;
+  final Widget? saveAsMine;
 
   @override
   Widget build(BuildContext context) {
@@ -229,6 +246,10 @@ class _Header extends StatelessWidget {
                     color: colors.onGlassMuted,
                   ),
                 ),
+              ],
+              if (saveAsMine case final save?) ...[
+                const SizedBox(height: AlistenSpacing.md),
+                Center(child: save),
               ],
             ],
           ),

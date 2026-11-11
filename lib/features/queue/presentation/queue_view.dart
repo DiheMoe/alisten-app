@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/queue/application/queue_controller.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
@@ -65,12 +66,25 @@ class QueueView extends ConsumerWidget {
     required this.onAddSong,
     required this.onResult,
     required this.onCopyTitle,
+    this.saveToPlaylist,
     super.key,
   });
 
   final VoidCallback onAddSong;
   final QueueResultCallback onResult;
   final ValueChanged<String> onCopyTitle;
+
+  /// 歌单功能依赖队列，这里反过来依赖它会形成循环，所以按钮由 app 层传入。
+  final Widget Function(Track track, String title)? saveToPlaylist;
+
+  Widget _withSave(QueueEntry entry, Widget trailing) {
+    final save = saveToPlaylist;
+    if (save == null) return trailing;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [save(entry.track, entry.meta.title), trailing],
+    );
+  }
 
   Future<bool> _like(QueueController queue, QueueEntry entry) async {
     final result = await queue.like(entry.id);
@@ -164,7 +178,10 @@ class QueueView extends ConsumerWidget {
                     entry: playing,
                     mine: mine,
                     onCopyTitle: onCopyTitle,
-                    trailing: _Playing(likes: playing.likes),
+                    trailing: _withSave(
+                      playing,
+                      _Playing(likes: playing.likes),
+                    ),
                   ),
                 ),
               ),
@@ -185,7 +202,10 @@ class QueueView extends ConsumerWidget {
                     entry: pending,
                     mine: mine,
                     onCopyTitle: onCopyTitle,
-                    trailing: _LikeCount(likes: pending.likes),
+                    trailing: _withSave(
+                      pending,
+                      _LikeCount(likes: pending.likes),
+                    ),
                   ),
                 ),
               ),
@@ -251,6 +271,10 @@ class QueueView extends ConsumerWidget {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                ?saveToPlaylist?.call(
+                                  entry.track,
+                                  entry.meta.title,
+                                ),
                                 _LikeButton(
                                   likes: entry.likes,
                                   label:
@@ -610,9 +634,12 @@ class _LikeNumber extends StatelessWidget {
         ),
         child: FadeTransition(opacity: animation, child: child),
       ),
+      // Android 的字号最大 2 倍；iOS 的辅助功能字号下，三位数的点赞数会把 320 pt
+      // 宽的行里的歌名挤没。
       child: Text(
         '$likes',
         key: ValueKey(likes),
+        textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 2),
         style: AlistenTypography.timecode.copyWith(
           color: AlistenColors.of(context).onGlassMuted,
         ),
@@ -685,7 +712,10 @@ class _LikeButtonState extends State<_LikeButton>
     final colors = AlistenColors.of(context);
     final lit = Theme.of(context).colorScheme.primary;
     final onPressed = widget.onPressed;
+    // 预留宽度随字号放大到 1.5 倍为止，否则 320 dp 宽的屏幕上大字号时，等待中
+    // 一行的保存、点赞和移除会把标题挤没，整行溢出。
     final countWidth = MediaQuery.textScalerOf(context)
+        .clamp(maxScaleFactor: 1.5)
         .scale(AlistenSizes.countWidth);
     return Pressable(
       onPressed: onPressed == null ? null : () => unawaited(_press()),
@@ -736,9 +766,14 @@ class _LikeButtonState extends State<_LikeButton>
                           ),
                   ),
                   const SizedBox(width: AlistenSpacing.xxs),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: countWidth),
-                    child: _LikeNumber(widget.likes),
+                  // 放不下的点赞数缩小到预留宽度之内，不再挤占歌名。
+                  SizedBox(
+                    width: countWidth,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: _LikeNumber(widget.likes),
+                    ),
                   ),
                 ],
               ),

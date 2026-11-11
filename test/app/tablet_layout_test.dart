@@ -208,7 +208,7 @@ void main() {
     );
     final router = appContainer(tester).read(routerProvider);
 
-    for (final page in ['/', '/history', '/settings']) {
+    for (final page in ['/', '/history', '/settings', '/playlists']) {
       router.go(page);
       await tester.pumpAndSettle();
       final back = page == '/'

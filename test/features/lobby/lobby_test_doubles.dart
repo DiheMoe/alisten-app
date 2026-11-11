@@ -440,9 +440,11 @@ final class FakeCredentialStore implements CredentialStore {
   Completer<void>? readLoginDeviceGate;
   int deleteTicketsCalls = 0;
   Exception? readMemberTokenError;
+  Completer<void>? readMemberTokenGate;
 
   @override
   Future<String?> readMemberToken() async {
+    await readMemberTokenGate?.future;
     final error = readMemberTokenError;
     if (error != null) throw error;
     return memberToken;

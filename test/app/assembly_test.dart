@@ -32,6 +32,11 @@ import 'package:alisten/features/history/data/share_history_exporter.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/playback/index.dart';
+import 'package:alisten/features/playlists/data/file_picker_playlist_file_source.dart';
+import 'package:alisten/features/playlists/data/preferences_playlist_view_store.dart';
+import 'package:alisten/features/playlists/data/rest_playlist_api.dart';
+import 'package:alisten/features/playlists/data/share_playlist_exporter.dart';
+import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/server/data/alisten_server_probe.dart';
 import 'package:alisten/features/server/data/server_data_sweep.dart';
@@ -112,6 +117,15 @@ void main() {
     expect(
       container.read(githubAuthorizerProvider),
       isA<WebAuthGithubAuthorizer>(),
+    );
+    expect(container.read(playlistApiProvider), isA<RestPlaylistApi>());
+    expect(
+      container.read(playlistFileSourceProvider),
+      isA<FilePickerPlaylistFileSource>(),
+    );
+    expect(
+      container.read(playlistExporterProvider),
+      isA<SharePlaylistExporter>(),
     );
   });
 
@@ -335,6 +349,58 @@ void main() {
       expect(rooms.last.channel.messages.single, contains('"ticket-of-B"'));
     });
 
+    test('the playlist API sends a member token only to the server that '
+        'issued it, and none for a shared playlist', () async {
+      FlutterSecureStorage.setMockInitialValues(<String, String>{});
+      final http = FakeHttpAdapter();
+      final stores = FakeCredentialStores();
+      stores('fcd7a878032db68b').memberToken = 'member-token-of-A';
+      stores('f475765b53c3272e').memberToken = 'member-token-of-B';
+      final container = await wired(
+        {},
+        platformAdapters(
+          audioEngine: FakeAudioEngine(),
+          credentialStores: stores.call,
+          appLinks: FakeAppLinkSource(),
+          apiHttp: http,
+        ),
+      );
+      final apiOfA = container.read(playlistApiProvider);
+      http.respond(200, {'items': <Object?>[]});
+      await apiOfA.listMine();
+
+      final directory = container.read(serverDirectoryProvider.notifier);
+      await directory.add(serverB);
+      await directory.setCurrent(serverB.id);
+
+      final apiOfB = container.read(playlistApiProvider);
+      await expectLater(
+        apiOfA.listMine(),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', 'NETWORK')),
+      );
+      await apiOfB.listMine();
+      http.respond(200, {
+        'name': '夜跑',
+        'favorites': false,
+        'ownerName': '阿柚',
+        'ownerAvatarHash': '',
+        'items': <Object?>[],
+      });
+      await apiOfB.shared('AbCdEfGhIjKlMnOpQrStUv');
+
+      expect(
+        [
+          for (final request in http.requests)
+            (request.uri.authority, request.authorization),
+        ],
+        [
+          ('livehouse.dihe.moe', 'Bearer member-token-of-A'),
+          ('example.com:8443', 'Bearer member-token-of-B'),
+          ('example.com:8443', null),
+        ],
+      );
+    });
+
     test('a new brand name does not rebuild the configuration', () async {
       final container = await switchable();
       final config = container.read(appConfigProvider);
@@ -510,6 +576,19 @@ void main() {
     final container = await wired();
 
     expect(() => container.read(historyExporterProvider), throwsA(anything));
+  });
+
+  test('the shared wiring keeps the playlist view in the preferences and '
+      'leaves the playlist I/O to the platform adapters', () async {
+    final container = await wired();
+
+    expect(
+      container.read(playlistViewStoreProvider),
+      isA<PreferencesPlaylistViewStore>(),
+    );
+    expect(() => container.read(playlistApiProvider), throwsA(anything));
+    expect(() => container.read(playlistFileSourceProvider), throwsA(anything));
+    expect(() => container.read(playlistExporterProvider), throwsA(anything));
   });
 
   test('the storage settings measure and clear covers and avatars '

@@ -29,6 +29,11 @@ import 'package:alisten/features/lyrics/data/wakelock_screen_awake.dart';
 import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/playback/data/reminder_notifier.dart';
 import 'package:alisten/features/playback/index.dart';
+import 'package:alisten/features/playlists/data/file_picker_playlist_file_source.dart';
+import 'package:alisten/features/playlists/data/preferences_playlist_view_store.dart';
+import 'package:alisten/features/playlists/data/rest_playlist_api.dart';
+import 'package:alisten/features/playlists/data/share_playlist_exporter.dart';
+import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/room/data/preferences_last_room_store.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/data/clipboard_source.dart';
@@ -124,6 +129,10 @@ List<Override> alistenWiring(
     searchHistoryStoreProvider.overrideWith(
       (ref) =>
           PreferencesSearchHistoryStore(ref.watch(sharedPreferencesProvider)),
+    ),
+    playlistViewStoreProvider.overrideWith(
+      (ref) =>
+          PreferencesPlaylistViewStore(ref.watch(sharedPreferencesProvider)),
     ),
     reminderNotifierProvider.overrideWith(
       (ref) => ReminderNotifier(
@@ -246,6 +255,18 @@ List<Override> platformAdapters({
         ref.watch(credentialStoreProvider).readMemberToken,
       );
     }),
+    // 与 alistenApiProvider 一样随当前服务器重建：请求和 memberToken 都留在
+    // 发起时的服务器上。
+    playlistApiProvider.overrideWith(
+      (ref) => RestPlaylistApi(
+        ref.watch(apiTransportProvider),
+        ref.watch(credentialStoreProvider).readMemberToken,
+      ),
+    ),
+    playlistFileSourceProvider.overrideWithValue(
+      const FilePickerPlaylistFileSource(),
+    ),
+    playlistExporterProvider.overrideWithValue(const SharePlaylistExporter()),
     connectivityStatusProvider.overrideWith(
       (ref) => connectivityStatus ?? Connectivity().onConnectivityChanged,
     ),

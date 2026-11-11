@@ -17,6 +17,7 @@ import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/playback/data/reminder_notifier.dart';
 import 'package:alisten/features/playback/index.dart';
+import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/application/clipboard_link_controller.dart';
 import 'package:alisten/features/search/application/shared_link.dart';
@@ -40,6 +41,7 @@ import '../features/history/history_test_doubles.dart';
 import '../features/lobby/lobby_test_doubles.dart';
 import '../features/lyrics/lyrics_test_doubles.dart';
 import '../features/playback/playback_test_doubles.dart' show FakeAudioEngine;
+import '../features/playlists/playlists_test_doubles.dart';
 import '../features/room/room_test_doubles.dart';
 import '../features/search/share_test_doubles.dart';
 import '../features/server/server_test_doubles.dart'
@@ -71,6 +73,10 @@ Future<List<Override>> alistenAppOverrides({
   FakeImageGallery? gallery,
   FakeReleaseSource? releases,
   FakeReleaseOpener? releaseOpener,
+  FakePlaylistApi? playlists,
+  Override? playlistApi,
+  FakePlaylistFileSource? playlistFiles,
+  FakePlaylistExporter? playlistExporter,
   FakeGithubAuthorizer? githubAuthorizer,
   Map<String, Object> preferences = const {},
 }) async {
@@ -132,6 +138,14 @@ Future<List<Override>> alistenAppOverrides({
     githubAuthorizerProvider.overrideWithValue(
       githubAuthorizer ?? FakeGithubAuthorizer(),
     ),
+    playlistApi ??
+        playlistApiProvider.overrideWithValue(playlists ?? FakePlaylistApi()),
+    playlistFileSourceProvider.overrideWithValue(
+      playlistFiles ?? FakePlaylistFileSource(),
+    ),
+    playlistExporterProvider.overrideWithValue(
+      playlistExporter ?? FakePlaylistExporter(),
+    ),
   ];
 }
 
@@ -159,6 +173,10 @@ Future<void> pumpAlistenApp(
   FakeImageGallery? gallery,
   FakeReleaseSource? releases,
   FakeReleaseOpener? releaseOpener,
+  FakePlaylistApi? playlists,
+  Override? playlistApi,
+  FakePlaylistFileSource? playlistFiles,
+  FakePlaylistExporter? playlistExporter,
   FakeGithubAuthorizer? githubAuthorizer,
   Map<String, Object> preferences = const {},
   List<Override> overrides = const [],
@@ -188,6 +206,10 @@ Future<void> pumpAlistenApp(
           releases: releases,
           releaseOpener: releaseOpener,
           githubAuthorizer: githubAuthorizer,
+          playlists: playlists,
+          playlistApi: playlistApi,
+          playlistFiles: playlistFiles,
+          playlistExporter: playlistExporter,
           preferences: preferences,
         ),
         ...overrides,
@@ -216,6 +238,7 @@ Future<EnteredRoom> enterRoom(
   NowPlaying nowPlaying = testNowPlaying,
   FakeAudioEngine? engine,
   int? serverNow,
+  FakePlaylistApi? playlists,
   List<Override> overrides = const [],
 }) async {
   tester.view
@@ -231,6 +254,7 @@ Future<EnteredRoom> enterRoom(
     credentials: FakeCredentialStore()..tickets[testRoomId] = 'saved-ticket',
     rooms: rooms,
     engine: engine,
+    playlists: playlists,
     overrides: overrides,
   );
   final router = appContainer(tester).read(routerProvider);

@@ -5,6 +5,7 @@ import 'dart:ui' show lerpDouble;
 import 'package:alisten/domain/mutation/mutation_result.dart';
 import 'package:alisten/domain/playback/playback_identity.dart';
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/playback/application/local_playback_state.dart';
 import 'package:alisten/features/playback/application/playback_controller.dart';
 import 'package:alisten/features/playback/presentation/local_playback_status.dart';
@@ -14,6 +15,7 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
+import 'package:alisten/shared/ui/fade_leaving_inert.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
@@ -33,6 +35,7 @@ class NowPlayingHeader extends ConsumerStatefulWidget {
     required this.onVoteSkipped,
     this.onExpand,
     this.onCopyTitle,
+    this.saveToPlaylist,
     this.body,
     super.key,
   });
@@ -44,6 +47,11 @@ class NowPlayingHeader extends ConsumerStatefulWidget {
   final ValueChanged<MutationResult<VoteSkipResult>> onVoteSkipped;
   final VoidCallback? onExpand;
   final ValueChanged<String>? onCopyTitle;
+
+  /// 歌单功能依赖播放，这里反过来依赖它会形成循环，所以按钮由 app 层传入。
+  /// 只在完整的播放器上显示：收拢成的那一行已有封面、标题、播放和投票切歌，
+  /// 放不下它。
+  final Widget Function(Track track, String title)? saveToPlaylist;
   final Widget? body;
 
   @override
@@ -141,6 +149,8 @@ class _NowPlayingHeaderState extends ConsumerState<NowPlayingHeader>
     final scaler = MediaQuery.textScalerOf(context);
     final playerTitleHeight = _TitleBlock.heightOf(scaler, compact: false);
     final rowTitleHeight = _TitleBlock.heightOf(scaler, compact: true);
+    final playerTitleLine = _TitleBlock.firstLineOf(scaler);
+    final save = widget.saveToPlaylist;
     final sideLabels = PlayerSideLabels.measure(
       scaler: scaler,
       direction: Directionality.of(context),
@@ -159,6 +169,7 @@ class _NowPlayingHeaderState extends ConsumerState<NowPlayingHeader>
             shrink: _shrink,
             fit: fit,
             playerTitleHeight: playerTitleHeight,
+            playerTitleLine: playerTitleLine,
             rowTitleHeight: rowTitleHeight,
           ),
           children: [
@@ -190,6 +201,20 @@ class _NowPlayingHeaderState extends ConsumerState<NowPlayingHeader>
                 onCopyTitle: widget.onCopyTitle,
               ),
             ),
+            if (save != null && nowPlaying != null && !status.isCompleted)
+              LayoutId(
+                id: _Part.save,
+                child: FadeTransition(
+                  opacity: _playerOpacity,
+                  child: _Interactive(
+                    enabled: !compact,
+                    child: save(
+                      nowPlaying.entry.track,
+                      nowPlaying.entry.meta.title,
+                    ),
+                  ),
+                ),
+              ),
             if (!status.isCompleted)
               LayoutId(
                 id: _Part.player,
@@ -419,6 +444,9 @@ class _TitleBlock extends ConsumerWidget {
         AlistenTypography.lineHeight(_subtitle(compact: compact), scaler);
   }
 
+  static double firstLineOf(TextScaler scaler) =>
+      AlistenTypography.lineHeight(_title(compact: false), scaler);
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = AlistenColors.of(context);
@@ -471,7 +499,7 @@ class _TitleBlock extends ConsumerWidget {
           duration: trackDuration,
           switchInCurve: AlistenCurves.standard,
           switchOutCurve: AlistenCurves.exit,
-          transitionBuilder: _fadeLeavingInert,
+          transitionBuilder: fadeLeavingInert,
           layoutBuilder: (current, previous) => Stack(
             alignment: AlignmentDirectional.topStart,
             children: [...previous, ?current],
@@ -510,7 +538,7 @@ class _TitleBlock extends ConsumerWidget {
               ),
               AnimatedSwitcher(
                 duration: AlistenDurations.of(context, AlistenDurations.short),
-                transitionBuilder: _fadeLeavingInert,
+                transitionBuilder: fadeLeavingInert,
                 layoutBuilder: (current, previous) => Stack(
                   alignment: AlignmentDirectional.topStart,
                   children: [...previous, ?current],
@@ -536,21 +564,6 @@ class _TitleBlock extends ConsumerWidget {
       },
     );
   }
-}
-
-/// 淡出途中不接收触摸也不被读出，以免已消失的说明（如失败提示）仍可操作。
-Widget _fadeLeavingInert(Widget child, Animation<double> animation) {
-  return AnimatedBuilder(
-    animation: animation,
-    builder: (context, child) {
-      final leaving = !animation.status.isForwardOrCompleted;
-      return IgnorePointer(
-        ignoring: leaving,
-        child: ExcludeSemantics(excluding: leaving, child: child),
-      );
-    },
-    child: FadeTransition(opacity: animation, child: child),
-  );
 }
 
 class _NoteLine extends StatelessWidget {
@@ -659,7 +672,7 @@ class _ThinProgress extends ConsumerWidget {
   }
 }
 
-enum _Part { body, cover, title, player, rowControls, rowProgress }
+enum _Part { body, cover, title, save, player, rowControls, rowProgress }
 
 const _coverToTitle = AlistenSpacing.xl;
 const _titleToControls = AlistenSpacing.lg;
@@ -836,12 +849,14 @@ class _StageLayout extends MultiChildLayoutDelegate {
     required this.shrink,
     required this.fit,
     required this.playerTitleHeight,
+    required this.playerTitleLine,
     required this.rowTitleHeight,
   }) : super(relayout: shrink);
 
   final Animation<double> shrink;
   final _PlayerFit fit;
   final double playerTitleHeight;
+  final double playerTitleLine;
   final double rowTitleHeight;
 
   double _layoutControls(double width) => hasChild(_Part.player)
@@ -862,6 +877,9 @@ class _StageLayout extends MultiChildLayoutDelegate {
       controlsHeightAt: _layoutControls,
     );
 
+    final save = hasChild(_Part.save)
+        ? layoutChild(_Part.save, BoxConstraints.loose(size))
+        : Size.zero;
     final rowControls = hasChild(_Part.rowControls)
         ? layoutChild(_Part.rowControls, BoxConstraints(maxWidth: width))
         : Size.zero;
@@ -890,9 +908,11 @@ class _StageLayout extends MultiChildLayoutDelegate {
     layoutChild(_Part.cover, BoxConstraints.tight(cover.size));
     positionChild(_Part.cover, cover.topLeft);
 
+    // 字号正常时按钮比标题第一行高，会伸进副标题那一行，所以整个标题块让出
+    // 它的宽度。
     final titleWidth = math.max(
       0.0,
-      lerpDouble(player.column, rowTitleEnd - rowTitleStart, t)!,
+      lerpDouble(player.column - save.width, rowTitleEnd - rowTitleStart, t)!,
     );
     layoutChild(
       _Part.title,
@@ -910,6 +930,16 @@ class _StageLayout extends MultiChildLayoutDelegate {
       ),
     );
 
+    if (hasChild(_Part.save)) {
+      positionChild(
+        _Part.save,
+        Offset(
+          player.columnStart + player.column - save.width,
+          math.max(0.0, player.titleTop + (playerTitleLine - save.height) / 2) +
+              t * _drift,
+        ),
+      );
+    }
     if (hasChild(_Part.player)) {
       positionChild(
         _Part.player,
@@ -949,6 +979,7 @@ class _StageLayout extends MultiChildLayoutDelegate {
     return oldDelegate.shrink != shrink ||
         oldDelegate.fit != fit ||
         oldDelegate.playerTitleHeight != playerTitleHeight ||
+        oldDelegate.playerTitleLine != playerTitleLine ||
         oldDelegate.rowTitleHeight != rowTitleHeight;
   }
 }

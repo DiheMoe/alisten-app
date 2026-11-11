@@ -22,6 +22,7 @@ class Pressable extends StatefulWidget {
     this.expanded,
     this.dimWhenDisabled = true,
     this.focusRadius = const BorderRadius.all(Radius.circular(AlistenRadii.sm)),
+    this.focusNode,
     super.key,
   });
 
@@ -39,6 +40,7 @@ class Pressable extends StatefulWidget {
   final bool? expanded;
   final bool dimWhenDisabled;
   final BorderRadius focusRadius;
+  final FocusNode? focusNode;
 
   @override
   State<Pressable> createState() => _PressableState();
@@ -112,6 +114,7 @@ class _PressableState extends State<Pressable> {
       label: widget.semanticLabel,
       onLongPressHint: widget.onLongPress == null ? null : widget.longPressHint,
       child: FocusableActionDetector(
+        focusNode: widget.focusNode,
         enabled: _enabled,
         mouseCursor: _enabled
             ? SystemMouseCursors.click

@@ -14,10 +14,12 @@ import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/lobby/index.dart';
+import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/index.dart';
+import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -29,6 +31,7 @@ import 'package:go_router/go_router.dart';
 const _pages = {
   '/',
   '/history',
+  '/playlists',
   '/settings',
   '/settings/licenses',
   '/settings/servers',
@@ -52,16 +55,20 @@ final routerProvider = Provider<GoRouter>((ref) {
   }
 
   void notice(String text) => toasts.show(ToastKind.warning, text);
-  final router = GoRouter(
+
+  // 面板在根导航器上，链接换掉打开它的页面后仍开着，所以不用页面的 context 跳转。
+  late final GoRouter router;
+  void openAccount() => router.go('/settings');
+
+  router = GoRouter(
     navigatorKey: rootNavigator,
     redirect: (context, state) {
       final uri = state.uri;
+      final segments = uri.pathSegments;
       if (_pages.contains(uri.path) ||
-          roomRoute(
-                uri.pathSegments,
-                sections: DeepLinkController.appSections,
-              ) !=
-              null) {
+          roomRoute(segments, sections: DeepLinkController.appSections) !=
+              null ||
+          _isPlaylistPage(segments)) {
         return null;
       }
       // 重定向可能在路由构建期间执行，不能在这时显示提示。
@@ -81,6 +88,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: _page(
               (context, state) => LobbyScreen(
                 onOpenRoom: (roomRef) => context.go('/r/$roomRef'),
+                onOpenPlaylists: () => context.go('/playlists'),
                 onOpenHistory: () => context.go('/history'),
                 onOpenSettings: () => context.go('/settings'),
                 onNotice: toasts.show,
@@ -94,8 +102,40 @@ final routerProvider = Provider<GoRouter>((ref) {
                     onResult: reportPick,
                     onNotice: toasts.show,
                     onCopyTitle: (title) => copySongTitle(toasts, title),
+                    saveToPlaylist: (track, title) => SaveToPlaylistButton(
+                      track: track,
+                      title: title,
+                      onOpenAccount: openAccount,
+                      onNotice: toasts.show,
+                      iconSize: AlistenSizes.iconSm,
+                    ),
                   ),
                 ),
+              ),
+              GoRoute(
+                path: 'playlists',
+                pageBuilder: _page(
+                  (context, state) => MyPlaylistsScreen(
+                    onOpenPlaylist: (id) => context.go('/playlists/$id'),
+                    onOpenAccount: openAccount,
+                    onNotice: toasts.show,
+                  ),
+                ),
+                routes: [
+                  GoRoute(
+                    path: ':id',
+                    pageBuilder: _page(
+                      (context, state) => MyPlaylistScreen(
+                        id: state.pathParameters['id']!,
+                        onResult: reportPick,
+                        onNotice: toasts.show,
+                        onCopyTitle: (title) => copySongTitle(toasts, title),
+                        onOpenAccount: openAccount,
+                        onDeleted: () => context.go('/playlists'),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               GoRoute(
                 path: 'settings',
@@ -233,6 +273,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                               id: state.pathParameters['id']!,
                               onResult: reportPick,
                               onNotice: notice,
+                              saveAsMine: (name) => SavePlatformPlaylistButton(
+                                playlistId: state.pathParameters['id']!,
+                                name: name,
+                                onOpenAccount: openAccount,
+                                onNotice: toasts.show,
+                              ),
                             ),
                           ),
                         ),
@@ -320,6 +366,12 @@ GoRouterPageBuilder _page(GoRouterWidgetBuilder builder, {bool task = false}) {
     );
   };
 }
+
+// 歌单 ID 由服务端给出，App 不假设它的格式。
+bool _isPlaylistPage(List<String> segments) =>
+    segments.length == 2 &&
+    segments.first == 'playlists' &&
+    segments[1].isNotEmpty;
 
 class _LostPage extends StatelessWidget {
   const _LostPage();

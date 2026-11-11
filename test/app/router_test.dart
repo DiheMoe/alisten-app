@@ -5,6 +5,7 @@ import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/lobby/index.dart';
+import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/server/data/preferences_server_store.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/index.dart';
@@ -31,6 +32,8 @@ void main() {
       ('/settings', '/settings/account/login', LoginScreen),
       ('/settings', '/settings/account/register', RegisterScreen),
       ('/settings', '/settings/account/pair', PairScreen),
+      ('/', '/playlists', MyPlaylistsScreen),
+      ('/playlists', '/playlists/pl-1', MyPlaylistScreen),
     ]) {
       testWidgets('$to slides in from $from and slides back out', (
         tester,
@@ -536,6 +539,7 @@ void main() {
       // 只有网易云有歌单页。
       '/r/x/playlists/qq/1',
       '/r/Not_A_Room',
+      '/playlists/a/b',
     ]) {
       router.go('/settings');
       await tester.pumpAndSettle();
@@ -549,6 +553,20 @@ void main() {
       expect(find.text(emptyLobbyText), findsOneWidget, reason: location);
       await tester.pumpAndSettle(const Duration(seconds: 4));
       expect(find.text('链接无效，已回到大厅'), findsNothing);
+    }
+  });
+
+  testWidgets('the playlist pages are let through', (tester) async {
+    await pumpAlistenApp(tester);
+    final router = appContainer(tester).read(routerProvider);
+
+    for (final location in ['/playlists', '/playlists/pl-1']) {
+      router.go(location);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(router.state.uri.path, location);
+      expect(find.text('链接无效，已回到大厅'), findsNothing, reason: location);
     }
   });
 }

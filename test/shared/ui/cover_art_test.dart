@@ -65,6 +65,25 @@ void main() {
 
     expect(find.byIcon(Icons.music_note_rounded), findsOneWidget);
   });
+
+  testWidgets('without an image the placeholder shows the given icon', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
+        home: const Row(
+          children: [
+            CoverArt(url: null, size: 52, placeholderIcon: Icons.star_rounded),
+            CoverArt(url: '', size: 52),
+          ],
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.star_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.music_note_rounded), findsOneWidget);
+  });
 }
 
 // 解码在引擎中真实异步进行：让出真实时间，直到没有加载中的封面，最多等 5 秒。

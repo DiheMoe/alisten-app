@@ -36,6 +36,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
     required this.onResult,
     required this.onNotice,
     required this.onCopyTitle,
+    this.saveToPlaylist,
     super.key,
   });
 
@@ -44,6 +45,9 @@ class HistoryScreen extends ConsumerStatefulWidget {
   /// 删除和清空的结果可能在页面关闭之后才提示。
   final void Function(ToastKind kind, String text) onNotice;
   final ValueChanged<String> onCopyTitle;
+
+  /// 保存按钮属于歌单功能，由 app 层组装传入。
+  final Widget Function(Track track, String title)? saveToPlaylist;
 
   @override
   ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
@@ -400,6 +404,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               onDelete: ({required bool swiped}) =>
                   _delete(listen, swiped: swiped),
               onCopyTitle: widget.onCopyTitle,
+              saveToPlaylist: widget.saveToPlaylist,
             );
           },
         ),
@@ -529,6 +534,7 @@ class _PlayRow extends StatelessWidget {
     required this.onPick,
     required this.onDelete,
     required this.onCopyTitle,
+    required this.saveToPlaylist,
     super.key,
   });
 
@@ -542,6 +548,7 @@ class _PlayRow extends StatelessWidget {
   /// 服务端确认删除时返回 true。
   final Future<bool> Function({required bool swiped}) onDelete;
   final ValueChanged<String> onCopyTitle;
+  final Widget Function(Track track, String title)? saveToPlaylist;
 
   @override
   Widget build(BuildContext context) {
@@ -598,12 +605,23 @@ class _PlayRow extends StatelessWidget {
           AlistenSpacing.xs,
           AlistenSpacing.xxs,
         ),
-        trailing: PickControl(
-          track: listen.track,
-          title: meta.title,
-          label: '再点一次《${meta.title}》',
-          subtle: true,
-          onPick: onPick,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ?saveToPlaylist?.call(listen.track, meta.title),
+            // 点歌结果写成文字，与保存按钮并排时，320 dp 宽的屏幕在 2 倍以上字号
+            // 下会撑破整行；结果另作为按钮的值读出，所以限制缩放。
+            MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 2,
+              child: PickControl(
+                track: listen.track,
+                title: meta.title,
+                label: '再点一次《${meta.title}》',
+                subtle: true,
+                onPick: onPick,
+              ),
+            ),
+          ],
         ),
       ),
     );

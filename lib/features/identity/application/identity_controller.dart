@@ -20,6 +20,8 @@ const serverChangedNotice = '服务器已经切换，这次操作没有完成。
 
 const doneOnOldServerText = '服务器已经切换，这次操作在原来的服务器上完成。';
 
+const unsureOnOldServerText = '服务器已经切换，这次操作可能已在原来的服务器上完成。';
+
 const identityUnreadableText = '身份凭据暂时无法读取，请稍后重试。';
 
 const _unauthorized = 'UNAUTHORIZED';

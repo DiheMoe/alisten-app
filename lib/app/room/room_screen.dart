@@ -10,9 +10,11 @@ import 'package:alisten/app/room/room_mode_bar.dart';
 import 'package:alisten/app/room/room_pager.dart';
 import 'package:alisten/app/room/room_top_bar.dart';
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/chat/index.dart';
 import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/playback/index.dart';
+import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/tokens.dart';
@@ -205,12 +207,23 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
     void reportQueue(MutationResult<Object?> result, String success) =>
         reportMutation(toasts, result, success: (_) => success);
     void copyTitle(String title) => copySongTitle(toasts, title);
+    // 面板在根导航器上，换到另一个房间时它仍开着，这个页面却可能已被换下。
+    final router = GoRouter.of(context);
+    Widget Function(Track track, String title) saveButton(double iconSize) =>
+        (track, title) => SaveToPlaylistButton(
+          track: track,
+          title: title,
+          onOpenAccount: () => router.go('/settings'),
+          onNotice: toasts.show,
+          iconSize: iconSize,
+        );
     Widget content(RoomMode page) => switch (page) {
       RoomMode.lyrics || RoomMode.player => const LyricsView(),
       RoomMode.queue => QueueView(
         onAddSong: _addSong,
         onResult: reportQueue,
         onCopyTitle: copyTitle,
+        saveToPlaylist: saveButton(AlistenSizes.iconSm),
       ),
       RoomMode.chat => const ChatView(),
     };
@@ -241,6 +254,7 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
       onVoteSkipped: (result) => _reportVote(toasts, result),
       onExpand: () => _show(RoomMode.player),
       onCopyTitle: copyTitle,
+      saveToPlaylist: saveButton(AlistenSizes.icon),
       body: twoPanes
           ? null
           : RoomPager(

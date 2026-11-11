@@ -30,6 +30,7 @@ const _createSpace = AlistenSizes.largeTouchTarget + 2 * AlistenSpacing.md;
 class LobbyScreen extends ConsumerStatefulWidget {
   const LobbyScreen({
     required this.onOpenRoom,
+    required this.onOpenPlaylists,
     required this.onOpenHistory,
     required this.onOpenSettings,
     required this.onNotice,
@@ -38,6 +39,7 @@ class LobbyScreen extends ConsumerStatefulWidget {
 
   /// 参数是房间别名或 UUID。
   final ValueChanged<String> onOpenRoom;
+  final VoidCallback onOpenPlaylists;
   final VoidCallback onOpenHistory;
   final VoidCallback onOpenSettings;
   final void Function(ToastKind kind, String text) onNotice;
@@ -212,6 +214,12 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                           semanticLabel: '播放历史',
                           style: IconCircleButtonStyle.plain,
                           onPressed: widget.onOpenHistory,
+                        ),
+                        IconCircleButton(
+                          icon: Icons.library_music_rounded,
+                          semanticLabel: '我的歌单',
+                          style: IconCircleButtonStyle.plain,
+                          onPressed: widget.onOpenPlaylists,
                         ),
                         IconCircleButton(
                           icon: Icons.settings_rounded,

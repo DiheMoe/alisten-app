@@ -202,6 +202,7 @@ class PickControl extends ConsumerWidget {
     this.wide = false,
     this.expand = false,
     this.subtle = false,
+    this.blockedReason,
     super.key,
   });
 
@@ -221,6 +222,9 @@ class PickControl extends ConsumerWidget {
   /// 占满可用宽度，只与 [wide] 一起使用。
   final bool expand;
 
+  /// 不为 null 时按钮不可用，读屏名称就是这段文字，例如临时房间里的链接曲目。
+  final String? blockedReason;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(
@@ -233,13 +237,14 @@ class PickControl extends ConsumerWidget {
     );
     final usable =
         connected && status != PickStatus.sending && status != PickStatus.added;
+    final blocked = blockedReason;
     return PickButton(
       status: status,
-      label: label ?? '点歌《$title》',
+      label: blocked ?? label ?? '点歌《$title》',
       wide: wide,
       expand: expand,
       subtle: subtle,
-      onPressed: usable ? () => onPick(track, title) : null,
+      onPressed: usable && blocked == null ? () => onPick(track, title) : null,
     );
   }
 }

@@ -25,6 +25,26 @@ void main() {
       expect(config.inviteLinkFor('hall'), 'https://example.com:8443/r/hall');
     });
 
+    test('a shared playlist link is on the same site as invites', () {
+      final config = AppConfig(
+        baseUrl: 'https://example.com:8443',
+        isRelease: true,
+      );
+
+      expect(
+        config.sharedPlaylistLinkFor('AbCdEfGhIjKlMnOpQrStUv'),
+        'https://example.com:8443/s/AbCdEfGhIjKlMnOpQrStUv',
+      );
+      expect(
+        AppConfig(
+          baseUrl: 'https://api.example.com',
+          isRelease: true,
+          linkHost: 'listen.example.com',
+        ).sharedPlaylistLinkFor('AbCdEfGhIjKlMnOpQrStUv'),
+        'https://listen.example.com/s/AbCdEfGhIjKlMnOpQrStUv',
+      );
+    });
+
     test(
       'an empty link host is rejected instead of producing hostless links',
       () {

@@ -81,6 +81,9 @@ final class AppConfig {
   final String linkHost;
 
   String inviteLinkFor(String roomRef) => 'https://$linkHost/r/$roomRef';
+
+  String sharedPlaylistLinkFor(String shareId) =>
+      'https://$linkHost/s/$shareId';
 }
 
 final class BuildEnvironment {

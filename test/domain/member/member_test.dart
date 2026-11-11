@@ -14,4 +14,14 @@ void main() {
     expect(member.avatarUrl(17.6), endsWith('&s=35'));
     expect(anonymous.avatarUrl(40), isNull);
   });
+
+  test('the avatar address is built from the hash alone, as for members', () {
+    expect(
+      avatarUrlFor('abc123', 40),
+      'https://www.gravatar.com/avatar/abc123?d=404&s=80',
+    );
+    expect(avatarUrlFor('abc123', 17.6), endsWith('&s=35'));
+    expect(avatarUrlFor('abc123', 5000), endsWith('&s=2048'));
+    expect(avatarUrlFor('', 40), isNull);
+  });
 }

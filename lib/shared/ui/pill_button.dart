@@ -23,6 +23,7 @@ class PillButton extends StatelessWidget {
     this.large = false,
     this.expand = false,
     this.glow = false,
+    this.expanded,
     super.key,
   });
 
@@ -36,6 +37,8 @@ class PillButton extends StatelessWidget {
 
   /// 只对 [PillButtonStyle.primary] 生效。
   final bool glow;
+
+  final bool? expanded;
 
   /// 按标签只占一行计算。
   static double heightOf(BuildContext context, {bool large = false}) {
@@ -68,6 +71,7 @@ class PillButton extends StatelessWidget {
       onPressed: busy ? null : onPressed,
       // 忙碌不等于不可用，不变淡。
       dimWhenDisabled: !busy,
+      expanded: expanded,
       focusRadius: BorderRadius.circular(AlistenRadii.pill),
       child: ConstrainedBox(
         constraints: BoxConstraints(

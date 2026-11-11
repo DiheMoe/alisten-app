@@ -4,6 +4,7 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -69,5 +70,32 @@ void main() {
     await finger.up();
     await tester.pumpAndSettle();
     expect(presses, 0);
+  });
+
+  testWidgets('a given focus node takes the focus and the activation', (
+    tester,
+  ) async {
+    final node = FocusNode();
+    addTearDown(node.dispose);
+    var pressed = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: Pressable(
+            focusNode: node,
+            onPressed: () => pressed++,
+            child: const SizedBox.square(dimension: 48),
+          ),
+        ),
+      ),
+    );
+
+    node.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+
+    expect(node.hasFocus, isTrue);
+    expect(pressed, 1);
   });
 }

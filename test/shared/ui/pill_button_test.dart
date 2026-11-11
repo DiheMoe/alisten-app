@@ -37,6 +37,36 @@ void main() {
     },
   );
 
+  testWidgets('a button that opens something says whether it is open; '
+      'others have no expanded state', (tester) async {
+    Future<void> show({bool? expanded}) => tester.pumpWidget(
+      MaterialApp(
+        theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
+        home: Center(
+          child: PillButton(label: '导入', expanded: expanded, onPressed: () {}),
+        ),
+      ),
+    );
+
+    await show();
+    expect(
+      tester.getSemantics(find.text('导入')),
+      isSemantics(label: '导入', isButton: true, hasExpandedState: false),
+    );
+
+    await show(expanded: false);
+    expect(
+      tester.getSemantics(find.text('导入')),
+      isSemantics(hasExpandedState: true, isExpanded: false),
+    );
+
+    await show(expanded: true);
+    expect(
+      tester.getSemantics(find.text('导入')),
+      isSemantics(hasExpandedState: true, isExpanded: true),
+    );
+  });
+
   for (final scale in [1.0, 1.5, 2.0, 3.0]) {
     for (final large in [false, true]) {
       testWidgets('heightOf is the height of a one-line button at text scale '

@@ -75,6 +75,7 @@ final class _Lobby {
   final FakeRoomTransportFactory rooms;
   final opened = <String>[];
   final notices = <(ToastKind, String)>[];
+  int playlistsOpened = 0;
 
   static Future<_Lobby> open(
     WidgetTester tester, {
@@ -116,6 +117,7 @@ final class _Lobby {
           theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
           home: LobbyScreen(
             onOpenRoom: opened.add,
+            onOpenPlaylists: () => playlistsOpened++,
             onOpenHistory: () {},
             onOpenSettings: () {},
             onNotice: (kind, text) => notices.add((kind, text)),
@@ -152,6 +154,49 @@ final class _Lobby {
 }
 
 void main() {
+  testWidgets('my playlists open from the header, between the history and '
+      'the settings', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final lobby = await _Lobby.open(tester);
+
+    final history = tester.getRect(find.bySemanticsLabel('播放历史'));
+    final playlists = tester.getRect(find.bySemanticsLabel('我的歌单'));
+    final settings = tester.getRect(find.bySemanticsLabel('设置'));
+    expect(history.right, lessThanOrEqualTo(playlists.left));
+    expect(playlists.right, lessThanOrEqualTo(settings.left));
+    await tester.tap(find.bySemanticsLabel('我的歌单'));
+    expect(lobby.playlistsOpened, 1);
+    semantics.dispose();
+  });
+
+  final largeText = ValueVariant<double>({2, 3});
+  testWidgets(
+    'on a narrow phone with large text the header buttons all stay in reach',
+    (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue =
+          largeText.currentValue!;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final lobby = await _Lobby.open(tester);
+      tester.view.physicalSize = const Size(320, 760) * 3;
+      await lobby.settle();
+
+      expect(tester.takeException(), isNull);
+      for (final label in ['播放历史', '我的歌单', '设置']) {
+        expect(
+          find
+              .byWidgetPredicate(
+                (widget) =>
+                    widget is IconCircleButton && widget.semanticLabel == label,
+              )
+              .hitTestable(),
+          findsOneWidget,
+          reason: label,
+        );
+      }
+    },
+    variant: largeText,
+  );
+
   testWidgets('the filter shows what was typed when the lobby opens again', (
     tester,
   ) async {
