@@ -417,6 +417,51 @@ void main() {
     expect(await api.share('pl-1'), _shareId);
   });
 
+  group('a file import against the 1 MiB body the server takes', () {
+    const limit = 1 << 20;
+
+    int bodyBytes(String title) => utf8
+        .encode(
+          jsonEncode({
+            'name': '旧歌单',
+            'tracks': [
+              {'durationMs': 0, 'title': title, 'track': _wireA},
+            ],
+          }),
+        )
+        .length;
+
+    // 用三字节的汉字填满：按字符数计算会远低于上限。
+    String titleFor(int bytes) {
+      final room = bytes - bodyBytes('');
+      return '晴' * (room ~/ 3) + 'a' * (room % 3);
+    }
+
+    Future<Object?> importTitled(String title) => api.importFile('旧歌单', [
+      PlaylistFileTrack(track: _a, title: title, durationMs: 0),
+    ]);
+
+    test('one byte over is refused as unsuitable and not sent', () async {
+      await expectLater(
+        importTitled(titleFor(limit + 1)),
+        throwsA(
+          isA<ApiException>()
+              .having((error) => error.code, 'code', 'INVALID_ARGUMENT')
+              .having((error) => error.status, 'status', isNull),
+        ),
+      );
+      expect(adapter.requests, isEmpty);
+    });
+
+    test('exactly the limit is sent', () async {
+      adapter.respond(201, {'playlist': _playlistJson(), 'imported': 1});
+
+      await importTitled(titleFor(limit));
+
+      expect(adapter.requests.single.headers['content-length'], '$limit');
+    });
+  });
+
   test('a shared playlist is read without a member token', () async {
     memberToken = null;
     adapter.respond(200, _sharedJson);

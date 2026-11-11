@@ -788,6 +788,30 @@ void main() {
       expect((result as MutationFailed).message, '文件里有不符合要求的内容，没有导入。');
     });
 
+    test('a file too large to send is told as unsuitable content, not as '
+        'unknown', () async {
+      final (opened: _, list: _, :controller) = await open();
+      server.failNext(
+        'importFile',
+        const ApiException(
+          code: 'INVALID_ARGUMENT',
+          message: '本机拒绝发出',
+          status: null,
+        ),
+      );
+
+      final result = await controller.importFile(file);
+
+      expect(
+        result,
+        isA<MutationFailed<ImportedPlaylist>>().having(
+          (r) => r.message,
+          'message',
+          invalidImportFileText,
+        ),
+      );
+    });
+
     test('a link over 2048 bytes is not sent, counted in bytes', () async {
       final (opened: _, list: _, :controller) = await open();
 

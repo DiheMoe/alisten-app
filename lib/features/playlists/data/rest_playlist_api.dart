@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/logging/app_log.dart';
@@ -15,6 +17,9 @@ const _logSource = 'playlists';
 // 服务端要先从网易云取回整个歌单，每次向网易云请求最多等 30 秒，大歌单要请求
 // 好几次；客户端先断开会让服务端已经创建的歌单变成结果未知。
 const _platformImportTimeout = Duration(seconds: 45);
+
+// serve 和 nginx 都只收 1 MiB 以内的导入请求体，超出时的 413 只能当作结果未知。
+const _maxImportBodyBytes = 1 << 20;
 
 final class RestPlaylistApi implements PlaylistApi {
   const RestPlaylistApi(this._transport, this._memberTokenReader);
@@ -141,13 +146,21 @@ final class RestPlaylistApi implements PlaylistApi {
   Future<ImportedPlaylist> importFile(
     String name,
     List<PlaylistFileTrack> tracks,
-  ) {
+  ) async {
+    final body = protocol.ImportMyPlaylistRequest(
+      name: name,
+      tracks: tracks.map(_importedTrack).toList(growable: false),
+    ).toJson();
+    if (utf8.encode(jsonEncode(body)).length > _maxImportBodyBytes) {
+      throw ApiException(
+        code: protocol.ErrorCode.invalidArgument.wireValue,
+        message: '歌单文件太大，没有导入。',
+        status: null,
+      );
+    }
     return _request(
       http.RestEndpoints.importMyPlaylist,
-      body: protocol.ImportMyPlaylistRequest(
-        name: name,
-        tracks: tracks.map(_importedTrack).toList(growable: false),
-      ).toJson(),
+      body: body,
       decode: (json) {
         final response = protocol.ImportMyPlaylistResponse.fromJson(json);
         return (
