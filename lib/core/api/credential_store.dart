@@ -14,7 +14,16 @@ abstract class CredentialStore {
   /// 与 [deleteMemberToken] 一样尽力而为。
   Future<void> deleteTicket(String roomId);
 
-  /// 删除本服务器的 memberToken 和全部票据，同样尽力而为。
+  /// 只删除本服务器的票据，memberToken 和设备凭证保留；与 [deleteMemberToken]
+  /// 一样尽力而为。票据绑定签发它的会话，换会话时全部作废。
+  Future<void> deleteTickets();
+
+  Future<String?> readLoginDevice(String username);
+
+  /// 退出登录时不删除：以后用同一个用户名登录时还要带上它。
+  Future<void> writeLoginDevice(String username, String device);
+
+  /// 删除本服务器的 memberToken、全部票据和设备凭证，同样尽力而为。
   Future<void> clear();
 }
 
@@ -51,6 +60,7 @@ final class SecureCredentialStore implements CredentialStore {
 
   static const _memberTokenKeyPrefix = 'member_token@';
   static const _ticketKeyPrefix = 'room_ticket@';
+  static const _loginDeviceKeyPrefix = 'login_device@';
 
   static String memberTokenKey(String serverId) =>
       '$_memberTokenKeyPrefix$serverId';
@@ -61,14 +71,20 @@ final class SecureCredentialStore implements CredentialStore {
     return ticketPrefix(serverId) + Uri.encodeComponent(roomId);
   }
 
+  static String loginDeviceKey(String serverId, String username) =>
+      '$_loginDeviceKeyPrefix$serverId.$username';
+
   static String? serverIdOf(String key) {
     if (key.startsWith(_memberTokenKeyPrefix)) {
       return key.substring(_memberTokenKeyPrefix.length);
     }
-    if (!key.startsWith(_ticketKeyPrefix)) return null;
-    final rest = key.substring(_ticketKeyPrefix.length);
-    final end = rest.indexOf('.');
-    return end < 0 ? null : rest.substring(0, end);
+    for (final prefix in const [_ticketKeyPrefix, _loginDeviceKeyPrefix]) {
+      if (!key.startsWith(prefix)) continue;
+      final rest = key.substring(prefix.length);
+      final end = rest.indexOf('.');
+      return end < 0 ? null : rest.substring(0, end);
+    }
+    return null;
   }
 
   final FlutterSecureStorage _storage;
@@ -114,17 +130,45 @@ final class SecureCredentialStore implements CredentialStore {
       _delete(ticketKey(serverId, roomId));
 
   @override
-  Future<void> clear() async {
+  Future<void> deleteTickets() =>
+      _deleteWhere((key) => key.startsWith(ticketPrefix(serverId)));
+
+  @override
+  Future<String?> readLoginDevice(String username) {
+    return _storage.read(
+      key: loginDeviceKey(serverId, username),
+      iOptions: iosOptions,
+    );
+  }
+
+  @override
+  Future<void> writeLoginDevice(String username, String device) async {
+    if (!_listed()) return;
+    await _storage.write(
+      key: loginDeviceKey(serverId, username),
+      value: device,
+      iOptions: iosOptions,
+    );
+  }
+
+  @override
+  Future<void> clear() => _deleteWhere(
+    (key) =>
+        key == memberTokenKey(serverId) ||
+        key.startsWith(ticketPrefix(serverId)) ||
+        key.startsWith('$_loginDeviceKeyPrefix$serverId.'),
+  );
+
+  Future<void> _deleteWhere(bool Function(String key) matches) async {
     final List<String> keys;
     try {
       final stored = await _storage.readAll(iOptions: iosOptions);
-      final tickets = ticketPrefix(serverId);
       keys = [
         for (final key in stored.keys)
-          if (key == memberTokenKey(serverId) || key.startsWith(tickets)) key,
+          if (matches(key)) key,
       ];
     } on Object {
-      AppLog.warn('credentials', 'clear failed', code: 'KEYCHAIN');
+      AppLog.warn('credentials', 'delete failed', code: 'KEYCHAIN');
       return;
     }
     for (final key in keys) {

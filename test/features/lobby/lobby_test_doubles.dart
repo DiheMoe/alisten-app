@@ -4,8 +4,10 @@ import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/credential_store.dart';
 import 'package:alisten/core/storage/preferences.dart';
+import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/domain/server/site_capabilities.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -48,6 +50,40 @@ final class FakeAlistenApi implements AlistenApi {
 
   Member createdMember = member;
   Completer<Member>? getMeResult;
+
+  /// `getMe` 返回的成员；为 null 时返回 [member]。登录成功后换成账号的成员。
+  Member? me;
+  Account? account;
+  bool recordListens = true;
+
+  int registerCalls = 0;
+  Exception? registerError;
+  Account registeredAccount = const Account(username: 'mao', github: false);
+
+  int loginCalls = 0;
+  ({String username, String password, String? device})? lastLogin;
+  Exception? loginError;
+  Completer<void>? loginGate;
+  SignedIn signedIn = const SignedIn(
+    memberToken: 'account-token',
+    member: accountMember,
+    account: Account(username: 'mao', github: false),
+    device: issuedDevice,
+  );
+
+  int logoutCalls = 0;
+  Exception? logoutError;
+
+  int changePasswordCalls = 0;
+  Exception? changePasswordError;
+  Completer<void>? changePasswordGate;
+
+  int getSiteCalls = 0;
+  Exception? getSiteError;
+  SiteCapabilities site = const SiteCapabilities(
+    registrationOpen: true,
+    githubLogin: false,
+  );
   Completer<Member>? updateMeResult;
 
   Completer<void>? createMemberGate;
@@ -72,13 +108,73 @@ final class FakeAlistenApi implements AlistenApi {
   }
 
   @override
-  Future<Member> getMe() async {
+  Future<MemberProfile> getMe() async {
     getMeCalls++;
     final error = getMeError;
     if (error != null) throw error;
     final pending = getMeResult;
-    if (pending != null) return pending.future;
-    return member;
+    final current = pending != null ? await pending.future : (me ?? member);
+    return MemberProfile(
+      member: current,
+      account: account,
+      recordListens: recordListens,
+    );
+  }
+
+  @override
+  Future<Account> register({
+    required String username,
+    required String password,
+  }) async {
+    registerCalls++;
+    final error = registerError;
+    if (error != null) throw error;
+    account = registeredAccount;
+    return registeredAccount;
+  }
+
+  @override
+  Future<SignedIn> login({
+    required String username,
+    required String password,
+    String? device,
+  }) async {
+    loginCalls++;
+    lastLogin = (username: username, password: password, device: device);
+    await loginGate?.future;
+    final error = loginError;
+    if (error != null) throw error;
+    me = signedIn.member;
+    account = signedIn.account;
+    return signedIn;
+  }
+
+  @override
+  Future<void> logout() async {
+    logoutCalls++;
+    final error = logoutError;
+    if (error != null) throw error;
+    me = null;
+    account = null;
+  }
+
+  @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    changePasswordCalls++;
+    await changePasswordGate?.future;
+    final error = changePasswordError;
+    if (error != null) throw error;
+  }
+
+  @override
+  Future<SiteCapabilities> getSite() async {
+    getSiteCalls++;
+    final error = getSiteError;
+    if (error != null) throw error;
+    return site;
   }
 
   @override
@@ -159,6 +255,10 @@ final class FakeCredentialStore implements CredentialStore {
   final Map<String, String> tickets = {};
   final List<String> writtenTickets = [];
   int deleteMemberCalls = 0;
+  final Map<String, String> loginDevices = {};
+  int writeLoginDeviceCalls = 0;
+  Completer<void>? readLoginDeviceGate;
+  int deleteTicketsCalls = 0;
   Exception? readMemberTokenError;
 
   @override
@@ -198,6 +298,24 @@ final class FakeCredentialStore implements CredentialStore {
     tickets.remove(roomId);
   }
 
+  @override
+  Future<void> deleteTickets() async {
+    deleteTicketsCalls++;
+    tickets.clear();
+  }
+
+  @override
+  Future<String?> readLoginDevice(String username) async {
+    await readLoginDeviceGate?.future;
+    return loginDevices[username];
+  }
+
+  @override
+  Future<void> writeLoginDevice(String username, String device) async {
+    writeLoginDeviceCalls++;
+    loginDevices[username] = device;
+  }
+
   int clearCalls = 0;
 
   Exception? clearError;
@@ -209,6 +327,7 @@ final class FakeCredentialStore implements CredentialStore {
     if (error != null) throw error;
     memberToken = null;
     tickets.clear();
+    loginDevices.clear();
   }
 }
 
@@ -243,4 +362,12 @@ const unauthorized = ApiException(
   code: 'UNAUTHORIZED',
   message: '身份已失效',
   status: 401,
+);
+
+const deviceCredential = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM-_01';
+const issuedDevice = 'zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONML-_9';
+const accountMember = Member(
+  id: 'account-member',
+  name: '账号听众',
+  avatarHash: '',
 );

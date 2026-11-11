@@ -10,6 +10,7 @@ import 'package:alisten/app/room_route_gate.dart';
 import 'package:alisten/core/protocol/protocol.gen.dart' show protocolVersion;
 import 'package:alisten/domain/room/room_route.dart';
 import 'package:alisten/domain/track/track.dart';
+import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/lobby/index.dart';
@@ -32,6 +33,8 @@ const _pages = {
   '/settings/licenses',
   '/settings/servers',
   '/settings/admin',
+  '/settings/account/login',
+  '/settings/account/register',
 };
 
 const invalidLinkText = '链接无效，已回到大厅';
@@ -116,6 +119,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                     onOpenLicenses: () => context.go('/settings/licenses'),
                     onOpenServers: () => context.go('/settings/servers'),
                     onOpenAdmin: () => context.go('/settings/admin'),
+                    accountActions: AccountActions(
+                      onOpenLogin: () => context.go('/settings/account/login'),
+                      onOpenRegister: () =>
+                          context.go('/settings/account/register'),
+                      onNotice: toasts.show,
+                    ),
                   ),
                 ),
                 routes: [
@@ -131,6 +140,30 @@ final routerProvider = Provider<GoRouter>((ref) {
                       (context, state) => ServerScreen(
                         onSwitched: () => context.go('/'),
                         onNotice: toasts.show,
+                      ),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'account/login',
+                    pageBuilder: _page(
+                      (context, state) => LoginScreen(
+                        onDone: () {
+                          toasts.show(ToastKind.success, '已登录');
+                          context.go('/settings');
+                        },
+                        onOpenRegister: () =>
+                            context.go('/settings/account/register'),
+                      ),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'account/register',
+                    pageBuilder: _page(
+                      (context, state) => RegisterScreen(
+                        onDone: () {
+                          toasts.show(ToastKind.success, '已注册');
+                          context.go('/settings');
+                        },
                       ),
                     ),
                   ),

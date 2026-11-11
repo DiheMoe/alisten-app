@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/credential_store.dart';
+import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/mutation/mutation_result.dart';
 import 'package:alisten/features/identity/index.dart';
@@ -190,13 +191,13 @@ void main() {
       credentials.memberToken = 'expired-token';
       api.createdMember = replacement;
       await controller.replaceAfterUnauthorized();
-      final replacements = identity().replacements;
+      final sessions = identity().session;
 
       controller.clearNotice();
 
       expect(identity().notice, isNull);
       expect(identity().member?.id, 'new-id');
-      expect(identity().replacements, replacements);
+      expect(identity().session, sessions);
     });
   });
 
@@ -427,7 +428,7 @@ void main() {
       api.getMeError = unauthorized;
       await controller.ensureMember();
       expect(identity().notice, identityRenewedNotice);
-      expect(identity().replacements, 1);
+      expect(identity().session, 1);
       api.getMeError = null;
       api.getMeResult = Completer<Member>();
 
@@ -435,7 +436,7 @@ void main() {
 
       expect(identity().member, isNull);
       expect(identity().notice, isNull);
-      expect(identity().replacements, 1);
+      expect(identity().session, 1);
       api.getMeResult!.complete(replacement);
       await resetting;
       expect(identity().member?.id, 'new-id');
@@ -546,7 +547,7 @@ void main() {
       expect(apiB.createMemberCalls, 0);
       expect(localEmail.clearCalls, 0);
       expect(current().notice, isNull);
-      expect(current().replacements, 0);
+      expect(current().session, 0);
       expect(current().member, isNull);
     });
 
@@ -615,6 +616,285 @@ void main() {
       expect(api.getMeCalls, 0);
       expect(apiB.getMeCalls, 1);
     });
+  });
+
+  group('adoptSession', () {
+    test(
+      'writes the new token, drops every ticket and counts a session',
+      () async {
+        credentials.memberToken = 'guest-token';
+        credentials.tickets['room-id'] = 'guest-ticket';
+        api.recordListens = false;
+
+        final signedIn = await controller.adoptSession(
+          (api) => api.login(username: 'mao', password: 'password1'),
+        );
+
+        expect(signedIn.memberToken, 'account-token');
+        expect(credentials.memberToken, 'account-token');
+        expect(credentials.tickets, isEmpty);
+        expect(identity().member?.id, 'account-member');
+        expect(identity().account?.username, 'mao');
+        expect(identity().recordListens, isFalse);
+        expect(identity().session, 1);
+        expect(localEmail.clearCalls, 1);
+      },
+    );
+
+    test('creates a guest first when this device has no identity', () async {
+      await controller.adoptSession(
+        (api) => api.login(username: 'mao', password: 'password1'),
+      );
+
+      expect(api.createMemberCalls, 1);
+      expect(api.loginCalls, 1);
+      expect(credentials.memberToken, 'account-token');
+      expect(identity().session, 1);
+    });
+
+    test('creating the first guest does not count a session', () async {
+      await controller.ensureMember();
+
+      expect(credentials.memberToken, 'new-member-token');
+      expect(identity().session, 0);
+    });
+
+    test('a profile that cannot be read after signing in does not fail the '
+        'sign-in', () async {
+      api.getMeError = const ApiException(
+        code: LocalErrorCodes.network,
+        message: '网络请求失败，请检查网络后重试。',
+        status: null,
+      );
+
+      await controller.adoptSession(
+        (api) => api.login(username: 'mao', password: 'password1'),
+      );
+
+      expect(credentials.memberToken, 'account-token');
+      expect(identity().member?.id, 'account-member');
+      expect(identity().account?.username, 'mao');
+      expect(identity().recordListens, isTrue);
+      expect(identity().session, 1);
+    });
+
+    test('a refusal of the old token while signing in waits and replaces '
+        'nothing', () async {
+      credentials.memberToken = 'guest-token';
+      api.loginGate = Completer<void>();
+
+      final signingIn = controller.adoptSession(
+        (api) => api.login(username: 'mao', password: 'password1'),
+      );
+      await pumpEventQueue();
+      final refused = controller.replaceAfterUnauthorized(
+        rejectedToken: 'guest-token',
+      );
+      api.loginGate!.complete();
+      await signingIn;
+      final member = await refused;
+
+      expect(api.createMemberCalls, 0);
+      expect(member.id, 'account-member');
+      expect(credentials.memberToken, 'account-token');
+    });
+
+    test(
+      'a rejected guest token is replaced and the refusal is rethrown',
+      () async {
+        credentials.memberToken = 'guest-token';
+        api.loginError = unauthorized;
+
+        await expectLater(
+          controller.adoptSession(
+            (api) => api.login(username: 'mao', password: 'password1'),
+          ),
+          throwsA(isA<ApiException>()),
+        );
+
+        expect(credentials.memberToken, 'new-member-token');
+        expect(identity().session, 1);
+      },
+    );
+
+    test('wrong credentials leave the identity alone', () async {
+      credentials.memberToken = 'guest-token';
+      credentials.tickets['room-id'] = 'guest-ticket';
+      api.loginError = const ApiException(
+        code: 'INVALID_CREDENTIALS',
+        message: '用户名或密码不对',
+        status: 401,
+      );
+
+      await expectLater(
+        controller.adoptSession(
+          (api) => api.login(username: 'mao', password: 'password1'),
+        ),
+        throwsA(isA<ApiException>()),
+      );
+
+      expect(credentials.memberToken, 'guest-token');
+      expect(credentials.tickets, {'room-id': 'guest-ticket'});
+      expect(identity().session, 0);
+    });
+  });
+
+  group('signOut', () {
+    setUp(() async {
+      credentials.memberToken = 'account-token';
+      api.me = accountMember;
+      api.account = const Account(username: 'mao', github: false);
+      await controller.restore();
+    });
+
+    test('drops the account session and starts a new guest', () async {
+      credentials.tickets['room-id'] = 'account-ticket';
+
+      await controller.signOut((api) => api.logout());
+
+      expect(api.logoutCalls, 1);
+      expect(credentials.memberToken, 'new-member-token');
+      expect(credentials.tickets, isEmpty);
+      expect(identity().account, isNull);
+      expect(identity().member?.id, 'member-id');
+      expect(identity().session, 1);
+    });
+
+    test('a session the server already dropped counts as signed out', () async {
+      api.logoutError = unauthorized;
+
+      await controller.signOut((api) => api.logout());
+
+      expect(credentials.memberToken, 'new-member-token');
+      expect(identity().account, isNull);
+    });
+
+    test('a network failure keeps the account', () async {
+      api.logoutError = const ApiException(
+        code: LocalErrorCodes.network,
+        message: '网络请求失败，请检查网络后重试。',
+        status: null,
+      );
+
+      await expectLater(
+        controller.signOut((api) => api.logout()),
+        throwsA(isA<ApiException>()),
+      );
+
+      expect(credentials.memberToken, 'account-token');
+      expect(identity().account?.username, 'mao');
+      expect(identity().session, 0);
+    });
+
+    test('a guest that cannot be created leaves the identity empty', () async {
+      api.createMemberError = const ApiException(
+        code: LocalErrorCodes.network,
+        message: '网络请求失败，请检查网络后重试。',
+        status: null,
+      );
+
+      await controller.signOut((api) => api.logout());
+
+      expect(credentials.memberToken, isNull);
+      expect(identity().member, isNull);
+      expect(identity().session, 1);
+    });
+
+    test('the signed-out token refused later only brings the missing '
+        'guest', () async {
+      api.createMemberError = const ApiException(
+        code: LocalErrorCodes.network,
+        message: '网络请求失败，请检查网络后重试。',
+        status: null,
+      );
+      await controller.signOut((api) => api.logout());
+      api.createMemberError = null;
+
+      await controller.replaceAfterUnauthorized(rejectedToken: 'account-token');
+
+      expect(identity().session, 1);
+      expect(identity().member?.id, 'member-id');
+      expect(credentials.memberToken, 'new-member-token');
+      expect(credentials.deleteMemberCalls, 1);
+      expect(localEmail.clearCalls, 1);
+    });
+  });
+
+  group('a registered account the server no longer accepts', () {
+    setUp(() async {
+      credentials.memberToken = 'account-token';
+      api.me = accountMember;
+      api.account = const Account(username: 'mao', github: false);
+      await controller.restore();
+      api.getMeError = unauthorized;
+    });
+
+    test('is announced as signed out when restored', () async {
+      credentials.tickets['room-id'] = 'account-ticket';
+
+      final discarded = await controller.restore();
+
+      expect(discarded, isTrue);
+      expect(identity().notice, signedOutNotice);
+      expect(identity().account, isNull);
+      expect(credentials.tickets, isEmpty);
+    });
+
+    test('is announced as signed out when replaced', () async {
+      await controller.replaceAfterUnauthorized(rejectedToken: 'account-token');
+
+      expect(identity().notice, signedOutNotice);
+    });
+
+    test('already discarded by restore, is not discarded again when '
+        'replaced', () async {
+      await controller.restore();
+      final session = identity().session;
+
+      final member = await controller.replaceAfterUnauthorized(
+        rejectedToken: 'account-token',
+      );
+
+      expect(session, 1);
+      expect(identity().session, session);
+      expect(member.id, 'member-id');
+      expect(identity().member?.id, 'member-id');
+      expect(api.createMemberCalls, 1);
+      expect(credentials.memberToken, 'new-member-token');
+      expect(credentials.deleteMemberCalls, 1);
+      expect(localEmail.clearCalls, 1);
+      expect(identity().notice, signedOutNotice);
+    });
+  });
+
+  test('restore reports a valid or missing identity as kept', () async {
+    expect(await controller.restore(), isFalse);
+    credentials.memberToken = 'stored-token';
+    expect(await controller.restore(), isFalse);
+  });
+
+  test('updateAccount applies only to the member that asked', () async {
+    credentials.memberToken = 'stored-token';
+    await controller.restore();
+
+    controller.updateAccount('someone-else', const Account(github: false));
+    expect(identity().account, isNull);
+
+    controller.updateAccount(
+      'member-id',
+      const Account(username: 'mao', github: false),
+    );
+    expect(identity().account?.username, 'mao');
+  });
+
+  test('saving an email for an account keeps it on the account', () async {
+    credentials.memberToken = 'account-token';
+    api.account = const Account(username: 'mao', github: false);
+    await controller.restore();
+
+    await controller.saveProfile(email: '  mao@example.com ');
+
+    expect(identity().account?.email, 'mao@example.com');
   });
 }
 

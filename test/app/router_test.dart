@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:alisten/app/router.dart';
+import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/lobby/index.dart';
@@ -9,6 +10,7 @@ import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/index.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
+import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +28,8 @@ void main() {
       ('/', '/history', HistoryScreen),
       ('/settings', '/settings/servers', ServerScreen),
       ('/settings', '/settings/admin', AdminScreen),
+      ('/settings', '/settings/account/login', LoginScreen),
+      ('/settings', '/settings/account/register', RegisterScreen),
     ]) {
       testWidgets('$to slides in from $from and slides back out', (
         tester,
@@ -250,6 +254,25 @@ void main() {
     expect(find.text('已切换到 周末听歌会'), findsOneWidget);
   });
 
+  testWidgets('a login from the login route toasts and returns to settings', (
+    tester,
+  ) async {
+    await pumpAlistenApp(tester);
+    final router = appContainer(tester).read(routerProvider);
+    router.go('/settings/account/login');
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).at(0), 'mao');
+    await tester.enterText(find.byType(TextField).at(1), 'password1');
+    await tester.tap(find.widgetWithText(PillButton, '登录'));
+    await tester.pumpAndSettle();
+
+    expect(router.state.uri.path, '/settings');
+    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.text('已登录'), findsOneWidget);
+  });
+
   group('the site admin', () {
     final tokenField = find.descendant(
       of: find.widgetWithText(AlistenTextField, '管理 token'),
@@ -293,6 +316,11 @@ void main() {
       expect(find.text('进入后台'), findsOneWidget);
 
       await signIn(tester);
+      await tester.scrollUntilVisible(
+        find.text('YouTube Cookie'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
       // 验证 token 和后台首页各读一次常驻房间列表，各音源账号各读一次，YouTube
       // Cookie 状态读一次；读取品牌名不带 token。
       expect(admin.listRoomsCalls, 2);
@@ -352,6 +380,11 @@ void main() {
       await tester.pumpAndSettle();
       await signIn(tester);
 
+      await tester.scrollUntilVisible(
+        find.text('一起听'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text('一起听'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('进入'));
@@ -380,6 +413,11 @@ void main() {
       await tester.pumpAndSettle();
       await signIn(tester);
 
+      await tester.scrollUntilVisible(
+        find.text('一起听'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text('一起听'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('API Key'));
@@ -418,6 +456,12 @@ void main() {
       await tester.pumpAndSettle();
       await signIn(tester);
 
+      await tester.scrollUntilVisible(
+        find.text('音源账号'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
       final netease = find.text('扫码登录').first;
       await tester.ensureVisible(netease);
       await tester.pumpAndSettle();

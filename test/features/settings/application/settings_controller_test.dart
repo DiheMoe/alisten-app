@@ -6,6 +6,7 @@ import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/credential_store.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/domain/history/search_record.dart';
+import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/mutation/mutation_result.dart';
 import 'package:alisten/domain/track/track.dart';
@@ -59,6 +60,28 @@ void main() {
     gateway = _FakeGateway();
     systemSettings = FakeSystemSettings();
     container = await open();
+  });
+
+  test('an account shows and saves the email of the account, not the local '
+      'one', () async {
+    final container = await open({'alisten.email': 'guest@example.com'});
+    credentials.memberToken = 'account-token';
+    api.account = const Account(
+      username: 'mao',
+      email: 'mao@example.com',
+      github: false,
+    );
+    await container.read(identityControllerProvider.notifier).restore();
+
+    expect(container.read(profileEmailProvider), 'mao@example.com');
+
+    final result = await controllerOf(container)
+        .saveProfile(nickname: '听众', email: 'new@example.com');
+
+    expect(result, isA<MutationSucceeded<Member>>());
+    expect(api.updatedEmail, 'new@example.com');
+    expect(container.read(profileEmailProvider), 'new@example.com');
+    expect(stateOf(container).value.email, 'guest@example.com');
   });
 
   group('system settings', () {

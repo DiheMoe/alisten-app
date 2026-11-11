@@ -23,6 +23,17 @@ final trimSearchHistoryProvider = Provider<Future<void> Function(int limit)>((
   throw UnimplementedError('trimSearchHistory 未注入');
 });
 
+/// 资料表单显示的邮箱：已注册账号以服务端保存的为准，游客用本机保存的。
+final profileEmailProvider = Provider<String>((ref) {
+  final account = ref.watch(
+    identityControllerProvider.select((identity) => identity.account),
+  );
+  if (account != null) return account.email ?? '';
+  return ref.watch(
+    settingsControllerProvider.select((settings) => settings.value.email),
+  );
+});
+
 /// 设置改动立即生效；写入失败只记日志，改动在应用关闭前仍然有效。
 final class SettingsController extends Notifier<SettingsState> {
   int _permissionRevision = 0;
@@ -31,10 +42,7 @@ final class SettingsController extends Notifier<SettingsState> {
   SettingsState build() {
     // 邮箱属于输入它时的身份。身份被替换时存储中的旧邮箱已删除，这里只清空
     // 当前值。
-    ref.listen(identityControllerProvider.select((s) => s.replacements), (
-      _,
-      _,
-    ) {
+    ref.listen(identityControllerProvider.select((s) => s.session), (_, _) {
       state = state.copyWith(value: state.value.copyWith(email: ''));
     });
     // 偏好设置已在内存中，同步读取可让已存的设置在第一帧之前生效。
@@ -182,19 +190,24 @@ final class SettingsController extends Notifier<SettingsState> {
     }
   }
 
-  /// 只发送与当前成员和已存邮箱不同的字段，还没有成员时非空邮箱照样发送。服务端
-  /// 接受后才在本机保存邮箱。
+  /// 只发送与当前成员和当前邮箱不同的字段，还没有成员时非空邮箱照样发送。已注册
+  /// 账号的邮箱以服务端的 `account.email` 为准，由服务端保存；游客的邮箱在服务端
+  /// 接受后才保存在本机。
   Future<MutationResult<Member>> saveProfile({
     required String nickname,
     required String email,
   }) async {
     final identity = ref.read(identityControllerProvider);
     final member = identity.member;
+    final account = identity.account;
     final nameChanged = nickname != (member?.name ?? '');
-    // 邮箱存在本机、各服务器共用，头像却由各服务器为自己的成员保存，所以新
-    // 服务器上的成员要收到一次邮箱才有头像。
+    final currentEmail = account != null
+        ? account.email ?? ''
+        : state.value.email;
+    // 游客的邮箱存在本机、各服务器共用，头像却由各服务器为自己的成员保存，
+    // 所以新服务器上的成员要收到一次邮箱才有头像。
     final emailChanged =
-        email != state.value.email || (member == null && email.isNotEmpty);
+        email != currentEmail || (member == null && email.isNotEmpty);
     if (!nameChanged && !emailChanged) {
       return const MutationNotSent('没有需要保存的修改。');
     }
@@ -220,11 +233,11 @@ final class SettingsController extends Notifier<SettingsState> {
     if (!ref.mounted || result is! MutationSucceeded<Member> || !emailChanged) {
       return result;
     }
-    // 保存期间身份被替换时，为旧身份输入的邮箱不能留给新身份。
-    final replaced =
-        ref.read(identityControllerProvider).replacements !=
-        identity.replacements;
-    if (!replaced) await setEmail(email);
+    // 已注册账号的邮箱由服务端保存。保存期间身份变了时，为旧身份输入的邮箱
+    // 不能留给新身份。
+    final changed =
+        ref.read(identityControllerProvider).session != identity.session;
+    if (account == null && !changed) await setEmail(email);
     return result;
   }
 

@@ -7,8 +7,10 @@ import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/core/protocol/domain_mapper.dart';
 import 'package:alisten/core/protocol/http.gen.dart' as http;
 import 'package:alisten/core/protocol/protocol.gen.dart' as protocol;
+import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/domain/server/site_capabilities.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -177,10 +179,46 @@ final class ApiTransport {
   }
 }
 
+final class SignedIn {
+  const SignedIn({
+    required this.memberToken,
+    required this.member,
+    required this.account,
+    this.device,
+  });
+
+  final String memberToken;
+  final Member member;
+  final Account account;
+
+  /// 只有密码登录会返回：本机以后登录这个账号时要带上的凭证。
+  final String? device;
+}
+
 abstract interface class AlistenApi {
   Future<({Member member, String memberToken})> createMember();
 
-  Future<Member> getMe();
+  Future<MemberProfile> getMe();
+
+  Future<Account> register({
+    required String username,
+    required String password,
+  });
+
+  Future<SignedIn> login({
+    required String username,
+    required String password,
+    String? device,
+  });
+
+  Future<void> logout();
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  });
+
+  Future<SiteCapabilities> getSite();
 
   Future<Member> updateMe({String? name, String? email});
 
@@ -223,12 +261,102 @@ final class RestAlistenApi implements AlistenApi {
   }
 
   @override
-  Future<Member> getMe() {
+  Future<MemberProfile> getMe() {
     return _request(
       http.RestEndpoints.getMe,
-      decode: (json) =>
-          toDomainMember(protocol.GetMeResponse.fromJson(json).member),
+      decode: (json) {
+        final response = protocol.GetMeResponse.fromJson(json);
+        final account = response.account;
+        return MemberProfile(
+          member: toDomainMember(response.member),
+          account: account == null ? null : toDomainAccount(account),
+          recordListens: response.recordListens,
+        );
+      },
     );
+  }
+
+  @override
+  Future<Account> register({
+    required String username,
+    required String password,
+  }) {
+    return _request(
+      http.RestEndpoints.register,
+      body: protocol.RegisterRequest(
+        username: username,
+        password: password,
+      ).toJson(),
+      decode: (json) =>
+          toDomainAccount(protocol.RegisterResponse.fromJson(json).account),
+    );
+  }
+
+  @override
+  Future<SignedIn> login({
+    required String username,
+    required String password,
+    String? device,
+  }) {
+    return _request(
+      http.RestEndpoints.login,
+      body: protocol.LoginRequest(
+        username: username,
+        password: password,
+        device: device,
+      ).toJson(),
+      decode: (json) {
+        final response = protocol.LoginResponse.fromJson(json);
+        return SignedIn(
+          memberToken: response.memberToken,
+          member: toDomainMember(response.member),
+          account: toDomainAccount(response.account),
+          device: response.device,
+        );
+      },
+    );
+  }
+
+  @override
+  Future<void> logout() => _send(http.RestEndpoints.logout);
+
+  @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) {
+    return _send(
+      http.RestEndpoints.changePassword,
+      body: protocol.ChangePasswordRequest(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      ).toJson(),
+    );
+  }
+
+  @override
+  Future<SiteCapabilities> getSite() {
+    return _request(
+      http.RestEndpoints.getSite,
+      decode: (json) {
+        final response = protocol.GetSiteResponse.fromJson(json);
+        return SiteCapabilities(
+          registrationOpen: response.registrationOpen,
+          githubLogin: response.githubLogin,
+        );
+      },
+    );
+  }
+
+  // 成功时没有回复体（204）的接口。
+  Future<void> _send(
+    http.RestEndpoint endpoint, {
+    Map<String, Object?> body = const {},
+  }) async {
+    final token = endpoint.auth == http.HttpAuth.member
+        ? await _memberTokenReader()
+        : null;
+    await _transport.execute(endpoint, body: body, token: token);
   }
 
   @override

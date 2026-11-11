@@ -72,9 +72,10 @@ void main() {
     () async {
       adapter.respond(200, {
         'member': _memberJson(id: 'member-2', name: 'Current listener'),
+        'recordListens': true,
       });
 
-      final member = await api.getMe();
+      final member = (await api.getMe()).member;
 
       expect(member.id, 'member-2');
       expect(member.name, 'Current listener');
@@ -444,6 +445,144 @@ void main() {
       );
       expect(adapter.cancelled, isTrue);
     });
+  });
+  test('getMe maps a registered account and the recording switch', () async {
+    adapter.respond(200, {
+      'member': _memberJson(id: 'member-2', name: '账号听众'),
+      'account': {
+        'username': 'mao',
+        'email': 'mao@example.com',
+        'github': true,
+      },
+      'recordListens': false,
+    });
+
+    final profile = await api.getMe();
+
+    expect(profile.member.id, 'member-2');
+    expect(profile.account?.username, 'mao');
+    expect(profile.account?.email, 'mao@example.com');
+    expect(profile.account?.github, isTrue);
+    expect(profile.recordListens, isFalse);
+  });
+
+  test('getMe leaves the account empty for a guest', () async {
+    adapter.respond(200, {
+      'member': _memberJson(id: 'member-3', name: '游客'),
+      'recordListens': true,
+    });
+
+    final profile = await api.getMe();
+
+    expect(profile.account, isNull);
+    expect(profile.recordListens, isTrue);
+  });
+
+  for (final device in [null, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM-_01']) {
+    test('login sends the member token and ${device == null ? 'no' : 'the'} '
+        'device credential', () async {
+      adapter.respond(201, {
+        'memberToken': 'account-token',
+        'member': _memberJson(id: 'account-member', name: '账号听众'),
+        'account': {'username': 'mao', 'github': false},
+        'device': 'zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONML-_9',
+      });
+
+      final signedIn = await api.login(
+        username: 'mao',
+        password: 'password1',
+        device: device,
+      );
+
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '/api/sessions');
+      expect(request.authorization, 'Bearer member-token');
+      expect(request.jsonBody, {
+        'username': 'mao',
+        'password': 'password1',
+        'device': ?device,
+      });
+      expect(signedIn.memberToken, 'account-token');
+      expect(signedIn.member.id, 'account-member');
+      expect(signedIn.account.username, 'mao');
+      expect(signedIn.device, 'zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONML-_9');
+    });
+  }
+
+  test('wrong credentials and a rejected token keep their own codes', () async {
+    adapter.respond(401, {
+      'error': {'code': 'INVALID_CREDENTIALS', 'message': '用户名或密码不对'},
+    });
+    await expectLater(
+      api.login(username: 'mao', password: 'password1'),
+      throwsA(
+        isA<ApiException>().having(
+          (e) => e.code,
+          'code',
+          'INVALID_CREDENTIALS',
+        ),
+      ),
+    );
+
+    adapter.respond(401, {
+      'error': {'code': 'UNAUTHORIZED', 'message': '身份已失效'},
+    });
+    await expectLater(
+      api.login(username: 'mao', password: 'password1'),
+      throwsA(
+        isA<ApiException>().having((e) => e.code, 'code', 'UNAUTHORIZED'),
+      ),
+    );
+  });
+
+  test('register returns the new account', () async {
+    adapter.respond(201, {
+      'account': {'username': 'mao', 'github': false},
+    });
+
+    final account = await api.register(username: 'mao', password: 'password1');
+
+    final request = adapter.requests.single;
+    expect(request.method, 'POST');
+    expect(request.path, '/api/account');
+    expect(request.jsonBody, {'username': 'mao', 'password': 'password1'});
+    expect(account.username, 'mao');
+  });
+
+  test('logout and changePassword accept an empty 204 answer', () async {
+    adapter.respondRaw(204, '', null);
+    await api.logout();
+    expect(adapter.requests.last.method, 'DELETE');
+    expect(adapter.requests.last.path, '/api/sessions/current');
+    expect(adapter.requests.last.authorization, 'Bearer member-token');
+
+    adapter.respondRaw(204, '', null);
+    await api.changePassword(
+      currentPassword: 'password1',
+      newPassword: 'password2',
+    );
+    expect(adapter.requests.last.method, 'PUT');
+    expect(adapter.requests.last.path, '/api/account/password');
+    expect(adapter.requests.last.authorization, 'Bearer member-token');
+    expect(adapter.requests.last.jsonBody, {
+      'currentPassword': 'password1',
+      'newPassword': 'password2',
+    });
+  });
+
+  test('getSite reads the capabilities without a token', () async {
+    adapter.respond(200, {
+      'brandName': 'Alisten',
+      'registrationOpen': false,
+      'githubLogin': true,
+    });
+
+    final site = await api.getSite();
+
+    expect(adapter.requests.single.authorization, isNull);
+    expect(site.registrationOpen, isFalse);
+    expect(site.githubLogin, isTrue);
   });
 }
 

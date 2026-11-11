@@ -50,6 +50,7 @@ const _replaced = RoomJoinFailed(
   '进入房间的请求已被新的操作取代，请重试。',
 );
 const _changingServer = RoomJoinFailed(RoomFailure.unavailable, '正在切换服务器，请稍候。');
+const _changingSession = RoomJoinFailed(RoomFailure.unavailable, '正在切换身份，请稍候。');
 
 /// 当前房间的唯一所有者，独占连接、副本和生命周期；页面和路由只决定显示哪个
 /// 房间。
@@ -65,6 +66,14 @@ final class RoomController extends Notifier<RoomState> {
   int _attempt = 0;
   int? _resolving;
   int _serverChanges = 0;
+  int _sessionChanges = 0;
+  // 换身份期间暂存的停止事件：服务端在登录成功时就让旧 token 失效，它引起的
+  // 4401 可能比登录的回复先到。换成功后会以新身份重新进入，没换成就照常处理。
+  ({int code, int generation})? _heldStop;
+  bool _reenterAfterChange = false;
+  // 重新进入时当前房间已没有连接，只靠一次可被取代的进房尝试接上，直到它进入
+  // 或失败；期间再进入同一个房间要接手这次尝试，不能当作已在房间里。
+  bool _reentering = false;
   // 连接代号：递增即丢弃旧连接的事件和结果。
   int _generation = 0;
   bool _syncing = false;
@@ -98,6 +107,16 @@ final class RoomController extends Notifier<RoomState> {
         unawaited(checkConnection());
       },
     );
+    ref.listen<int>(
+      identityControllerProvider.select((identity) => identity.session),
+      (_, _) {
+        if (_sessionChanges > 0) {
+          _reenterAfterChange = true;
+          return;
+        }
+        unawaited(_reenter());
+      },
+    );
     ref.onDispose(() {
       _attempt++;
       _generation++;
@@ -107,7 +126,7 @@ final class RoomController extends Notifier<RoomState> {
   }
 
   /// [ref] 是房间 id 或别名。它已是当前房间时不做任何事，除非当前房间因授权或
-  /// 暂不可用而失败。[password] 只在申请票据时使用。
+  /// 暂不可用而失败，或正以新身份重新进入。[password] 只在申请票据时使用。
   ///
   /// 拿到新房间的票据后才释放当前房间；此前失败时当前房间保持不变，失败只体现
   /// 在返回结果中。没有运行中的房间时，失败成为房间状态。
@@ -120,6 +139,9 @@ final class RoomController extends Notifier<RoomState> {
   }) {
     if (_serverChanges > 0) {
       return (attempt: _attempt, result: Future.value(_changingServer));
+    }
+    if (_sessionChanges > 0) {
+      return (attempt: _attempt, result: Future.value(_changingSession));
     }
     final attempt = ++_attempt;
     return (attempt: attempt, result: _open(ref.trim(), password, attempt));
@@ -134,6 +156,30 @@ final class RoomController extends Notifier<RoomState> {
       return await change();
     } finally {
       _serverChanges--;
+    }
+  }
+
+  /// 登录、退出等会更换 memberToken 的 [change] 经它执行：期间拒绝进房，当前
+  /// 连接的停止事件先暂存。结束时，会话代号变了且能重新进入，就以新身份重新
+  /// 进入当前房间，暂存的事件作废；代号没变或不能重新进入，就补处理仍属于当前
+  /// 连接的暂存事件。
+  Future<T> changeSession<T>(Future<T> Function() change) async {
+    _sessionChanges++;
+    try {
+      return await change();
+    } finally {
+      _sessionChanges--;
+      if (_sessionChanges == 0) {
+        final held = _heldStop;
+        final reenter = _reenterAfterChange;
+        _heldStop = null;
+        _reenterAfterChange = false;
+        if (reenter && _canReenter) {
+          unawaited(_reenter());
+        } else if (held != null && held.generation == _generation) {
+          _onStopped(held.code);
+        }
+      }
     }
   }
 
@@ -192,12 +238,41 @@ final class RoomController extends Notifier<RoomState> {
     return RoomJoined(listing);
   }
 
+  // 正在换票据的进房尝试自己报告结果，否则它触发的身份替换会让这里一再重进。
+  bool get _canReenter =>
+      _ref != null &&
+      ref.mounted &&
+      _serverChanges == 0 &&
+      _resolving == null &&
+      (state.failure == null || _retryable);
+
+  // 旧会话的票据和连接都已作废，以新身份重新进入同一个房间。
+  Future<void> _reenter() async {
+    final target = _ref;
+    if (target == null || !_canReenter) return;
+    final attempt = ++_attempt;
+    _generation++;
+    _reentering = true;
+    final released = _release();
+    state = RoomState(
+      status: RoomConnectionStatus.connecting,
+      activeRoomId: state.activeRoomId,
+      roomName: state.snapshot?.room.name ?? state.roomName,
+      roomSlug: state.roomSlug,
+      notices: state.notices,
+    );
+    await released;
+    if (attempt != _attempt) return;
+    await _open(target, null, attempt);
+  }
+
   /// 放弃 [beginOpen] 返回的尝试，例如发起页面已关闭。仅在仍解析房间和票据时
   /// 生效，该尝试以“被取代”结束，当前房间不受影响；离开房间用 [leaveRoom]。
   void cancelOpen(int attempt) {
     if (_resolving != attempt || attempt != _attempt) return;
     _resolving = null;
     _attempt++;
+    if (_reentering) unawaited(_reenter());
   }
 
   /// [ref]（id 或别名）是否指向当前房间。
@@ -208,6 +283,7 @@ final class RoomController extends Notifier<RoomState> {
     final server = _server;
     _attempt++;
     _generation++;
+    _reentering = false;
     _ref = null;
     _listing = null;
     _server = null;
@@ -357,6 +433,7 @@ final class RoomController extends Notifier<RoomState> {
   }
 
   bool get _retryable =>
+      _reentering ||
       state.failure == RoomFailure.authorization ||
       state.failure == RoomFailure.unavailable;
 
@@ -379,6 +456,7 @@ final class RoomController extends Notifier<RoomState> {
   Future<void> _enter(String target, RoomListing? listing, _RoomServer server) {
     final sameRoom = listing != null && _isActive(listing.id);
     _generation++;
+    _reentering = false;
     _ref = target;
     _listing = listing;
     _server = server;
@@ -522,6 +600,10 @@ final class RoomController extends Notifier<RoomState> {
         // 客户端从不发送的帧。
         AppLog.debug(_logSource, 'error event', code: code);
       case RoomStopped(:final code):
+        if (_sessionChanges > 0) {
+          _heldStop = (code: code, generation: generation);
+          return;
+        }
         _onStopped(code);
     }
   }
@@ -547,6 +629,7 @@ final class RoomController extends Notifier<RoomState> {
     if (code == 4401 && roomId != null && credentials != null) {
       unawaited(credentials.deleteTicket(roomId));
     }
+    if (code == 4401) unawaited(_verifyIdentity());
     final failure = switch (code) {
       4401 => RoomFailure.authorization,
       4404 => RoomFailure.notFound,
@@ -559,6 +642,20 @@ final class RoomController extends Notifier<RoomState> {
       RoomFailure.outdated => _outdatedMessage,
       RoomFailure.unavailable => '与房间的连接已经停止。',
     });
+  }
+
+  // 4401 可能表示票据所属的会话被删除了，例如在别处修改了密码。身份被拒时
+  // restore 会丢弃它，会话代号随之变化，由监听重新进入。
+  Future<void> _verifyIdentity() async {
+    try {
+      await ref.read(identityControllerProvider.notifier).restore();
+    } on Object catch (error) {
+      AppLog.debug(
+        _logSource,
+        'identity not verified after 4401',
+        code: error is ApiException ? error.code : null,
+      );
+    }
   }
 
   // 清空快照会同时停止播放。

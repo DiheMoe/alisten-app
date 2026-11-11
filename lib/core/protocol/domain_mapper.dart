@@ -1,7 +1,16 @@
 import 'package:alisten/core/protocol/protocol.gen.dart' as protocol;
+import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/domain/track/track.dart';
+
+Account toDomainAccount(protocol.Account account) {
+  return Account(
+    username: account.username,
+    email: account.email,
+    github: account.github,
+  );
+}
 
 Member toDomainMember(protocol.Member member) {
   return Member(

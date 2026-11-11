@@ -8,6 +8,7 @@ import 'package:alisten/app/router.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/core/protocol/protocol.gen.dart' show protocolVersion;
+import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/settings/index.dart';
@@ -125,6 +126,105 @@ void main() {
     for (final text in ['界面字号', '资源档位', '减少动态效果', '本机音量', '房主', '管理员']) {
       expect(find.textContaining(text), findsNothing, reason: text);
     }
+  });
+
+  Future<void> pumpDirect(
+    WidgetTester tester, {
+    Widget? accountActions,
+    FakeAlistenApi? api,
+    FakeCredentialStore? credentials,
+  }) async {
+    tester.view
+      ..physicalSize = const Size(360, 780) * 3
+      ..devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: await alistenAppOverrides(
+          api: api,
+          credentials: credentials,
+        ),
+        child: MaterialApp(
+          theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
+          home: SettingsScreen(
+            appVersion: appVersion,
+            protocolVersion: protocolVersion,
+            onProfileResult: (_) {},
+            onNotice: (_, _) {},
+            onOpenLicenses: () {},
+            onOpenServers: () {},
+            onOpenAdmin: () {},
+            accountActions: accountActions,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('the account group shows the actions it is given', (
+    tester,
+  ) async {
+    await pumpDirect(tester, accountActions: const Text('账号操作'));
+    expect(find.text('账号'), findsOneWidget);
+    expect(find.text('账号操作'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('账号操作')).dy,
+      greaterThan(tester.getTopLeft(find.text('账号')).dy),
+    );
+  });
+
+  Future<void> expectSubtitle(
+    WidgetTester tester,
+    String label, {
+    Account? account,
+    bool restored = true,
+  }) async {
+    final api = FakeAlistenApi()..account = account;
+    final credentials = FakeCredentialStore()
+      ..memberToken = account == null ? 'guest-token' : 'account-token';
+    if (!restored) {
+      api
+        ..getMeError = Exception('offline')
+        ..createMemberError = Exception('offline');
+      credentials.memberToken = null;
+    }
+    await pumpDirect(tester, api: api, credentials: credentials);
+    if (restored) {
+      await ProviderScope.containerOf(
+        tester.element(find.byType(SettingsScreen)),
+      ).read(identityControllerProvider.notifier).restore();
+      await tester.pumpAndSettle();
+    }
+    expect(find.text(label), findsOneWidget);
+  }
+
+  testWidgets('a restored guest is labelled as a guest', (tester) async {
+    await expectSubtitle(tester, '游客');
+  });
+
+  testWidgets('before any identity exists the subtitle says so', (
+    tester,
+  ) async {
+    await expectSubtitle(tester, '还没有身份', restored: false);
+  });
+
+  testWidgets('a registered account shows its username under the name', (
+    tester,
+  ) async {
+    await expectSubtitle(
+      tester,
+      '@mao',
+      account: const Account(username: 'mao', github: false),
+    );
+  });
+
+  testWidgets('a GitHub-only account is labelled as such', (tester) async {
+    await expectSubtitle(
+      tester,
+      '用 GitHub 登录的账号',
+      account: const Account(github: true),
+    );
   });
 
   testWidgets('long long short long long short on the version row opens the '

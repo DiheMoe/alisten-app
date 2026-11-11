@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:alisten/domain/history/search_record.dart';
+import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/mutation/mutation_result.dart';
 import 'package:alisten/features/identity/index.dart';
@@ -72,6 +73,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
     required this.onOpenLicenses,
     required this.onOpenServers,
     required this.onOpenAdmin,
+    this.accountActions,
     super.key,
   });
 
@@ -82,6 +84,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
   final VoidCallback onOpenLicenses;
   final VoidCallback onOpenServers;
   final VoidCallback onOpenAdmin;
+  final Widget? accountActions;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -102,9 +105,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _nickname = TextEditingController(
       text: ref.read(identityControllerProvider).member?.name ?? '',
     );
-    _email = TextEditingController(
-      text: ref.read(settingsControllerProvider).value.email,
-    );
+    _email = TextEditingController(text: ref.read(profileEmailProvider));
     // 启动时可能因离线没取到成员，这里再取一次。
     unawaited(
       Future.microtask(() async {
@@ -170,12 +171,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       (previous, next) => _follow(_nickname, previous, next),
     );
     ref.listen(
-      settingsControllerProvider.select((state) => state.value.email),
+      profileEmailProvider,
       (previous, next) => _follow(_email, previous, next),
     );
     final state = ref.watch(settingsControllerProvider);
     final settings = state.value;
-    final member = ref.watch(identityControllerProvider).member;
+    final identity = ref.watch(identityControllerProvider);
+    final member = identity.member;
     return AlistenScaffold(
       background: const PageGlow(),
       topBar: AlistenTopBar(
@@ -195,7 +197,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           MediaQuery.paddingOf(context).bottom + AlistenSpacing.xl,
         ),
         children: [
-          _Group(title: '个人资料', children: [_profile(member, settings)]),
+          _Group(
+            title: '账号',
+            children: [
+              _profile(member, identity.account),
+              ?widget.accountActions,
+            ],
+          ),
           _Group(
             title: '外观',
             children: [
@@ -337,12 +345,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _profile(Member? member, LocalSettings settings) {
+  Widget _profile(Member? member, Account? account) {
     final colors = AlistenColors.of(context);
     final typed = _nickname.text.trim();
     final name = typed.isEmpty ? member?.name ?? '' : typed;
     final changed =
-        _nickname.text != (member?.name ?? '') || _email.text != settings.email;
+        _nickname.text != (member?.name ?? '') ||
+        _email.text != ref.read(profileEmailProvider);
     return Padding(
       padding: const EdgeInsets.all(AlistenSpacing.md),
       child: Column(
@@ -370,7 +379,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ).copyWith(color: colors.onGlass),
                     ),
                     Text(
-                      '头像来自邮箱对应的 Gravatar',
+                      _identityLabel(member, account),
                       style: AlistenTypography.secondary.copyWith(
                         color: colors.onGlassMuted,
                       ),
@@ -773,4 +782,11 @@ class _Permission extends StatelessWidget {
       ),
     );
   }
+}
+
+String _identityLabel(Member? member, Account? account) {
+  if (member == null) return '还没有身份';
+  if (account == null) return '游客';
+  final username = account.username;
+  return username == null ? '用 GitHub 登录的账号' : '@$username';
 }

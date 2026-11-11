@@ -2,13 +2,17 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:alisten/app/router.dart';
+import 'package:alisten/core/api/api_error.dart';
+import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/room/index.dart';
+import 'package:alisten/features/settings/index.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/admin/admin_test_doubles.dart';
 import '../features/lobby/lobby_test_doubles.dart';
@@ -26,6 +30,21 @@ void main() {
       (_) {},
     );
     await tester.pump();
+  }
+
+  // Flutter 只接受逐级经过 hidden 和 inactive 的切换，paused 直接到 resumed 会
+  // 触发断言。
+  void goAwayAndComeBack(WidgetTester tester) {
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
   }
 
   testWidgets('animations pause while the app is not in the foreground', (
@@ -189,6 +208,12 @@ void main() {
     await tester.pumpAndSettle();
     await container.read(adminSessionProvider.notifier).signIn('t-1');
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('音源账号'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     final signIn = find.text('扫码登录').first;
     await tester.ensureVisible(signIn);
     await tester.pumpAndSettle();
@@ -245,6 +270,12 @@ void main() {
     container.read(routerProvider).go('/settings/admin');
     await tester.pumpAndSettle();
     await container.read(adminSessionProvider.notifier).signIn('t-1');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('音源账号'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     final signIn = find.text('扫码登录').first;
     await tester.ensureVisible(signIn);
@@ -315,5 +346,65 @@ void main() {
     await platformReports(tester, AppLifecycleState.resumed);
 
     expect(activeWhenVisible, [false]);
+  });
+
+  testWidgets('coming back to the foreground re-reads a saved identity', (
+    tester,
+  ) async {
+    final api = FakeAlistenApi();
+    final credentials = FakeCredentialStore()..memberToken = 'stored-token';
+    await pumpAlistenApp(tester, api: api, credentials: credentials);
+    await tester.pump();
+    final before = api.getMeCalls;
+
+    goAwayAndComeBack(tester);
+    await tester.pump();
+
+    expect(api.getMeCalls, before + 1);
+  });
+
+  testWidgets('coming back without an identity creates none', (tester) async {
+    final api = FakeAlistenApi();
+    await pumpAlistenApp(tester, api: api);
+    await tester.pump();
+
+    goAwayAndComeBack(tester);
+    await tester.pump();
+
+    expect(api.getMeCalls, 0);
+    expect(api.createMemberCalls, 0);
+  });
+
+  testWidgets('coming back to the foreground moves the local email into an '
+      'account that has none', (tester) async {
+    final api = FakeAlistenApi()
+      ..account = const Account(username: 'mao', github: false)
+      ..getMeError = const ApiException(
+        code: LocalErrorCodes.network,
+        message: '网络请求失败，请检查网络后重试。',
+        status: null,
+      );
+    await pumpAlistenApp(
+      tester,
+      api: api,
+      credentials: FakeCredentialStore()..memberToken = 'account-token',
+      preferences: const {'alisten.email': 'guest@example.com'},
+    );
+    final settings = appContainer(tester).read(settingsControllerProvider);
+    expect(settings.value.email, 'guest@example.com');
+    expect(api.updateMeCalls, 0);
+    api.getMeError = null;
+
+    goAwayAndComeBack(tester);
+    await tester.pumpAndSettle();
+
+    expect(api.updateMeCalls, 1);
+    expect(api.updatedEmail, 'guest@example.com');
+    expect(
+      appContainer(tester).read(settingsControllerProvider).value.email,
+      '',
+    );
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getString('alisten.email') ?? '', isEmpty);
   });
 }

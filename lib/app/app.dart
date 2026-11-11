@@ -10,6 +10,7 @@ import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/avatar/avatar_cache.dart';
 import 'package:alisten/core/avatar/avatar_image.dart';
 import 'package:alisten/core/logging/app_log.dart';
+import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/identity/index.dart';
@@ -92,6 +93,7 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
       unawaited(
         ref.read(settingsControllerProvider.notifier).refreshPermission(),
       );
+      unawaited(_restoreIdentity());
     }
   }
 
@@ -212,9 +214,12 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
     return null;
   }
 
+  // 回到前台时也读一次：账号可能已在别处退出，记录开关和邮箱可能被其他设备
+  // 改过。restore 没有 memberToken 时不发请求。
   Future<void> _restoreIdentity() async {
     try {
       await ref.read(identityControllerProvider.notifier).restore();
+      await ref.read(accountControllerProvider).migrateLocalEmail();
     } on Object catch (error) {
       AppLog.debug(
         _logSource,

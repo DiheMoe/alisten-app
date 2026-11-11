@@ -20,6 +20,8 @@ class AlistenTextField extends StatefulWidget {
     this.autofocus = false,
     this.obscureText = false,
     this.sensitive = false,
+    this.autocorrect = true,
+    this.enableSuggestions = true,
     this.keyboardType,
     this.textInputAction,
     this.autofillHints,
@@ -48,6 +50,8 @@ class AlistenTextField extends StatefulWidget {
   /// 不联想、不纠错。读屏复制、Android 输入法的复制和 iOS 原生拷贝由平台直接
   /// 写入系统剪贴板，Dart 层无法拦截，因此不能保证内容不外泄。
   final bool sensitive;
+  final bool autocorrect;
+  final bool enableSuggestions;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final Iterable<String>? autofillHints;
@@ -151,8 +155,8 @@ class _AlistenTextFieldState extends State<AlistenTextField> {
       keyboardType: widget.keyboardType,
       textInputAction: widget.textInputAction,
       autofillHints: widget.autofillHints,
-      autocorrect: !widget.sensitive,
-      enableSuggestions: !widget.sensitive,
+      autocorrect: widget.autocorrect && !widget.sensitive,
+      enableSuggestions: widget.enableSuggestions && !widget.sensitive,
       enableIMEPersonalizedLearning: !widget.sensitive,
       contextMenuBuilder: _contextMenu,
       minLines: 1,

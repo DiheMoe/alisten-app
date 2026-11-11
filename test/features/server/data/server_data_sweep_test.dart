@@ -33,6 +33,8 @@ void main() {
     'member_token@$_removed': 'left',
     'room_ticket@$_removed.room-1': 'left',
     'room_ticket@$_removed.room%2F2': 'left',
+    'login_device@$_listed.mao': 'kept',
+    'login_device@$_removed.mao': 'left',
     'member_token': 'legacy',
     'room_ticket.room-1': 'legacy',
     'unrelated': 'u',
@@ -77,6 +79,7 @@ void main() {
     expect(await secureValues(), {
       'member_token@$_listed': 'kept',
       'room_ticket@$_listed.room-1': 'kept',
+      'login_device@$_listed.mao': 'kept',
       'member_token': 'legacy',
       'room_ticket.room-1': 'legacy',
       'unrelated': 'u',

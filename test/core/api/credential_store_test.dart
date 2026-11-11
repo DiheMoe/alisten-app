@@ -158,4 +158,59 @@ void main() {
     expect(logs, everyElement(contains('code=KEYCHAIN')));
     expect(logs, everyElement(isNot(contains('aaaa'))));
   });
+
+  test(
+    'deleting the tickets keeps the member token and the login devices',
+    () async {
+      await store.writeMemberToken('member-token');
+      await store.writeTicket('room-one', 'ticket-one');
+      await store.writeTicket('room/two', 'ticket-two');
+      await store.writeLoginDevice('mao', 'device-one');
+
+      await store.deleteTickets();
+
+      expect(await store.readTicket('room-one'), isNull);
+      expect(await store.readTicket('room/two'), isNull);
+      expect(await store.readMemberToken(), 'member-token');
+      expect(await store.readLoginDevice('mao'), 'device-one');
+    },
+  );
+
+  test('login devices are kept per server and per username', () async {
+    const other = SecureCredentialStore(
+      FlutterSecureStorage(),
+      serverId: 'bbbb',
+    );
+    await store.writeLoginDevice('mao', 'device-a');
+    await store.writeLoginDevice('gou', 'device-b');
+    await other.writeLoginDevice('mao', 'device-c');
+
+    expect(await store.readLoginDevice('mao'), 'device-a');
+    expect(await store.readLoginDevice('gou'), 'device-b');
+    expect(await other.readLoginDevice('mao'), 'device-c');
+  });
+
+  test('clearing a server also forgets its login devices', () async {
+    const other = SecureCredentialStore(
+      FlutterSecureStorage(),
+      serverId: 'bbbb',
+    );
+    await store.writeLoginDevice('mao', 'device-a');
+    await other.writeLoginDevice('mao', 'device-c');
+
+    await store.clear();
+
+    expect(await store.readLoginDevice('mao'), isNull);
+    expect(await other.readLoginDevice('mao'), 'device-c');
+  });
+
+  test('the server of a login device key is read back from its name', () {
+    expect(
+      SecureCredentialStore.serverIdOf(
+        SecureCredentialStore.loginDeviceKey('aaaa', 'mao'),
+      ),
+      'aaaa',
+    );
+    expect(SecureCredentialStore.serverIdOf('login_device@'), isNull);
+  });
 }
