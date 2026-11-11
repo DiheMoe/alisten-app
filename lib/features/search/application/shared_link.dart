@@ -20,6 +20,9 @@ enum LinkProblem {
 
   /// 任意服务器的 Alisten 房间链接。
   roomLink,
+
+  /// 任意服务器的歌单分享链接。
+  sharedPlaylistLink,
 }
 
 /// 文本中第一个链接的识别结果。
@@ -32,7 +35,7 @@ final class ResolvedShare {
     this.title,
     this.problem,
     this.unfollowed = false,
-    this.otherRoom,
+    this.linkRoute,
   });
 
   /// 已规范化。
@@ -48,20 +51,24 @@ final class ResolvedShare {
   final LinkProblem? problem;
 
   /// 尚不知道指向什么：网易云或 QQ 音乐的短链接还没有经
-  /// [LinkResolver.resolve] 展开，或形如房间的链接还没有询问它的服务器。
+  /// [LinkResolver.resolve] 展开，或形如房间、分享歌单的链接还没有询问它的
+  /// 服务器。
   final bool unfollowed;
 
-  /// 当前服务器上另一个房间的路由，由用户点按进入；只在 [problem] 为
-  /// [LinkProblem.roomLink] 时可能存在。
-  final String? otherRoom;
+  /// 当前服务器上另一个房间或分享歌单的路由，由用户点按打开；只在 [problem]
+  /// 为 [LinkProblem.roomLink] 或 [LinkProblem.sharedPlaylistLink] 时可能存在。
+  final String? linkRoute;
 
-  ResolvedShare asRoomLink({String? otherRoom}) {
+  ResolvedShare asSiteLink(SiteLinkKind kind, {String? route}) {
     return ResolvedShare(
       link: link,
       platform: platform,
       title: title,
-      problem: LinkProblem.roomLink,
-      otherRoom: otherRoom,
+      problem: switch (kind) {
+        SiteLinkKind.room => LinkProblem.roomLink,
+        SiteLinkKind.sharedPlaylist => LinkProblem.sharedPlaylistLink,
+      },
+      linkRoute: route,
     );
   }
 }
@@ -91,8 +98,9 @@ final sharedTextSourceProvider = Provider<SharedTextSource>((ref) {
 
 const typedShortLinkDelay = Duration(milliseconds: 400);
 
-/// 普通链接立即识别；短链接和形如房间的链接等输入停顿后再联网确认，是邀请时
-/// 改为房间链接并提供邀请。输入框内容一变就放弃，并取消进行中的请求。
+/// 普通链接立即识别；短链接和形如房间或分享歌单的链接等输入停顿后再联网确认，
+/// 是站点链接时改为房间或歌单链接并提供邀请。输入框内容一变就放弃，并取消进行
+/// 中的请求。
 final typedLinkProvider = NotifierProvider.autoDispose
     .family<TypedLinkController, ResolvedShare?, String>(
       TypedLinkController.new,
@@ -149,10 +157,10 @@ final class TypedLinkController extends Notifier<ResolvedShare?> {
           .recognize(_text, cancel: cancel);
       if (!ref.mounted) return;
       if (invite != null) {
-        final otherRoom = ref
+        final route = ref
             .read(inviteOfferControllerProvider.notifier)
             .offerPassively(invite);
-        state = share.asRoomLink(otherRoom: otherRoom);
+        state = share.asSiteLink(invite.link.kind, route: route);
         return;
       }
       state = share;
@@ -168,6 +176,7 @@ const notSongText = '只支持单曲链接';
 const unrecognizedText = '没能识别这个链接';
 const ephemeralLinkText = '临时房间只能点 B 站链接';
 const roomLinkText = '这是房间链接，不能用来点歌。';
+const sharedPlaylistLinkText = '这是歌单分享链接，不能用来点歌。';
 
 /// 能点时返回 null。链接曲目能否点取决于房间类型，[kind] 未知时不给出原因。
 String? unpickableReason(ResolvedShare share, RoomKind? kind) {
@@ -178,6 +187,8 @@ String? unpickableReason(ResolvedShare share, RoomKind? kind) {
       return unrecognizedText;
     case LinkProblem.roomLink:
       return roomLinkText;
+    case LinkProblem.sharedPlaylistLink:
+      return sharedPlaylistLinkText;
     case null:
       break;
   }

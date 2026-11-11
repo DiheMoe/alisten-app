@@ -348,6 +348,189 @@ void main() {
     expect(pairs, ['ABCD2345']);
   });
 
+  test('a shared playlist on this host is a route; a bad one is not', () {
+    final controller = DeepLinkController(config: () => listen);
+
+    expect(
+      controller.routeFor(
+        Uri.parse('https://listen.example/s/AbCdEfGhIjKlMnOpQrStUv'),
+      ),
+      '/s/AbCdEfGhIjKlMnOpQrStUv',
+    );
+    expect(
+      controller.routeFor(Uri.parse('https://listen.example/s/short')),
+      isNull,
+    );
+    expect(
+      controller.routeFor(
+        Uri.parse('https://evil.example/s/AbCdEfGhIjKlMnOpQrStUv'),
+      ),
+      isNull,
+    );
+  });
+
+  test('a shared playlist link is exactly its two path segments: no '
+      'trailing slash, no user info, an escaped letter is that letter', () {
+    final controller = DeepLinkController(config: () => listen);
+    String? route(String link) => controller.routeFor(Uri.parse(link));
+
+    expect(route('https://listen.example/s/AbCdEfGhIjKlMnOpQrStUv/'), isNull);
+    expect(
+      route('https://user@listen.example/s/AbCdEfGhIjKlMnOpQrStUv'),
+      isNull,
+    );
+    expect(
+      route('https://listen.example/s/%41bCdEfGhIjKlMnOpQrStUv'),
+      '/s/AbCdEfGhIjKlMnOpQrStUv',
+    );
+    expect(
+      route('https://listen.example/s/AbCdEfGhIjKlMnOpQrStUv?from=x#y'),
+      '/s/AbCdEfGhIjKlMnOpQrStUv',
+    );
+    for (final escaped in ['%2F', '%25', '%20']) {
+      expect(
+        route('https://listen.example/s/AbCdEfGhIjKlMnOpQrStU$escaped'),
+        isNull,
+        reason: escaped,
+      );
+    }
+  });
+
+  test('a shared playlist of another server is handed on like a room '
+      'there', () async {
+    final source = FakeAppLinkSource();
+    final controller = DeepLinkController(config: () => listen, source: source);
+    final others = <Uri>[];
+    var invalid = 0;
+
+    await controller.start(
+      (_) {},
+      onInvalid: () => invalid++,
+      onOtherServer: others.add,
+    );
+    source.open(Uri.parse('https://other.example/s/AbCdEfGhIjKlMnOpQrStUv'));
+    await pumpEventQueue();
+
+    expect(others, [
+      Uri.parse('https://other.example/s/AbCdEfGhIjKlMnOpQrStUv'),
+    ]);
+    expect(invalid, 0);
+  });
+
+  test('a link only shaped almost like a shared playlist is invalid on this '
+      'host and never handed on to another', () async {
+    final source = FakeAppLinkSource();
+    final controller = DeepLinkController(config: () => listen, source: source);
+    final routes = <String>[];
+    final others = <Uri>[];
+    var invalid = 0;
+
+    await controller.start(
+      routes.add,
+      onInvalid: () => invalid++,
+      onOtherServer: others.add,
+    );
+    for (final link in [
+      'https://listen.example/s/AbCdEfGhIjKlMnOpQrStUv/',
+      'https://other.example/s/AbCdEfGhIjKlMnOpQrStUv/',
+      'https://other.example/s/short',
+      'http://other.example/s/AbCdEfGhIjKlMnOpQrStUv',
+    ]) {
+      source.open(Uri.parse(link));
+    }
+    await pumpEventQueue();
+
+    expect(invalid, 4);
+    expect(routes, isEmpty);
+    expect(others, isEmpty);
+  });
+
+  test('a link with user info is invalid and never handed on to another '
+      'server', () async {
+    final source = FakeAppLinkSource();
+    final controller = DeepLinkController(config: () => listen, source: source);
+    final routes = <String>[];
+    final others = <Uri>[];
+    var invalid = 0;
+
+    await controller.start(
+      routes.add,
+      onInvalid: () => invalid++,
+      onOtherServer: others.add,
+    );
+    for (final link in [
+      'https://user@listen.example/s/AbCdEfGhIjKlMnOpQrStUv',
+      'https://user@listen.example/r/listen',
+    ]) {
+      source.open(Uri.parse(link));
+    }
+    await pumpEventQueue();
+
+    expect(invalid, 2);
+    expect(routes, isEmpty);
+    expect(others, isEmpty);
+  });
+
+  test('the app launched by a room link with user info is not entering a '
+      'room', () async {
+    final source = FakeAppLinkSource(
+      initial: Uri.parse('https://user@listen.example/r/listen'),
+    );
+    final controller = DeepLinkController(config: () => listen, source: source);
+
+    final launched = await controller.start((_) {}, onOtherServer: (_) {});
+
+    expect(launched, isFalse);
+  });
+
+  test('pair links still go to their own callbacks', () async {
+    final source = FakeAppLinkSource();
+    final controller = DeepLinkController(config: () => listen, source: source);
+    final pairs = <String>[];
+    final otherPairs = <String>[];
+    final routes = <String>[];
+
+    await controller.start(
+      routes.add,
+      onPair: pairs.add,
+      onOtherServerPair: otherPairs.add,
+    );
+    source
+      ..open(Uri.parse('https://listen.example/pair#ABCD2345'))
+      ..open(Uri.parse('https://other.example/pair#ABCD2345'));
+    await pumpEventQueue();
+
+    expect(pairs, ['ABCD2345']);
+    expect(otherPairs, ['other.example']);
+    expect(routes, isEmpty);
+  });
+
+  for (final link in [
+    'https://listen.example/s/AbCdEfGhIjKlMnOpQrStUv',
+    'https://other.example/s/AbCdEfGhIjKlMnOpQrStUv',
+    'https://listen.example/pair#ABCD2345',
+  ]) {
+    test('a start from $link leaves the room to the last one', () async {
+      final source = FakeAppLinkSource(initial: Uri.parse(link));
+      final controller = DeepLinkController(
+        config: () => listen,
+        source: source,
+      );
+      final followed = <Object>[];
+
+      final launched = await controller.start(
+        followed.add,
+        onOtherServer: followed.add,
+        onPair: followed.add,
+        onOtherServerPair: followed.add,
+      );
+      await pumpEventQueue();
+
+      expect(launched, isFalse);
+      expect(followed, hasLength(1), reason: 'the link is still followed');
+    });
+  }
+
   test(
     'the GitHub callback scheme is left to the auth plugin, silently',
     () async {

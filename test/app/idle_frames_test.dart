@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../features/history/history_test_doubles.dart';
 import '../features/lobby/lobby_test_doubles.dart';
+import '../features/playlists/playlists_test_doubles.dart';
 import '../features/search/search_test_doubles.dart';
 import '../features/search/share_test_doubles.dart';
 import 'app_test_harness.dart';
@@ -93,7 +94,13 @@ void main() {
       'refreshes', (tester) async {
     final room = await enterBusyRoom(tester);
 
-    for (final path in ['/', '/history', '/settings', '/playlists']) {
+    for (final path in [
+      '/',
+      '/history',
+      '/settings',
+      '/playlists',
+      '/s/$shareIdA',
+    ]) {
       room.router.go(path);
       expect(
         await idleFrames(tester),

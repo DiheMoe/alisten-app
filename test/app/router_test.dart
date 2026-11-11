@@ -18,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../features/admin/admin_test_doubles.dart';
 import '../features/lobby/lobby_test_doubles.dart';
+import '../features/playlists/playlists_test_doubles.dart';
 import '../features/server/server_test_doubles.dart'
     show FakeCredentialStores, serverB;
 import 'app_test_harness.dart';
@@ -34,6 +35,7 @@ void main() {
       ('/settings', '/settings/account/pair', PairScreen),
       ('/', '/playlists', MyPlaylistsScreen),
       ('/playlists', '/playlists/pl-1', MyPlaylistScreen),
+      ('/', '/s/$shareIdA', SharedPlaylistScreen),
     ]) {
       testWidgets('$to slides in from $from and slides back out', (
         tester,
@@ -539,6 +541,8 @@ void main() {
       // 只有网易云有歌单页。
       '/r/x/playlists/qq/1',
       '/r/Not_A_Room',
+      '/s/abc',
+      '/s/$shareIdA/x',
       '/playlists/a/b',
     ]) {
       router.go('/settings');
@@ -560,7 +564,7 @@ void main() {
     await pumpAlistenApp(tester);
     final router = appContainer(tester).read(routerProvider);
 
-    for (final location in ['/playlists', '/playlists/pl-1']) {
+    for (final location in ['/playlists', '/playlists/pl-1', '/s/$shareIdA']) {
       router.go(location);
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));

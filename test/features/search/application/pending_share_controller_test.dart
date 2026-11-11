@@ -383,6 +383,57 @@ void main() {
     });
   });
 
+  group('a shared playlist link', () {
+    const id = 'AbCdEfGhIjKlMnOpQrStUv';
+
+    ResolvedShare webLink(String link) => ResolvedShare(
+      link: link,
+      platform: LinkPlatform.web,
+      track: Track(source: TrackSource.link, id: link),
+    );
+
+    test('of the current server is opened from inside a room, not kept as '
+        'a song', () async {
+      final harness = await _Harness.create();
+      const link = 'https://livehouse.dihe.moe/s/$id';
+      harness.links.answers[link] = webLink(link);
+      await harness.enter('listen', RoomKind.persistent);
+      harness.container.listen(pendingShareControllerProvider, (_, _) {});
+
+      harness.shares.share(link);
+      await pumpEventQueue();
+
+      expect(
+        harness.invite?.target,
+        isA<InviteToCurrent>()
+            .having((t) => t.route, 'route', '/s/$id')
+            .having((t) => t.isActiveRoom, 'isActiveRoom', isFalse),
+      );
+      expect(harness.pending, isNull);
+      expect(harness.links.asked, isEmpty, reason: 'not resolved as a song');
+      expect(harness.probe.siteProbed, isEmpty);
+    });
+
+    test('of a saved server is offered as an invite to that server', () async {
+      final harness = await _Harness.create();
+      const link = 'https://example.com:8443/s/$id';
+      harness.links.answers[link] = webLink(link);
+      harness.container.listen(pendingShareControllerProvider, (_, _) {});
+
+      harness.shares.share(link);
+      await pumpEventQueue();
+
+      expect(
+        harness.invite?.target,
+        isA<InviteToSaved>()
+            .having((t) => t.server, 'server', serverB)
+            .having((t) => t.route, 'route', '/s/$id'),
+      );
+      expect(harness.pending, isNull);
+      expect(harness.links.asked, isEmpty, reason: 'not resolved as a song');
+    });
+  });
+
   group('a link typed in song search', () {
     const short = 'https://163cn.tv/abcd';
     const shorter = 'https://163cn.tv/abc';

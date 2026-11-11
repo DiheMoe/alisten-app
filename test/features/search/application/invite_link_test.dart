@@ -89,6 +89,104 @@ void main() {
     );
   });
 
+  test('a shared playlist on the current server is opened as it is and is '
+      'never the active room', () async {
+    await open();
+    await container.read(roomControllerProvider.notifier).openRoom('listen');
+    rooms.last.emitHello();
+    await pumpEventQueue();
+
+    final target = await recognize(
+      'https://livehouse.dihe.moe/s/AbCdEfGhIjKlMnOpQrStUv',
+    );
+
+    expect(
+      target,
+      isA<InviteToCurrent>()
+          .having((t) => t.route, 'route', '/s/AbCdEfGhIjKlMnOpQrStUv')
+          .having((t) => t.isActiveRoom, 'isActiveRoom', isFalse)
+          .having((t) => t.link.kind, 'kind', SiteLinkKind.sharedPlaylist),
+    );
+    expect(probe.siteProbed, isEmpty);
+  });
+
+  test('a shared playlist on a saved server is offered with that '
+      'server', () async {
+    await open();
+
+    final target = await recognize(
+      'https://example.com:8443/s/AbCdEfGhIjKlMnOpQrStUv',
+    );
+
+    expect(
+      target,
+      isA<InviteToSaved>().having((t) => t.server.id, 'server', serverB.id),
+    );
+  });
+
+  group('a shared playlist not on the current server', () {
+    const share = '/s/AbCdEfGhIjKlMnOpQrStUv';
+
+    test('is never the current server, not even at another port of its '
+        'host, and is no playlist where the site is not Alisten', () async {
+      await open();
+      probe.siteResults['https://www.reddit.com'] = const ProbeFailed(
+        ProbeFailure.notAlisten,
+      );
+
+      expect(await recognize('https://livehouse.dihe.moe:8443$share'), isNull);
+      expect(await recognize('https://www.reddit.com$share'), isNull);
+      expect(probe.siteProbed, [
+        ('https://livehouse.dihe.moe:8443', _fiveSeconds),
+        ('https://www.reddit.com', _fiveSeconds),
+      ]);
+    });
+
+    test(
+      'on an Alisten server not saved is offered with that server',
+      () async {
+        await open();
+        probe.siteResults['https://new.example.org'] = const ProbeSucceeded(
+          origin: 'https://new.example.org',
+          brandName: '新站',
+        );
+
+        expect(
+          await recognize('https://new.example.org$share'),
+          isA<InviteToNew>()
+              .having(
+                (t) => t.server.origin,
+                'origin',
+                'https://new.example.org',
+              )
+              .having((t) => t.route, 'route', share),
+        );
+      },
+    );
+
+    test('found while its server was current stays with that server once '
+        'another is current', () async {
+      await open();
+      final found = await recognize('https://livehouse.dihe.moe$share');
+      expect(found, isA<InviteToCurrent>());
+
+      await container
+          .read(serverDirectoryProvider.notifier)
+          .setCurrent(serverB.id);
+
+      expect(
+        await container.read(inviteRecognizerProvider).refresh(found!),
+        isA<InviteToSaved>()
+            .having(
+              (t) => t.server.id,
+              'server',
+              testEnvironment.defaultServerId,
+            )
+            .having((t) => t.route, 'route', share),
+      );
+    });
+  });
+
   test('a room on a saved server, found anywhere in the text, is offered '
       'with that server and not probed', () async {
     await open();

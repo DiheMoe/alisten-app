@@ -10,8 +10,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const _logSource = 'invite';
 
-// 形如房间的链接也可能只是 reddit 之类的网页，确认之前歌曲链接的识别要一直
-// 等待。
+// 形如房间或分享歌单的链接也可能只是 reddit 之类的网页，确认之前歌曲链接的
+// 识别要一直等待。
 const _siteProbeTimeout = Duration(seconds: 5);
 
 /// 归类只在识别时成立，处理之前要用 [InviteRecognizer.refresh] 按此刻的当前
@@ -93,7 +93,7 @@ final class InviteRecognizer {
   }
 
   // 默认服务器的网站可以不在 API 主机上（`ALISTEN_LINK_HOST`），两个主机上的
-  // 房间链接都属于它。
+  // 站点链接都属于它。
   InviteTarget? _classify(InviteLink invite) {
     final directory = _ref.read(serverDirectoryProvider);
     final server =
@@ -103,9 +103,11 @@ final class InviteRecognizer {
         server?.id == directory.currentId) {
       return InviteToCurrent(
         link: invite,
-        isActiveRoom: _ref
-            .read(roomControllerProvider.notifier)
-            .names(invite.roomRef),
+        isActiveRoom: switch (invite.roomRef) {
+          final roomRef? =>
+            _ref.read(roomControllerProvider.notifier).names(roomRef),
+          null => false,
+        },
       );
     }
     if (server == null) return null;
@@ -180,9 +182,9 @@ final class InviteOfferController extends Notifier<InviteOffer?> {
     state = InviteOffer(id: ++_lastId, target: target);
   }
 
-  /// 用于剪贴板和点歌页输入框等非用户主动打开的链接：已在房间里时不提供当前
-  /// 服务器其他房间的邀请，因为打开它会退出正在听的房间，改为返回它的路由，由
-  /// 用户点按进入。其余照常 [offer] 并返回 null。
+  /// 用于剪贴板和点歌页输入框等非用户主动打开的链接：已在房间里时，当前服务器
+  /// 的其他房间和分享歌单都不直接打开（进入房间会退出正在听的房间，打开歌单会
+  /// 离开点歌页），改为返回它的路由，由用户点按。其余照常 [offer] 并返回 null。
   String? offerPassively(InviteTarget target) {
     if (target case InviteToCurrent(isActiveRoom: false)
         when ref.read(roomControllerProvider).activeRoomId != null) {

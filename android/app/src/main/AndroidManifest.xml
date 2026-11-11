@@ -41,6 +41,7 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="${linkHost}" android:pathPrefix="/r/"/>
                 <data android:scheme="https" android:host="${linkHost}" android:path="/pair"/>
+                <data android:scheme="https" android:host="${linkHost}" android:pathPrefix="/s/"/>
             </intent-filter>
             <!-- 接收音乐 App 分享的歌曲链接。audio_service 缓存的引擎同时只服务
                  一个 Activity，分享必须交给已运行的实例，因此用 singleTask。 -->

@@ -292,9 +292,14 @@ void main() {
     );
   });
 
-  test('App Links open room links and pairing links of the build host', () {
+  test('App Links open room links, pairing links and shared playlists of the '
+      'build host, in one filter', () {
     final manifest = File('android/app/src/main/AndroidManifest.xml')
         .readAsStringSync();
+    expect(
+      RegExp(r'<intent-filter android:autoVerify="true">').allMatches(manifest),
+      hasLength(1),
+    );
     final filter = RegExp(
       r'<intent-filter android:autoVerify="true">(.*?)</intent-filter>',
       dotAll: true,
@@ -314,6 +319,13 @@ void main() {
         r'android:path="/pair"/>',
       ),
     );
-    expect(RegExp('<data ').allMatches(filter), hasLength(2));
+    expect(
+      filter,
+      contains(
+        r'<data android:scheme="https" android:host="${linkHost}" '
+        r'android:pathPrefix="/s/"/>',
+      ),
+    );
+    expect(RegExp('<data ').allMatches(filter), hasLength(3));
   });
 }

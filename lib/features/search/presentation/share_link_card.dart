@@ -56,7 +56,7 @@ class ShareLinkCard extends ConsumerWidget {
   /// 为 null 时不显示关闭按钮。
   final VoidCallback? onDismiss;
 
-  /// 链接是 [ResolvedShare.otherRoom] 时，以它的路由调用。
+  /// 链接是 [ResolvedShare.linkRoute] 时，以它的路由调用。
   final ValueChanged<String>? onEnterRoom;
 
   /// 放在面板里时为 false，面板本身已有底板。
@@ -86,19 +86,27 @@ class ShareLinkCard extends ConsumerWidget {
       color: colors.onGlassMuted,
     );
 
-    final otherRoom = share?.otherRoom;
+    final linkRoute = share?.linkRoute;
+    final playlistLink = share?.problem == LinkProblem.sharedPlaylistLink;
     final enterRoom = onEnterRoom;
     final inRoom = ref.watch(
       roomControllerProvider.select((room) => room.activeRoomId != null),
     );
     final Widget action;
-    if (otherRoom != null && enterRoom != null && !resolving) {
+    if (linkRoute != null && enterRoom != null && !resolving) {
+      // 打开歌单不离开房间，所以没有“离开当前房间并进入”的说法。
       action = PillButton(
-        label: inRoom ? '离开当前房间并进入' : '进入这个房间',
-        icon: Icons.meeting_room_rounded,
+        label: playlistLink
+            ? '打开这个歌单'
+            : inRoom
+            ? '离开当前房间并进入'
+            : '进入这个房间',
+        icon: playlistLink
+            ? Icons.queue_music_rounded
+            : Icons.meeting_room_rounded,
         large: true,
         expand: true,
-        onPressed: () => enterRoom(otherRoom),
+        onPressed: () => enterRoom(linkRoute),
       );
     } else if (resolving) {
       action = Row(
@@ -158,7 +166,11 @@ class ShareLinkCard extends ConsumerWidget {
             if (onDismiss case final dismiss?)
               IconCircleButton(
                 icon: Icons.close_rounded,
-                semanticLabel: otherRoom == null ? '不点这条链接' : '不进入这个房间',
+                semanticLabel: linkRoute == null
+                    ? '不点这条链接'
+                    : playlistLink
+                    ? '不打开这个歌单'
+                    : '不进入这个房间',
                 style: IconCircleButtonStyle.plain,
                 iconSize: AlistenSizes.iconSm,
                 diameter: AlistenSizes.rowAction,

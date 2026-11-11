@@ -8,6 +8,7 @@ import 'package:alisten/app/room/room_mode.dart';
 import 'package:alisten/app/room/room_screen.dart';
 import 'package:alisten/app/room_route_gate.dart';
 import 'package:alisten/core/protocol/protocol.gen.dart' show protocolVersion;
+import 'package:alisten/domain/playlist/share_route.dart';
 import 'package:alisten/domain/room/room_route.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/account/index.dart';
@@ -68,7 +69,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (_pages.contains(uri.path) ||
           roomRoute(segments, sections: DeepLinkController.appSections) !=
               null ||
-          _isPlaylistPage(segments)) {
+          _isPlaylistPage(segments) ||
+          sharedPlaylistRoute(segments) != null) {
         return null;
       }
       // 重定向可能在路由构建期间执行，不能在这时显示提示。
@@ -136,6 +138,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                     ),
                   ),
                 ],
+              ),
+              GoRoute(
+                path: 's/:shareId',
+                pageBuilder: _page(
+                  (context, state) => SharedPlaylistScreen(
+                    shareId: state.pathParameters['shareId']!,
+                    onResult: reportPick,
+                    onNotice: toasts.show,
+                    onCopyTitle: (title) => copySongTitle(toasts, title),
+                    onOpenAccount: openAccount,
+                  ),
+                ),
               ),
               GoRoute(
                 path: 'settings',

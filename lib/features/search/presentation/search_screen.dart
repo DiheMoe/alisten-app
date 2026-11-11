@@ -355,7 +355,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           clipboard.link != typed)
         _linkCardSliver(
           ShareLinkCard(
-            heading: clipboard.otherRoom == null ? '点剪贴板里的链接' : '剪贴板里的房间链接',
+            heading: clipboard.linkRoute == null
+                ? '点剪贴板里的链接'
+                : clipboard.problem == LinkProblem.sharedPlaylistLink
+                ? '剪贴板里的歌单链接'
+                : '剪贴板里的房间链接',
             share: clipboard,
             onResult: widget.onResult,
             onPicked: clipboardOffer.dismiss,
@@ -372,10 +376,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
     final share = ref.watch(typedLinkProvider(text));
     final following = share?.unfollowed ?? false;
-    final otherRoom = share?.otherRoom;
+    final linkRoute = share?.linkRoute;
     final reason = share == null
         ? unrecognizedText
-        : following || otherRoom != null
+        : following || linkRoute != null
         ? null
         : unpickableReason(share, kind);
     if (reason == null) {
@@ -383,8 +387,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ShareLinkCard(
           heading: following
               ? '这条链接'
-              : otherRoom == null
+              : linkRoute == null
               ? '点这条链接'
+              : share?.problem == LinkProblem.sharedPlaylistLink
+              ? '歌单链接'
               : '房间链接',
           share: share,
           resolving: following,
@@ -400,6 +406,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         message: switch (share?.problem) {
           LinkProblem.notSong => '歌单、专辑和歌手的链接不能直接点，可以搜索歌名。',
           LinkProblem.roomLink => null,
+          LinkProblem.sharedPlaylistLink => null,
           null when share?.track?.source == TrackSource.link =>
             '其他网站的链接可以在常驻房间里点。',
           _ => '检查链接是否完整，或者直接搜索歌名。',

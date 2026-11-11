@@ -106,4 +106,61 @@ void main() {
     await page.settle();
     expect(page.router.state.uri.path, '/r/other');
   });
+
+  testWidgets('a shared playlist link typed is a card to open it, never a '
+      'song', (tester) async {
+    final page = await SearchPage.open(tester);
+
+    await type(page, 'https://livehouse.dihe.moe/s/AbCdEfGhIjKlMnOpQrStUv');
+    await page.settle();
+    await page.settle();
+
+    expect(find.text('歌单链接'), findsOneWidget);
+    expect(find.text('打开这个歌单'), findsOneWidget);
+    expect(find.text(_enter), findsNothing);
+    expect(find.text('点这条链接'), findsNothing);
+    expect(find.byType(PickControl), findsNothing);
+    expect(page.router.state.uri.path, '/r/listen/search');
+  });
+
+  testWidgets('a shared playlist link on the clipboard is offered as a '
+      'playlist, not as a song', (tester) async {
+    final page = await SearchPage.open(
+      tester,
+      clipboard: FakeClipboardSource(
+        'https://livehouse.dihe.moe/s/AbCdEfGhIjKlMnOpQrStUv',
+      ),
+    );
+    await page.settle();
+
+    expect(find.text('剪贴板里的歌单链接'), findsOneWidget);
+    expect(find.text('点剪贴板里的链接'), findsNothing);
+    expect(find.text('打开这个歌单'), findsOneWidget);
+
+    await tester.tap(find.text('打开这个歌单'));
+    await page.settle();
+    expect(page.router.state.uri.path, '/s/AbCdEfGhIjKlMnOpQrStUv');
+  });
+
+  testWidgets('a shared playlist link typed on another server says why it '
+      'cannot be picked', (tester) async {
+    final probe = FakeServerProbe()
+      ..siteResults['https://new.example.org'] = const ProbeSucceeded(
+        origin: 'https://new.example.org',
+        brandName: '新站',
+      );
+    final page = await SearchPage.open(tester, probe: probe);
+
+    await type(page, 'https://new.example.org/s/AbCdEfGhIjKlMnOpQrStUv');
+    await page.settle();
+    await page.settle();
+    expect(find.text('添加 新站 并打开歌单？'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await page.settle();
+
+    expect(find.text('这是歌单分享链接，不能用来点歌。'), findsOneWidget);
+    expect(find.text('检查链接是否完整，或者直接搜索歌名。'), findsNothing);
+    expect(find.text(_unrecognized), findsNothing);
+    expect(find.byType(PickControl), findsNothing);
+  });
 }

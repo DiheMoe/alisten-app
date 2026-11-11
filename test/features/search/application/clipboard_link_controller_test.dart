@@ -126,13 +126,49 @@ void main() {
     expect(offer(), isNull);
     expect(page.read()?.link, 'https://livehouse.dihe.moe/r/other');
     expect(page.read()?.problem, LinkProblem.roomLink);
-    expect(page.read()?.otherRoom, '/r/other');
+    expect(page.read()?.linkRoute, '/r/other');
     expect(probe.siteProbed, isEmpty);
 
     page.close();
     await container.pump();
     page = await check();
     expect(page.read(), isNull, reason: 'held once');
+  });
+
+  test('a shared playlist of the current server is held for the user to '
+      'open, not taken for a song', () async {
+    await enterListen(RoomKind.persistent);
+    clipboard.copy('https://livehouse.dihe.moe/s/AbCdEfGhIjKlMnOpQrStUv');
+
+    var page = await check();
+
+    expect(offer(), isNull);
+    expect(page.read()?.problem, LinkProblem.sharedPlaylistLink);
+    expect(page.read()?.linkRoute, '/s/AbCdEfGhIjKlMnOpQrStUv');
+    expect(page.read()?.track, isNull);
+    expect(probe.siteProbed, isEmpty);
+
+    page.close();
+    await container.pump();
+    page = await check();
+    expect(page.read(), isNull, reason: 'held once');
+  });
+
+  test('a shared playlist of a saved server is offered as an invite to that '
+      'server, not held as a card', () async {
+    await enterListen(RoomKind.persistent);
+    clipboard.copy('https://example.com:8443/s/AbCdEfGhIjKlMnOpQrStUv');
+
+    final page = await check();
+
+    expect(
+      offer()?.target,
+      isA<InviteToSaved>()
+          .having((t) => t.server, 'server', serverB)
+          .having((t) => t.route, 'route', '/s/AbCdEfGhIjKlMnOpQrStUv'),
+    );
+    expect(page.read(), isNull);
+    expect(probe.siteProbed, isEmpty);
   });
 
   test('a room link on a website that is not Alisten is a song link like '

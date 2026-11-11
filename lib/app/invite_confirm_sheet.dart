@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:alisten/app/feedback.dart';
 import 'package:alisten/app/router.dart';
 import 'package:alisten/core/logging/app_log.dart';
+import 'package:alisten/domain/server/invite_link.dart';
 import 'package:alisten/domain/server/server_profile.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/features/server/index.dart';
@@ -70,6 +71,7 @@ Future<void> _follow(
   final String title;
   final String message;
   final String confirmLabel;
+  final opensPlaylist = target.link.kind == SiteLinkKind.sharedPlaylist;
   switch (target) {
     case InviteToCurrent(isActiveRoom: true):
       return;
@@ -79,14 +81,18 @@ Future<void> _follow(
     case InviteToSaved(server: final saved):
       server = saved;
       final directory = ref.read(serverDirectoryProvider);
-      title = '切换到 ${server.displayName} 并进入房间？';
+      title = opensPlaylist
+          ? '切换到 ${server.displayName} 并打开歌单？'
+          : '切换到 ${server.displayName} 并进入房间？';
       message = '服务器：${directory.linkAuthorityOf(server)}。切换后会退出当前房间。';
-      confirmLabel = '切换并进入';
+      confirmLabel = opensPlaylist ? '切换并打开' : '切换并进入';
     case InviteToNew(server: final added):
       server = added;
-      title = '添加 ${server.displayName} 并进入房间？';
+      title = opensPlaylist
+          ? '添加 ${server.displayName} 并打开歌单？'
+          : '添加 ${server.displayName} 并进入房间？';
       message = '服务器：${server.authority}。添加后会切换到这个服务器，并退出当前房间。';
-      confirmLabel = '添加并进入';
+      confirmLabel = opensPlaylist ? '添加并打开' : '添加并进入';
   }
   final navigator = ref.read(routerProvider).routerDelegate.navigatorKey;
   // 应用刚启动时第一个页面可能还没有建好。

@@ -69,17 +69,17 @@ final class ClipboardLinkController extends Notifier<ResolvedShare?> {
       if (invite != null &&
           text != null &&
           ref.read(_clipboardMemoryProvider).offered != text) {
-        final otherRoom = ref
+        final route = ref
             .read(inviteOfferControllerProvider.notifier)
             .offerPassively(invite);
-        if (otherRoom == null) {
+        if (route == null) {
           memory.offer(text);
         } else {
           final link = ref.read(linkResolverProvider).recognize(text);
           read = (
             stamp: stamp,
             text: text,
-            share: link?.asRoomLink(otherRoom: otherRoom),
+            share: link?.asSiteLink(invite.link.kind, route: route),
           );
         }
       }
@@ -91,7 +91,7 @@ final class ClipboardLinkController extends Notifier<ResolvedShare?> {
     final kind = ref.read(roomControllerProvider).snapshot?.room.kind;
     // 链接曲目能否点取决于房间类型：类型未知时不做判断，留给下一次检查。
     final link = share.track?.source == TrackSource.link;
-    if (share.otherRoom == null &&
+    if (share.linkRoute == null &&
         (unpickableReason(share, kind) != null || (link && kind == null))) {
       return;
     }

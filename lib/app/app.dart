@@ -10,6 +10,7 @@ import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/avatar/avatar_cache.dart';
 import 'package:alisten/core/avatar/avatar_image.dart';
 import 'package:alisten/core/logging/app_log.dart';
+import 'package:alisten/domain/room/room_route.dart';
 import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/identity/index.dart';
@@ -53,7 +54,7 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
   late final AppLifecycleListener _lifecycle;
   late final Future<void> _started;
 
-  // 链接或提醒已指定去处时，启动流程不再恢复上次的房间。
+  // 链接或提醒已指定房间时，启动流程不再恢复上次的房间。
   bool _roomOpened = false;
 
   @override
@@ -130,7 +131,11 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
   }
 
   void _openRoute(String route) {
-    _roomOpened = true;
+    // 分享页不决定进哪个房间，启动时照样恢复上次的房间。
+    final segments = Uri.parse(route).pathSegments;
+    if (roomRoute(segments, sections: DeepLinkController.appSections) != null) {
+      _roomOpened = true;
+    }
     ref.read(routerProvider).go(route);
   }
 

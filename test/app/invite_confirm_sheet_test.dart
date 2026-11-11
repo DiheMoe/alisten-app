@@ -3,7 +3,9 @@ import 'dart:convert';
 
 import 'package:alisten/app/router.dart';
 import 'package:alisten/domain/server/invite_link.dart';
+import 'package:alisten/domain/playlist/my_playlist.dart';
 import 'package:alisten/domain/server/server_profile.dart';
+import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/features/server/data/preferences_server_store.dart';
 import 'package:alisten/features/server/index.dart';
@@ -11,9 +13,11 @@ import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/playlists/playlists_test_doubles.dart';
 import '../features/server/server_test_doubles.dart'
     show FakeCredentialStores, FakeServerProbe, serverB;
 import 'app_test_harness.dart';
@@ -41,13 +45,27 @@ final _toListen = InviteToCurrent(
   isActiveRoom: false,
 );
 
+const _shareId = 'AbCdEfGhIjKlMnOpQrStUv';
+
+final _playlistOnB = InviteToSaved(
+  link: _link('https://example.com:8443/s/$_shareId'),
+  server: serverB,
+);
+
+final _playlistOnNewSite = InviteToNew(
+  link: _link('https://new.example.org/s/$_shareId'),
+  server: _newSite,
+);
+
 void main() {
   late FakeServerProbe probe;
   late FakeAppLinkSource links;
+  late FakePlaylistApi playlists;
 
   setUp(() {
     probe = FakeServerProbe();
     links = FakeAppLinkSource();
+    playlists = FakePlaylistApi();
   });
 
   /// 默认服务器为当前服务器，另已保存并加入过 [serverB]；给出 [current] 时以它
@@ -56,6 +74,7 @@ void main() {
     WidgetTester tester, {
     String? current,
     MediaQueryData system = const MediaQueryData(),
+    Override? playlistApi,
   }) async {
     tester.view
       ..physicalSize = const Size(360, 780) * 3
@@ -69,10 +88,12 @@ void main() {
       credentialStores: credentials,
       probe: probe,
       links: links,
+      playlists: playlists,
       preferences: {
         PreferencesServerStore.profilesKey: jsonEncode([serverB.toJson()]),
         PreferencesServerStore.currentKey: ?current,
       },
+      playlistApi: playlistApi,
     );
   }
 
@@ -93,6 +114,22 @@ void main() {
     await tester.pump();
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
+  }
+
+  // 读取挂起时分享页一直在转圈，pumpAndSettle 等不到结束，只能逐步推进时间。
+  Future<void> settleWhileReading(WidgetTester tester) async {
+    for (var step = 0; step < 20; step++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
+
+  /// 记下读取分享时的当前服务器。
+  List<String> sharesReadOn(WidgetTester tester) {
+    final servers = <String>[];
+    playlists.onCall = (method) {
+      if (method == 'shared') servers.add(currentId(tester));
+    };
+    return servers;
   }
 
   testWidgets('a room on the current server is opened without asking', (
@@ -341,6 +378,146 @@ void main() {
     expect(find.byType(ConfirmSheet), findsOneWidget);
     expect(find.text('添加 第三站 并进入房间？'), findsOneWidget);
     expect(find.text('添加 新站 并进入房间？'), findsNothing);
+  });
+
+  testWidgets('a shared playlist on a saved server is opened, and read, '
+      'once switching there is confirmed', (tester) async {
+    await open(tester);
+    final readOn = sharesReadOn(tester);
+
+    await offer(tester, _playlistOnB);
+
+    expect(find.text('切换到 周末听歌会 并打开歌单？'), findsOneWidget);
+    expect(find.text('服务器：example.com:8443。切换后会退出当前房间。'), findsOneWidget);
+    expect(playlists.count('shared'), 0);
+    final reading = playlists.hold('shared');
+    await tester.tap(find.text('切换并打开'));
+    await settleWhileReading(tester);
+
+    expect(readOn, [serverB.id]);
+    expect(currentId(tester), serverB.id);
+    reading.complete();
+    await tester.pumpAndSettle();
+
+    expect(currentId(tester), serverB.id);
+    expect(router(tester).state.uri.path, '/s/$_shareId');
+  });
+
+  testWidgets('a shared playlist left open while switching to another '
+      'server for its own is never asked of the new server', (tester) async {
+    final onB = FakePlaylistApi()
+      ..sharedPlaylist = SharedPlaylist(
+        name: '别处',
+        favorites: false,
+        ownerName: '阿柚',
+        ownerAvatarHash: '',
+        items: [song('b')],
+      );
+    playlists.sharedPlaylist = SharedPlaylist(
+      name: '夜跑',
+      favorites: false,
+      ownerName: '阿柚',
+      ownerAvatarHash: '',
+      items: [song('a')],
+    );
+    await open(
+      tester,
+      playlistApi: playlistApiProvider.overrideWith(
+        (ref) =>
+            ref.watch(currentServerProvider).id == serverB.id ? onB : playlists,
+      ),
+    );
+    router(tester).go('/s/$shareIdA');
+    await tester.pumpAndSettle();
+    expect(playlists.calls, ['shared $shareIdA']);
+
+    await offer(
+      tester,
+      InviteToSaved(
+        link: _link('https://example.com:8443/s/$shareIdB'),
+        server: serverB,
+      ),
+    );
+    await tester.tap(find.text('切换并打开'));
+    await tester.pumpAndSettle();
+
+    expect(currentId(tester), serverB.id);
+    expect(router(tester).state.uri.path, '/s/$shareIdB');
+    expect(onB.calls, ['shared $shareIdB']);
+    expect(playlists.calls, ['shared $shareIdA']);
+  });
+
+  testWidgets('a shared playlist on a saved server not confirmed changes '
+      'nothing', (tester) async {
+    await open(tester);
+
+    await offer(tester, _playlistOnB);
+    expect(find.text('切换到 周末听歌会 并打开歌单？'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ConfirmSheet), findsNothing);
+    expect(currentId(tester), isNot(serverB.id));
+    expect(router(tester).state.uri.path, '/');
+  });
+
+  testWidgets('a shared playlist on a new server is opened, and read, once '
+      'the server is added and joined', (tester) async {
+    await open(tester);
+    final readOn = sharesReadOn(tester);
+
+    await offer(tester, _playlistOnNewSite);
+
+    expect(find.text('添加 新站 并打开歌单？'), findsOneWidget);
+    expect(
+      find.text('服务器：new.example.org。添加后会切换到这个服务器，并退出当前房间。'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('添加并打开'));
+    await tester.pumpAndSettle();
+    expect(playlists.count('shared'), 0);
+    final reading = playlists.hold('shared');
+    await tester.tap(find.text('加入'));
+    await settleWhileReading(tester);
+
+    expect(readOn, [_newSite.id]);
+    expect(currentId(tester), _newSite.id);
+    reading.complete();
+    await tester.pumpAndSettle();
+
+    expect(currentId(tester), _newSite.id);
+    expect(router(tester).state.uri.path, '/s/$_shareId');
+  });
+
+  testWidgets('a shared playlist on the current server is opened without '
+      'asking', (tester) async {
+    await open(tester);
+
+    await offer(
+      tester,
+      InviteToCurrent(
+        link: _link('https://livehouse.dihe.moe/s/$_shareId'),
+        isActiveRoom: false,
+      ),
+    );
+
+    expect(find.byType(ConfirmSheet), findsNothing);
+    expect(router(tester).state.uri.path, '/s/$_shareId');
+  });
+
+  testWidgets('an app link to a shared playlist of another server asks to '
+      'switch there first and reads nothing from this server', (tester) async {
+    await open(tester, current: serverB.id);
+
+    links.open(Uri.parse('https://livehouse.dihe.moe/s/$_shareId'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('切换到 Alisten 并打开歌单？'), findsOneWidget);
+    expect(find.text('服务器：livehouse.dihe.moe。切换后会退出当前房间。'), findsOneWidget);
+    expect(find.text('切换并打开'), findsOneWidget);
+    expect(probe.siteProbed, isEmpty);
+    expect(playlists.count('shared'), 0);
+    expect(router(tester).state.uri.path, '/');
   });
 
   group('an app link to a room of another server', () {

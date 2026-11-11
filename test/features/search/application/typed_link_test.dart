@@ -74,7 +74,7 @@ void main() {
       expect(typed()?.unfollowed, isFalse);
       expect(typed()?.problem, LinkProblem.roomLink);
       expect(typed()?.track, isNull);
-      expect(typed()?.otherRoom, isNull);
+      expect(typed()?.linkRoute, isNull);
       expect(unpickableReason(typed()!, null), '这是房间链接，不能用来点歌。');
     });
   });
@@ -138,6 +138,52 @@ void main() {
       final typed = container.read(typedLinkProvider(reddit));
       expect(typed?.link, reddit);
       expect(typed?.unfollowed, isFalse);
+      expect(typed?.track?.source, TrackSource.link);
+    });
+  });
+
+  test('a shared playlist link typed on a saved server is a playlist link '
+      'and an invite to that server, never a song', () {
+    fakeAsync((async) {
+      final container = typing();
+      const shared = 'https://example.com:8443/s/AbCdEfGhIjKlMnOpQrStUv';
+
+      container.listen(typedLinkProvider(shared), (_, _) {});
+      expect(container.read(typedLinkProvider(shared))?.track, isNull);
+      async.elapse(const Duration(milliseconds: 400));
+      async.flushMicrotasks();
+
+      expect(
+        container.read(inviteOfferControllerProvider)?.target,
+        isA<InviteToSaved>()
+            .having((t) => t.server, 'server', serverB)
+            .having((t) => t.route, 'route', '/s/AbCdEfGhIjKlMnOpQrStUv'),
+      );
+      final typed = container.read(typedLinkProvider(shared))!;
+      expect(typed.problem, LinkProblem.sharedPlaylistLink);
+      expect(typed.track, isNull);
+      expect(typed.linkRoute, isNull);
+      expect(unpickableReason(typed, null), '这是歌单分享链接，不能用来点歌。');
+    });
+  });
+
+  test('a shared playlist link on a website that is not Alisten stays a '
+      'link', () {
+    fakeAsync((async) {
+      final container = typing();
+      const reddit = 'https://www.reddit.com/s/AbCdEfGhIjKlMnOpQrStUv';
+      probe.siteResults['https://www.reddit.com'] = const ProbeFailed(
+        ProbeFailure.notAlisten,
+      );
+
+      container.listen(typedLinkProvider(reddit), (_, _) {});
+      async.elapse(const Duration(milliseconds: 400));
+      async.flushMicrotasks();
+
+      expect(probe.siteProbed, hasLength(1));
+      expect(container.read(inviteOfferControllerProvider), isNull);
+      final typed = container.read(typedLinkProvider(reddit));
+      expect(typed?.problem, isNull);
       expect(typed?.track?.source, TrackSource.link);
     });
   });

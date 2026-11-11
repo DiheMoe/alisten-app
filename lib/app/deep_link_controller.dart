@@ -4,6 +4,7 @@ import 'package:alisten/app/room/room_mode.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/domain/member/github.dart';
+import 'package:alisten/domain/playlist/share_route.dart';
 import 'package:alisten/domain/room/room_route.dart';
 import 'package:app_links/app_links.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,8 +63,14 @@ final class DeepLinkController {
   /// 端口也必须一致：同一主机的不同端口是另一个服务器。
   String? routeFor(Uri uri) {
     if (uri.scheme != 'https' || uri.authority != host) return null;
-    return roomRoute(uri.pathSegments, sections: linkRoomSections);
+    return _siteRoute(uri);
   }
+
+  static String? _siteRoute(Uri uri) =>
+      _roomRoute(uri) ?? sharedPlaylistRoute(uri.pathSegments);
+
+  static String? _roomRoute(Uri uri) =>
+      roomRoute(uri.pathSegments, sections: linkRoomSections);
 
   /// 配对码在片段里，不进入请求和 Referer。
   ({String authority, String fragment})? pairLinkFor(Uri uri) {
@@ -76,14 +83,16 @@ final class DeepLinkController {
   }
 
   // App Links 只为构建时的域名验证；切换服务器后，打开的仍是该域名的链接。
-  bool _isOtherServerRoom(Uri uri) {
+  bool _isOtherServerLink(Uri uri) {
     return uri.scheme == 'https' &&
+        uri.userInfo.isEmpty &&
         routeFor(uri) == null &&
-        roomRoute(uri.pathSegments, sections: linkRoomSections) != null;
+        _siteRoute(uri) != null;
   }
 
   /// 返回应用是否由房间链接（包括其他服务器的）启动；为 true 时由该链接决定
-  /// 进入哪个房间。配对链接不算：用它启动时照常恢复上次的房间。
+  /// 进入哪个房间。配对链接和分享链接不算：用它们启动时照常恢复上次的房间，
+  /// 用户才能从分享页点歌进去。
   Future<bool> start(
     void Function(String route) onRoute, {
     void Function()? onInvalid,
@@ -94,7 +103,7 @@ final class DeepLinkController {
     final linkSource = source ?? PluginAppLinkSource();
     await _subscription?.cancel();
     bool toOtherServer(Uri uri) =>
-        onOtherServer != null && _isOtherServerRoom(uri);
+        onOtherServer != null && _isOtherServerLink(uri);
     _subscription = linkSource.uriLinkStream.listen((uri) {
       // MainActivity 是导出的，其他 App 可以把 GitHub 回调地址直接发过来；回调只由
       // 授权会话接收，这里不处理，也不算无效链接。
@@ -121,6 +130,7 @@ final class DeepLinkController {
       // 启动链接也由 `uriLinkStream` 送达，这里只判断是否存在。
       final initial = await linkSource.getInitialLink();
       return initial != null &&
+          _roomRoute(initial) != null &&
           (routeFor(initial) != null || toOtherServer(initial));
     } on Object {
       AppLog.warn(_logSource, 'launch link not read');
