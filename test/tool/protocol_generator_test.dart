@@ -368,7 +368,7 @@ void main() {
         'adminSetGithubCredential',
         'adminDeleteGithubCredential',
         'adminListMedia',
-        'adminDeleteMedia',
+        'adminRemoveMedia',
         'adminUpdateSite',
         'adminOpenRegistration',
         'adminCloseRegistration',

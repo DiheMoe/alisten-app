@@ -5,7 +5,7 @@ import 'package:alisten/core/protocol/protocol_runtime.dart';
 export 'package:alisten/core/protocol/protocol_runtime.dart'
     show ProtocolMismatchException, WsEvent, WsRequest, WsResponse;
 
-const protocolVersion = '6bee23791ffa52ad';
+const protocolVersion = 'ce462456c63356c6';
 
 class APIKey {
   const APIKey({required this.key});
@@ -323,6 +323,21 @@ class ImportedTrack {
     'title': title,
     'track': track.toJson(),
   };
+}
+
+enum MediaSort {
+  stored('stored'),
+  idle('idle'),
+  size('size');
+
+  const MediaSort(this.wireValue);
+
+  final String wireValue;
+
+  static MediaSort fromJson(Object? value) =>
+      readEnum(value, values, (candidate) => candidate.wireValue, 'MediaSort');
+
+  String toJson() => wireValue;
 }
 
 class Member {
@@ -1072,6 +1087,8 @@ class SourceAccount {
 
 class StoredMedia {
   const StoredMedia({
+    required this.artist,
+    required this.coverUrl,
     required this.key,
     required this.lastPlayedAtMs,
     required this.link,
@@ -1083,6 +1100,14 @@ class StoredMedia {
 
   factory StoredMedia.fromJson(Map<String, Object?> json) {
     return StoredMedia(
+      artist: readString(
+        requiredField(json, 'artist', 'StoredMedia'),
+        'StoredMedia.artist',
+      ),
+      coverUrl: readString(
+        requiredField(json, 'coverUrl', 'StoredMedia'),
+        'StoredMedia.coverUrl',
+      ),
       key: readString(
         requiredField(json, 'key', 'StoredMedia'),
         'StoredMedia.key',
@@ -1115,6 +1140,8 @@ class StoredMedia {
     );
   }
 
+  final String artist;
+  final String coverUrl;
   final String key;
   final int? lastPlayedAtMs;
   final String link;
@@ -1124,6 +1151,8 @@ class StoredMedia {
   final String title;
 
   Map<String, Object?> toJson() => <String, Object?>{
+    'artist': artist,
+    'coverUrl': coverUrl,
     'key': key,
     'lastPlayedAtMs': lastPlayedAtMs,
     'link': link,
@@ -1132,6 +1161,23 @@ class StoredMedia {
     'storedAtMs': storedAtMs,
     'title': title,
   };
+}
+
+class StoredMediaRef {
+  const StoredMediaRef({required this.key});
+
+  factory StoredMediaRef.fromJson(Map<String, Object?> json) {
+    return StoredMediaRef(
+      key: readString(
+        requiredField(json, 'key', 'StoredMediaRef'),
+        'StoredMediaRef.key',
+      ),
+    );
+  }
+
+  final String key;
+
+  Map<String, Object?> toJson() => <String, Object?>{'key': key};
 }
 
 class Track {
@@ -3385,8 +3431,45 @@ class AdminSetGithubCredentialRequest {
   };
 }
 
+class AdminListMediaRequest {
+  const AdminListMediaRequest({this.page, this.q, this.sort});
+
+  factory AdminListMediaRequest.fromJson(Map<String, Object?> json) {
+    return AdminListMediaRequest(
+      page: switch (optionalField(json, 'page', 'AdminListMediaRequest')) {
+        null => null,
+        final value => readInt(value, 'AdminListMediaRequest.page'),
+      },
+      q: switch (optionalField(json, 'q', 'AdminListMediaRequest')) {
+        null => null,
+        final value => readString(value, 'AdminListMediaRequest.q'),
+      },
+      sort: switch (optionalField(json, 'sort', 'AdminListMediaRequest')) {
+        null => null,
+        final value => MediaSort.fromJson(value),
+      },
+    );
+  }
+
+  final int? page;
+  final String? q;
+  final MediaSort? sort;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'page': ?page,
+    'q': ?q,
+    'sort': ?sort?.toJson(),
+  };
+}
+
 class AdminListMediaResponse {
-  const AdminListMediaResponse({required this.items});
+  const AdminListMediaResponse({
+    required this.items,
+    required this.page,
+    required this.pageSize,
+    required this.total,
+    required this.totalBytes,
+  });
 
   factory AdminListMediaResponse.fromJson(Map<String, Object?> json) {
     return AdminListMediaResponse(
@@ -3401,13 +3484,99 @@ class AdminListMediaResponse {
                 ),
               )
               .toList(growable: false),
+      page: readInt(
+        requiredField(json, 'page', 'AdminListMediaResponse'),
+        'AdminListMediaResponse.page',
+      ),
+      pageSize: readInt(
+        requiredField(json, 'pageSize', 'AdminListMediaResponse'),
+        'AdminListMediaResponse.pageSize',
+      ),
+      total: readInt(
+        requiredField(json, 'total', 'AdminListMediaResponse'),
+        'AdminListMediaResponse.total',
+      ),
+      totalBytes: readInt(
+        requiredField(json, 'totalBytes', 'AdminListMediaResponse'),
+        'AdminListMediaResponse.totalBytes',
+      ),
     );
   }
 
   final List<StoredMedia> items;
+  final int page;
+  final int pageSize;
+  final int total;
+  final int totalBytes;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'items': items.map((item) => item.toJson()).toList(growable: false),
+    'page': page,
+    'pageSize': pageSize,
+    'total': total,
+    'totalBytes': totalBytes,
+  };
+}
+
+class AdminRemoveMediaRequest {
+  const AdminRemoveMediaRequest({required this.media});
+
+  factory AdminRemoveMediaRequest.fromJson(Map<String, Object?> json) {
+    return AdminRemoveMediaRequest(
+      media:
+          readList(
+                requiredField(json, 'media', 'AdminRemoveMediaRequest'),
+                'AdminRemoveMediaRequest.media',
+              )
+              .map(
+                (item) => StoredMediaRef.fromJson(
+                  readObject(item, 'AdminRemoveMediaRequest.media[]'),
+                ),
+              )
+              .toList(growable: false),
+    );
+  }
+
+  final List<StoredMediaRef> media;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'media': media.map((item) => item.toJson()).toList(growable: false),
+  };
+}
+
+class AdminRemoveMediaResponse {
+  const AdminRemoveMediaResponse({required this.deleted, required this.inUse});
+
+  factory AdminRemoveMediaResponse.fromJson(Map<String, Object?> json) {
+    return AdminRemoveMediaResponse(
+      deleted:
+          readList(
+                requiredField(json, 'deleted', 'AdminRemoveMediaResponse'),
+                'AdminRemoveMediaResponse.deleted',
+              )
+              .map(
+                (item) =>
+                    readString(item, 'AdminRemoveMediaResponse.deleted[]'),
+              )
+              .toList(growable: false),
+      inUse:
+          readList(
+                requiredField(json, 'inUse', 'AdminRemoveMediaResponse'),
+                'AdminRemoveMediaResponse.inUse',
+              )
+              .map(
+                (item) => readString(item, 'AdminRemoveMediaResponse.inUse[]'),
+              )
+              .toList(growable: false),
+    );
+  }
+
+  final List<String> deleted;
+  final List<String> inUse;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'deleted': deleted,
+    'inUse': inUse,
   };
 }
 

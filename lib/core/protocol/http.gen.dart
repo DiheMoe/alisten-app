@@ -578,22 +578,22 @@ abstract final class RestEndpoints {
 
   static const adminListMedia = RestEndpoint(
     name: 'adminListMedia',
-    method: 'GET',
-    path: '/api/admin/media',
+    method: 'POST',
+    path: '/api/admin/media/queries',
     auth: HttpAuth.admin,
     successStatus: 200,
     hasLocation: false,
     pathParameters: <String>[],
   );
 
-  static const adminDeleteMedia = RestEndpoint(
-    name: 'adminDeleteMedia',
-    method: 'DELETE',
-    path: '/api/admin/media/{key}',
+  static const adminRemoveMedia = RestEndpoint(
+    name: 'adminRemoveMedia',
+    method: 'POST',
+    path: '/api/admin/media/removals',
     auth: HttpAuth.admin,
-    successStatus: 204,
+    successStatus: 200,
     hasLocation: false,
-    pathParameters: <String>['key'],
+    pathParameters: <String>[],
   );
 
   static const adminUpdateSite = RestEndpoint(
@@ -845,7 +845,7 @@ abstract final class RestEndpoints {
     adminSetGithubCredential,
     adminDeleteGithubCredential,
     adminListMedia,
-    adminDeleteMedia,
+    adminRemoveMedia,
     adminUpdateSite,
     adminOpenRegistration,
     adminCloseRegistration,
