@@ -606,7 +606,13 @@ final class _Generator {
       return (_parseValue(alternatives[0].$1, '$where.anyOf[0]'), true);
     }
     if (schema['type'] == 'array') {
-      _allowOnly(schema, const {'type', 'description', 'items'}, where);
+      _allowOnly(schema, const {
+        'type',
+        'description',
+        'items',
+        'minItems',
+        'maxItems',
+      }, where);
       final items = _object(schema['items'], '$where.items');
       return (_ListOf(_parseValue(items, '$where.items')), false);
     }

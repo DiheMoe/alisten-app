@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:alisten/core/protocol/protocol.gen.dart' show protocolVersion;
 import 'package:alisten/core/clock/server_clock.dart';
 import 'package:alisten/core/realtime/room_transport.dart';
 import 'package:alisten/core/realtime/websocket_room_transport.dart';
@@ -27,7 +28,7 @@ void main() {
       expect(hello['data'], {
         'roomId': 'room-id',
         'ticket': 'ticket',
-        'protocolVersion': '473ee31f5ef912b4',
+        'protocolVersion': protocolVersion,
       });
 
       channel.receive(_response(hello['id']! as String, 'hello', _helloData()));

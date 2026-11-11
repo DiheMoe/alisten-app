@@ -278,7 +278,7 @@ void main() {
         http.RestEndpoints.values.where(
           (endpoint) => endpoint.auth == http.HttpAuth.admin,
         ),
-        hasLength(21),
+        hasLength(28),
       );
       expect(http.RestEndpoints.adminListRooms.path, '/api/admin/rooms');
       expect(http.RestEndpoints.roomSync.name, 'roomSync');

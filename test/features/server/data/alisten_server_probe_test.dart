@@ -415,6 +415,10 @@ void main() {
       final longest = '🎵' * AlistenServerProbe.maxBrandNameRunes;
       final cases = <(String, ProbeResult)>[
         ('{"brandName":"  大猫听歌房 "}', _found),
+        (
+          '{"brandName":"大猫听歌房","registrationOpen":false,"githubLogin":true}',
+          _found,
+        ),
         ('{"brandName":""}', notAlisten),
         ('{"brandName":" \\t "}', notAlisten),
         ('{"brandName":"大猫\\u0007听歌房"}', notAlisten),

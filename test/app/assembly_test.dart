@@ -266,7 +266,7 @@ void main() {
       }
 
       final apiOfA = container.read(alistenApiProvider);
-      http.respond(200, {'member': _member});
+      http.respond(200, {'member': _member, 'recordListens': true});
       await apiOfA.getMe();
       http.respond(201, {'ticket': 'ticket-of-A'});
       await joinRoom(await apiOfA.createTicket('room-1'));
@@ -286,7 +286,7 @@ void main() {
       await directory.add(serverB);
       await directory.setCurrent(serverB.id);
 
-      http.respond(200, {'member': _member});
+      http.respond(200, {'member': _member, 'recordListens': true});
       await container.read(alistenApiProvider).getMe();
       await expectLater(
         apiOfA.getMe(),

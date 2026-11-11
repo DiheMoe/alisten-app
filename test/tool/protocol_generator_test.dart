@@ -163,6 +163,17 @@ void main() {
       expect(output, isNot(contains("static const hello = 'hello';")));
     });
 
+    test('array bounds are accepted and left to the server', () {
+      final idl = _minimalIdl();
+      _schema(idl, <String>[r'$defs', 'Sample', 'properties', 'tags'])
+        ..['minItems'] = 1
+        ..['maxItems'] = 1000;
+
+      final output = generateProtocol(idl);
+
+      expect(output, contains('final List<Source> tags;'));
+    });
+
     test('unsupported keywords fail with their IDL path', () {
       final idl = _minimalIdl();
       _schema(idl, <String>[
@@ -331,7 +342,7 @@ void main() {
       );
     });
 
-    test('real IDL names all 21 admin endpoints', () {
+    test('real IDL names all 28 admin endpoints', () {
       final output = generateHttp(_backendIdl());
 
       for (final name in <String>[
@@ -353,13 +364,20 @@ void main() {
         'adminGetYoutubeCredential',
         'adminSetYoutubeCredential',
         'adminDeleteYoutubeCredential',
+        'adminGetGithubCredential',
+        'adminSetGithubCredential',
+        'adminDeleteGithubCredential',
         'adminListMedia',
         'adminDeleteMedia',
         'adminUpdateSite',
+        'adminOpenRegistration',
+        'adminCloseRegistration',
+        'adminGetAccount',
+        'adminResetAccountPassword',
       ]) {
         expect(output, contains('static const $name = RestEndpoint('));
       }
-      expect(RegExp('auth: HttpAuth.admin,').allMatches(output).length, 21);
+      expect(RegExp('auth: HttpAuth.admin,').allMatches(output).length, 28);
     }, skip: _backendSkip);
 
     test('endpoint name conflicts fail with both IDL paths', () {

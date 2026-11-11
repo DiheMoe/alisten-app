@@ -274,15 +274,19 @@ _Verdict _closeVerdict(int? code) {
   };
 }
 
+// 只认品牌名：其余字段随服务端版本增减，旧版本的服务器同样要能认出来，再由
+// 握手判断是否兼容。
 String? _brandName(String body) {
-  final String name;
+  final Object? json;
   try {
-    final json = jsonDecode(body);
-    if (json is! Map<String, Object?>) return null;
-    name = protocol.GetSiteResponse.fromJson(json).brandName.trim();
+    json = jsonDecode(body);
   } on FormatException {
     return null;
   }
+  if (json is! Map<String, Object?>) return null;
+  final raw = json['brandName'];
+  if (raw is! String) return null;
+  final name = raw.trim();
   if (name.isEmpty ||
       name.runes.length > AlistenServerProbe.maxBrandNameRunes ||
       name.runes.any(_isControl)) {

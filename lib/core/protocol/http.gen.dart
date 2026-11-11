@@ -146,6 +146,176 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
+  static const register = RestEndpoint(
+    name: 'register',
+    method: 'POST',
+    path: '/api/account',
+    auth: HttpAuth.member,
+    successStatus: 201,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const changePassword = RestEndpoint(
+    name: 'changePassword',
+    method: 'PUT',
+    path: '/api/account/password',
+    auth: HttpAuth.member,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const login = RestEndpoint(
+    name: 'login',
+    method: 'POST',
+    path: '/api/sessions',
+    auth: HttpAuth.member,
+    successStatus: 201,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const logout = RestEndpoint(
+    name: 'logout',
+    method: 'DELETE',
+    path: '/api/sessions/current',
+    auth: HttpAuth.member,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const listMyPlaylists = RestEndpoint(
+    name: 'listMyPlaylists',
+    method: 'GET',
+    path: '/api/me/playlists',
+    auth: HttpAuth.member,
+    successStatus: 200,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const createMyPlaylist = RestEndpoint(
+    name: 'createMyPlaylist',
+    method: 'POST',
+    path: '/api/me/playlists',
+    auth: HttpAuth.member,
+    successStatus: 201,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const renameMyPlaylist = RestEndpoint(
+    name: 'renameMyPlaylist',
+    method: 'PATCH',
+    path: '/api/me/playlists/{id}',
+    auth: HttpAuth.member,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>['id'],
+  );
+
+  static const deleteMyPlaylist = RestEndpoint(
+    name: 'deleteMyPlaylist',
+    method: 'DELETE',
+    path: '/api/me/playlists/{id}',
+    auth: HttpAuth.member,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>['id'],
+  );
+
+  static const listMyPlaylistItems = RestEndpoint(
+    name: 'listMyPlaylistItems',
+    method: 'GET',
+    path: '/api/me/playlists/{id}/items',
+    auth: HttpAuth.member,
+    successStatus: 200,
+    hasLocation: false,
+    pathParameters: <String>['id'],
+  );
+
+  static const addMyPlaylistItem = RestEndpoint(
+    name: 'addMyPlaylistItem',
+    method: 'POST',
+    path: '/api/me/playlists/{id}/items',
+    auth: HttpAuth.member,
+    successStatus: 201,
+    hasLocation: false,
+    pathParameters: <String>['id'],
+  );
+
+  static const removeMyPlaylistItems = RestEndpoint(
+    name: 'removeMyPlaylistItems',
+    method: 'POST',
+    path: '/api/me/playlists/{id}/removals',
+    auth: HttpAuth.member,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>['id'],
+  );
+
+  static const copyMyPlaylistItems = RestEndpoint(
+    name: 'copyMyPlaylistItems',
+    method: 'POST',
+    path: '/api/me/playlists/{id}/copies',
+    auth: HttpAuth.member,
+    successStatus: 200,
+    hasLocation: false,
+    pathParameters: <String>['id'],
+  );
+
+  static const moveMyPlaylistItems = RestEndpoint(
+    name: 'moveMyPlaylistItems',
+    method: 'POST',
+    path: '/api/me/playlists/{id}/moves',
+    auth: HttpAuth.member,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>['id'],
+  );
+
+  static const listMyTrackPlaylists = RestEndpoint(
+    name: 'listMyTrackPlaylists',
+    method: 'POST',
+    path: '/api/me/playlist-memberships',
+    auth: HttpAuth.member,
+    successStatus: 200,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const importMyPlaylist = RestEndpoint(
+    name: 'importMyPlaylist',
+    method: 'POST',
+    path: '/api/me/playlists/imports',
+    auth: HttpAuth.member,
+    successStatus: 201,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const resolveMyPlaylistLink = RestEndpoint(
+    name: 'resolveMyPlaylistLink',
+    method: 'POST',
+    path: '/api/me/playlist-links',
+    auth: HttpAuth.member,
+    successStatus: 200,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const importMyPlatformPlaylist = RestEndpoint(
+    name: 'importMyPlatformPlaylist',
+    method: 'POST',
+    path: '/api/me/playlists/platform-imports',
+    auth: HttpAuth.member,
+    successStatus: 201,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
   static const listRooms = RestEndpoint(
     name: 'listRooms',
     method: 'GET',
@@ -376,6 +546,36 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
+  static const adminGetGithubCredential = RestEndpoint(
+    name: 'adminGetGithubCredential',
+    method: 'GET',
+    path: '/api/admin/credentials/github',
+    auth: HttpAuth.admin,
+    successStatus: 200,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const adminSetGithubCredential = RestEndpoint(
+    name: 'adminSetGithubCredential',
+    method: 'PUT',
+    path: '/api/admin/credentials/github',
+    auth: HttpAuth.admin,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const adminDeleteGithubCredential = RestEndpoint(
+    name: 'adminDeleteGithubCredential',
+    method: 'DELETE',
+    path: '/api/admin/credentials/github',
+    auth: HttpAuth.admin,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
   static const adminListMedia = RestEndpoint(
     name: 'adminListMedia',
     method: 'GET',
@@ -406,6 +606,186 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
+  static const adminOpenRegistration = RestEndpoint(
+    name: 'adminOpenRegistration',
+    method: 'PUT',
+    path: '/api/admin/registration',
+    auth: HttpAuth.admin,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const adminCloseRegistration = RestEndpoint(
+    name: 'adminCloseRegistration',
+    method: 'DELETE',
+    path: '/api/admin/registration',
+    auth: HttpAuth.admin,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const adminGetAccount = RestEndpoint(
+    name: 'adminGetAccount',
+    method: 'GET',
+    path: '/api/admin/accounts/{username}',
+    auth: HttpAuth.admin,
+    successStatus: 200,
+    hasLocation: false,
+    pathParameters: <String>['username'],
+  );
+
+  static const adminResetAccountPassword = RestEndpoint(
+    name: 'adminResetAccountPassword',
+    method: 'POST',
+    path: '/api/admin/accounts/{username}/password',
+    auth: HttpAuth.admin,
+    successStatus: 200,
+    hasLocation: false,
+    pathParameters: <String>['username'],
+  );
+
+  static const listMyListens = RestEndpoint(
+    name: 'listMyListens',
+    method: 'GET',
+    path: '/api/me/listens',
+    auth: HttpAuth.member,
+    successStatus: 200,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const removeMyListen = RestEndpoint(
+    name: 'removeMyListen',
+    method: 'POST',
+    path: '/api/me/listens/removals',
+    auth: HttpAuth.member,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const clearMyListens = RestEndpoint(
+    name: 'clearMyListens',
+    method: 'DELETE',
+    path: '/api/me/listens',
+    auth: HttpAuth.member,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const enableListenRecording = RestEndpoint(
+    name: 'enableListenRecording',
+    method: 'PUT',
+    path: '/api/me/listen-recording',
+    auth: HttpAuth.member,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const disableListenRecording = RestEndpoint(
+    name: 'disableListenRecording',
+    method: 'DELETE',
+    path: '/api/me/listen-recording',
+    auth: HttpAuth.member,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const shareMyPlaylist = RestEndpoint(
+    name: 'shareMyPlaylist',
+    method: 'POST',
+    path: '/api/me/playlists/{id}/share',
+    auth: HttpAuth.member,
+    successStatus: 200,
+    hasLocation: false,
+    pathParameters: <String>['id'],
+  );
+
+  static const unshareMyPlaylist = RestEndpoint(
+    name: 'unshareMyPlaylist',
+    method: 'DELETE',
+    path: '/api/me/playlists/{id}/share',
+    auth: HttpAuth.member,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>['id'],
+  );
+
+  static const getSharedPlaylist = RestEndpoint(
+    name: 'getSharedPlaylist',
+    method: 'GET',
+    path: '/api/shared-playlists/{shareId}',
+    auth: HttpAuth.none,
+    successStatus: 200,
+    hasLocation: false,
+    pathParameters: <String>['shareId'],
+  );
+
+  static const copySharedPlaylist = RestEndpoint(
+    name: 'copySharedPlaylist',
+    method: 'POST',
+    path: '/api/shared-playlists/{shareId}/copies',
+    auth: HttpAuth.member,
+    successStatus: 201,
+    hasLocation: false,
+    pathParameters: <String>['shareId'],
+  );
+
+  static const createPairingCode = RestEndpoint(
+    name: 'createPairingCode',
+    method: 'POST',
+    path: '/api/account/pairing-codes',
+    auth: HttpAuth.member,
+    successStatus: 201,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const redeemPairingCode = RestEndpoint(
+    name: 'redeemPairingCode',
+    method: 'POST',
+    path: '/api/sessions/pairing',
+    auth: HttpAuth.member,
+    successStatus: 201,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const startGithubLogin = RestEndpoint(
+    name: 'startGithubLogin',
+    method: 'POST',
+    path: '/api/auth/github',
+    auth: HttpAuth.member,
+    successStatus: 201,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const finishGithubLogin = RestEndpoint(
+    name: 'finishGithubLogin',
+    method: 'POST',
+    path: '/api/auth/github/exchange',
+    auth: HttpAuth.member,
+    successStatus: 200,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
+  static const unbindGithub = RestEndpoint(
+    name: 'unbindGithub',
+    method: 'POST',
+    path: '/api/account/github/removals',
+    auth: HttpAuth.member,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
   static const values = <RestEndpoint>[
     roomSync,
     queueAdd,
@@ -421,6 +801,23 @@ abstract final class RestEndpoints {
     createMember,
     getMe,
     updateMe,
+    register,
+    changePassword,
+    login,
+    logout,
+    listMyPlaylists,
+    createMyPlaylist,
+    renameMyPlaylist,
+    deleteMyPlaylist,
+    listMyPlaylistItems,
+    addMyPlaylistItem,
+    removeMyPlaylistItems,
+    copyMyPlaylistItems,
+    moveMyPlaylistItems,
+    listMyTrackPlaylists,
+    importMyPlaylist,
+    resolveMyPlaylistLink,
+    importMyPlatformPlaylist,
     listRooms,
     getRoom,
     createRoom,
@@ -444,8 +841,29 @@ abstract final class RestEndpoints {
     adminGetYoutubeCredential,
     adminSetYoutubeCredential,
     adminDeleteYoutubeCredential,
+    adminGetGithubCredential,
+    adminSetGithubCredential,
+    adminDeleteGithubCredential,
     adminListMedia,
     adminDeleteMedia,
     adminUpdateSite,
+    adminOpenRegistration,
+    adminCloseRegistration,
+    adminGetAccount,
+    adminResetAccountPassword,
+    listMyListens,
+    removeMyListen,
+    clearMyListens,
+    enableListenRecording,
+    disableListenRecording,
+    shareMyPlaylist,
+    unshareMyPlaylist,
+    getSharedPlaylist,
+    copySharedPlaylist,
+    createPairingCode,
+    redeemPairingCode,
+    startGithubLogin,
+    finishGithubLogin,
+    unbindGithub,
   ];
 }

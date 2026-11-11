@@ -5,7 +5,7 @@ import 'package:alisten/core/protocol/protocol_runtime.dart';
 export 'package:alisten/core/protocol/protocol_runtime.dart'
     show ProtocolMismatchException, WsEvent, WsRequest, WsResponse;
 
-const protocolVersion = '473ee31f5ef912b4';
+const protocolVersion = '6bee23791ffa52ad';
 
 class APIKey {
   const APIKey({required this.key});
@@ -19,6 +19,37 @@ class APIKey {
   final String key;
 
   Map<String, Object?> toJson() => <String, Object?>{'key': key};
+}
+
+class Account {
+  const Account({this.email, required this.github, this.username});
+
+  factory Account.fromJson(Map<String, Object?> json) {
+    return Account(
+      email: switch (optionalField(json, 'email', 'Account')) {
+        null => null,
+        final value => readString(value, 'Account.email'),
+      },
+      github: readBool(
+        requiredField(json, 'github', 'Account'),
+        'Account.github',
+      ),
+      username: switch (optionalField(json, 'username', 'Account')) {
+        null => null,
+        final value => readString(value, 'Account.username'),
+      },
+    );
+  }
+
+  final String? email;
+  final bool github;
+  final String? username;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'email': ?email,
+    'github': github,
+    'username': ?username,
+  };
 }
 
 enum ActivityKind {
@@ -41,6 +72,33 @@ enum ActivityKind {
   );
 
   String toJson() => wireValue;
+}
+
+class AdminAccount {
+  const AdminAccount({required this.member, required this.username});
+
+  factory AdminAccount.fromJson(Map<String, Object?> json) {
+    return AdminAccount(
+      member: Member.fromJson(
+        readObject(
+          requiredField(json, 'member', 'AdminAccount'),
+          'AdminAccount.member',
+        ),
+      ),
+      username: readString(
+        requiredField(json, 'username', 'AdminAccount'),
+        'AdminAccount.username',
+      ),
+    );
+  }
+
+  final Member member;
+  final String username;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'member': member.toJson(),
+    'username': username,
+  };
 }
 
 class Empty {
@@ -121,6 +179,7 @@ enum EntryStatus {
 enum ErrorCode {
   invalidArgument('INVALID_ARGUMENT'),
   unauthorized('UNAUTHORIZED'),
+  invalidCredentials('INVALID_CREDENTIALS'),
   forbidden('FORBIDDEN'),
   notFound('NOT_FOUND'),
   conflict('CONFLICT'),
@@ -161,6 +220,108 @@ class ErrorInfo {
   Map<String, Object?> toJson() => <String, Object?>{
     'code': code.toJson(),
     'message': message,
+  };
+}
+
+enum GitHubClient {
+  web('web'),
+  app('app');
+
+  const GitHubClient(this.wireValue);
+
+  final String wireValue;
+
+  static GitHubClient fromJson(Object? value) => readEnum(
+    value,
+    values,
+    (candidate) => candidate.wireValue,
+    'GitHubClient',
+  );
+
+  String toJson() => wireValue;
+}
+
+enum GitHubIntent {
+  login('login'),
+  bind('bind'),
+  verify('verify');
+
+  const GitHubIntent(this.wireValue);
+
+  final String wireValue;
+
+  static GitHubIntent fromJson(Object? value) => readEnum(
+    value,
+    values,
+    (candidate) => candidate.wireValue,
+    'GitHubIntent',
+  );
+
+  String toJson() => wireValue;
+}
+
+class ImportedTrack {
+  const ImportedTrack({
+    this.album,
+    this.artist,
+    this.coverUrl,
+    required this.durationMs,
+    this.pageUrl,
+    required this.title,
+    required this.track,
+  });
+
+  factory ImportedTrack.fromJson(Map<String, Object?> json) {
+    return ImportedTrack(
+      album: switch (optionalField(json, 'album', 'ImportedTrack')) {
+        null => null,
+        final value => readString(value, 'ImportedTrack.album'),
+      },
+      artist: switch (optionalField(json, 'artist', 'ImportedTrack')) {
+        null => null,
+        final value => readString(value, 'ImportedTrack.artist'),
+      },
+      coverUrl: switch (optionalField(json, 'coverUrl', 'ImportedTrack')) {
+        null => null,
+        final value => readString(value, 'ImportedTrack.coverUrl'),
+      },
+      durationMs: readInt(
+        requiredField(json, 'durationMs', 'ImportedTrack'),
+        'ImportedTrack.durationMs',
+      ),
+      pageUrl: switch (optionalField(json, 'pageUrl', 'ImportedTrack')) {
+        null => null,
+        final value => readString(value, 'ImportedTrack.pageUrl'),
+      },
+      title: readString(
+        requiredField(json, 'title', 'ImportedTrack'),
+        'ImportedTrack.title',
+      ),
+      track: Track.fromJson(
+        readObject(
+          requiredField(json, 'track', 'ImportedTrack'),
+          'ImportedTrack.track',
+        ),
+      ),
+    );
+  }
+
+  final String? album;
+  final String? artist;
+  final String? coverUrl;
+  final int durationMs;
+  final String? pageUrl;
+  final String title;
+  final Track track;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'album': ?album,
+    'artist': ?artist,
+    'coverUrl': ?coverUrl,
+    'durationMs': durationMs,
+    'pageUrl': ?pageUrl,
+    'title': title,
+    'track': track.toJson(),
   };
 }
 
@@ -221,6 +382,135 @@ class Members {
   Map<String, Object?> toJson() => <String, Object?>{
     'onlineCount': onlineCount,
     'sessions': sessions.map((item) => item.toJson()).toList(growable: false),
+  };
+}
+
+class MyListen {
+  const MyListen({
+    required this.heardAtMs,
+    required this.meta,
+    required this.track,
+  });
+
+  factory MyListen.fromJson(Map<String, Object?> json) {
+    return MyListen(
+      heardAtMs: readInt(
+        requiredField(json, 'heardAtMs', 'MyListen'),
+        'MyListen.heardAtMs',
+      ),
+      meta: TrackMeta.fromJson(
+        readObject(requiredField(json, 'meta', 'MyListen'), 'MyListen.meta'),
+      ),
+      track: Track.fromJson(
+        readObject(requiredField(json, 'track', 'MyListen'), 'MyListen.track'),
+      ),
+    );
+  }
+
+  final int heardAtMs;
+  final TrackMeta meta;
+  final Track track;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'heardAtMs': heardAtMs,
+    'meta': meta.toJson(),
+    'track': track.toJson(),
+  };
+}
+
+class MyPlaylist {
+  const MyPlaylist({
+    required this.coverUrl,
+    required this.createdAtMs,
+    required this.favorites,
+    required this.id,
+    required this.name,
+    required this.shareId,
+    required this.trackCount,
+    required this.updatedAtMs,
+  });
+
+  factory MyPlaylist.fromJson(Map<String, Object?> json) {
+    return MyPlaylist(
+      coverUrl: switch (requiredField(json, 'coverUrl', 'MyPlaylist')) {
+        null => null,
+        final value => readString(value, 'MyPlaylist.coverUrl'),
+      },
+      createdAtMs: readInt(
+        requiredField(json, 'createdAtMs', 'MyPlaylist'),
+        'MyPlaylist.createdAtMs',
+      ),
+      favorites: readBool(
+        requiredField(json, 'favorites', 'MyPlaylist'),
+        'MyPlaylist.favorites',
+      ),
+      id: readString(requiredField(json, 'id', 'MyPlaylist'), 'MyPlaylist.id'),
+      name: readString(
+        requiredField(json, 'name', 'MyPlaylist'),
+        'MyPlaylist.name',
+      ),
+      shareId: switch (requiredField(json, 'shareId', 'MyPlaylist')) {
+        null => null,
+        final value => readString(value, 'MyPlaylist.shareId'),
+      },
+      trackCount: readInt(
+        requiredField(json, 'trackCount', 'MyPlaylist'),
+        'MyPlaylist.trackCount',
+      ),
+      updatedAtMs: readInt(
+        requiredField(json, 'updatedAtMs', 'MyPlaylist'),
+        'MyPlaylist.updatedAtMs',
+      ),
+    );
+  }
+
+  final String? coverUrl;
+  final int createdAtMs;
+  final bool favorites;
+  final String id;
+  final String name;
+  final String? shareId;
+  final int trackCount;
+  final int updatedAtMs;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'coverUrl': coverUrl,
+    'createdAtMs': createdAtMs,
+    'favorites': favorites,
+    'id': id,
+    'name': name,
+    'shareId': shareId,
+    'trackCount': trackCount,
+    'updatedAtMs': updatedAtMs,
+  };
+}
+
+class MyPlaylistItem {
+  const MyPlaylistItem({required this.meta, required this.track});
+
+  factory MyPlaylistItem.fromJson(Map<String, Object?> json) {
+    return MyPlaylistItem(
+      meta: TrackMeta.fromJson(
+        readObject(
+          requiredField(json, 'meta', 'MyPlaylistItem'),
+          'MyPlaylistItem.meta',
+        ),
+      ),
+      track: Track.fromJson(
+        readObject(
+          requiredField(json, 'track', 'MyPlaylistItem'),
+          'MyPlaylistItem.track',
+        ),
+      ),
+    );
+  }
+
+  final TrackMeta meta;
+  final Track track;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'meta': meta.toJson(),
+    'track': track.toJson(),
   };
 }
 
@@ -663,6 +953,62 @@ class RoomSnapshot {
     'room': room.toJson(),
     'seq': seq,
     'term': term,
+  };
+}
+
+class SharedPlaylist {
+  const SharedPlaylist({
+    required this.favorites,
+    required this.items,
+    required this.name,
+    required this.ownerAvatarHash,
+    required this.ownerName,
+  });
+
+  factory SharedPlaylist.fromJson(Map<String, Object?> json) {
+    return SharedPlaylist(
+      favorites: readBool(
+        requiredField(json, 'favorites', 'SharedPlaylist'),
+        'SharedPlaylist.favorites',
+      ),
+      items:
+          readList(
+                requiredField(json, 'items', 'SharedPlaylist'),
+                'SharedPlaylist.items',
+              )
+              .map(
+                (item) => MyPlaylistItem.fromJson(
+                  readObject(item, 'SharedPlaylist.items[]'),
+                ),
+              )
+              .toList(growable: false),
+      name: readString(
+        requiredField(json, 'name', 'SharedPlaylist'),
+        'SharedPlaylist.name',
+      ),
+      ownerAvatarHash: readString(
+        requiredField(json, 'ownerAvatarHash', 'SharedPlaylist'),
+        'SharedPlaylist.ownerAvatarHash',
+      ),
+      ownerName: readString(
+        requiredField(json, 'ownerName', 'SharedPlaylist'),
+        'SharedPlaylist.ownerName',
+      ),
+    );
+  }
+
+  final bool favorites;
+  final List<MyPlaylistItem> items;
+  final String name;
+  final String ownerAvatarHash;
+  final String ownerName;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'favorites': favorites,
+    'items': items.map((item) => item.toJson()).toList(growable: false),
+    'name': name,
+    'ownerAvatarHash': ownerAvatarHash,
+    'ownerName': ownerName,
   };
 }
 
@@ -1699,22 +2045,42 @@ class CreateMemberResponse {
 }
 
 class GetMeResponse {
-  const GetMeResponse({required this.member});
+  const GetMeResponse({
+    this.account,
+    required this.member,
+    required this.recordListens,
+  });
 
   factory GetMeResponse.fromJson(Map<String, Object?> json) {
     return GetMeResponse(
+      account: switch (optionalField(json, 'account', 'GetMeResponse')) {
+        null => null,
+        final value => Account.fromJson(
+          readObject(value, 'GetMeResponse.account'),
+        ),
+      },
       member: Member.fromJson(
         readObject(
           requiredField(json, 'member', 'GetMeResponse'),
           'GetMeResponse.member',
         ),
       ),
+      recordListens: readBool(
+        requiredField(json, 'recordListens', 'GetMeResponse'),
+        'GetMeResponse.recordListens',
+      ),
     );
   }
 
+  final Account? account;
   final Member member;
+  final bool recordListens;
 
-  Map<String, Object?> toJson() => <String, Object?>{'member': member.toJson()};
+  Map<String, Object?> toJson() => <String, Object?>{
+    'account': ?account?.toJson(),
+    'member': member.toJson(),
+    'recordListens': recordListens,
+  };
 }
 
 class UpdateMeRequest {
@@ -1759,6 +2125,618 @@ class UpdateMeResponse {
   final Member member;
 
   Map<String, Object?> toJson() => <String, Object?>{'member': member.toJson()};
+}
+
+class RegisterRequest {
+  const RegisterRequest({required this.password, required this.username});
+
+  factory RegisterRequest.fromJson(Map<String, Object?> json) {
+    return RegisterRequest(
+      password: readString(
+        requiredField(json, 'password', 'RegisterRequest'),
+        'RegisterRequest.password',
+      ),
+      username: readString(
+        requiredField(json, 'username', 'RegisterRequest'),
+        'RegisterRequest.username',
+      ),
+    );
+  }
+
+  final String password;
+  final String username;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'password': password,
+    'username': username,
+  };
+}
+
+class RegisterResponse {
+  const RegisterResponse({required this.account});
+
+  factory RegisterResponse.fromJson(Map<String, Object?> json) {
+    return RegisterResponse(
+      account: Account.fromJson(
+        readObject(
+          requiredField(json, 'account', 'RegisterResponse'),
+          'RegisterResponse.account',
+        ),
+      ),
+    );
+  }
+
+  final Account account;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'account': account.toJson(),
+  };
+}
+
+class ChangePasswordRequest {
+  const ChangePasswordRequest({
+    required this.currentPassword,
+    required this.newPassword,
+  });
+
+  factory ChangePasswordRequest.fromJson(Map<String, Object?> json) {
+    return ChangePasswordRequest(
+      currentPassword: readString(
+        requiredField(json, 'currentPassword', 'ChangePasswordRequest'),
+        'ChangePasswordRequest.currentPassword',
+      ),
+      newPassword: readString(
+        requiredField(json, 'newPassword', 'ChangePasswordRequest'),
+        'ChangePasswordRequest.newPassword',
+      ),
+    );
+  }
+
+  final String currentPassword;
+  final String newPassword;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'currentPassword': currentPassword,
+    'newPassword': newPassword,
+  };
+}
+
+class LoginRequest {
+  const LoginRequest({
+    this.device,
+    required this.password,
+    required this.username,
+  });
+
+  factory LoginRequest.fromJson(Map<String, Object?> json) {
+    return LoginRequest(
+      device: switch (optionalField(json, 'device', 'LoginRequest')) {
+        null => null,
+        final value => readString(value, 'LoginRequest.device'),
+      },
+      password: readString(
+        requiredField(json, 'password', 'LoginRequest'),
+        'LoginRequest.password',
+      ),
+      username: readString(
+        requiredField(json, 'username', 'LoginRequest'),
+        'LoginRequest.username',
+      ),
+    );
+  }
+
+  final String? device;
+  final String password;
+  final String username;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'device': ?device,
+    'password': password,
+    'username': username,
+  };
+}
+
+class LoginResponse {
+  const LoginResponse({
+    required this.account,
+    required this.device,
+    required this.member,
+    required this.memberToken,
+  });
+
+  factory LoginResponse.fromJson(Map<String, Object?> json) {
+    return LoginResponse(
+      account: Account.fromJson(
+        readObject(
+          requiredField(json, 'account', 'LoginResponse'),
+          'LoginResponse.account',
+        ),
+      ),
+      device: readString(
+        requiredField(json, 'device', 'LoginResponse'),
+        'LoginResponse.device',
+      ),
+      member: Member.fromJson(
+        readObject(
+          requiredField(json, 'member', 'LoginResponse'),
+          'LoginResponse.member',
+        ),
+      ),
+      memberToken: readString(
+        requiredField(json, 'memberToken', 'LoginResponse'),
+        'LoginResponse.memberToken',
+      ),
+    );
+  }
+
+  final Account account;
+  final String device;
+  final Member member;
+  final String memberToken;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'account': account.toJson(),
+    'device': device,
+    'member': member.toJson(),
+    'memberToken': memberToken,
+  };
+}
+
+class ListMyPlaylistsResponse {
+  const ListMyPlaylistsResponse({required this.items});
+
+  factory ListMyPlaylistsResponse.fromJson(Map<String, Object?> json) {
+    return ListMyPlaylistsResponse(
+      items:
+          readList(
+                requiredField(json, 'items', 'ListMyPlaylistsResponse'),
+                'ListMyPlaylistsResponse.items',
+              )
+              .map(
+                (item) => MyPlaylist.fromJson(
+                  readObject(item, 'ListMyPlaylistsResponse.items[]'),
+                ),
+              )
+              .toList(growable: false),
+    );
+  }
+
+  final List<MyPlaylist> items;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'items': items.map((item) => item.toJson()).toList(growable: false),
+  };
+}
+
+class CreateMyPlaylistRequest {
+  const CreateMyPlaylistRequest({required this.name});
+
+  factory CreateMyPlaylistRequest.fromJson(Map<String, Object?> json) {
+    return CreateMyPlaylistRequest(
+      name: readString(
+        requiredField(json, 'name', 'CreateMyPlaylistRequest'),
+        'CreateMyPlaylistRequest.name',
+      ),
+    );
+  }
+
+  final String name;
+
+  Map<String, Object?> toJson() => <String, Object?>{'name': name};
+}
+
+class RenameMyPlaylistRequest {
+  const RenameMyPlaylistRequest({required this.name});
+
+  factory RenameMyPlaylistRequest.fromJson(Map<String, Object?> json) {
+    return RenameMyPlaylistRequest(
+      name: readString(
+        requiredField(json, 'name', 'RenameMyPlaylistRequest'),
+        'RenameMyPlaylistRequest.name',
+      ),
+    );
+  }
+
+  final String name;
+
+  Map<String, Object?> toJson() => <String, Object?>{'name': name};
+}
+
+class ListMyPlaylistItemsResponse {
+  const ListMyPlaylistItemsResponse({required this.items});
+
+  factory ListMyPlaylistItemsResponse.fromJson(Map<String, Object?> json) {
+    return ListMyPlaylistItemsResponse(
+      items:
+          readList(
+                requiredField(json, 'items', 'ListMyPlaylistItemsResponse'),
+                'ListMyPlaylistItemsResponse.items',
+              )
+              .map(
+                (item) => MyPlaylistItem.fromJson(
+                  readObject(item, 'ListMyPlaylistItemsResponse.items[]'),
+                ),
+              )
+              .toList(growable: false),
+    );
+  }
+
+  final List<MyPlaylistItem> items;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'items': items.map((item) => item.toJson()).toList(growable: false),
+  };
+}
+
+class AddMyPlaylistItemRequest {
+  const AddMyPlaylistItemRequest({required this.track});
+
+  factory AddMyPlaylistItemRequest.fromJson(Map<String, Object?> json) {
+    return AddMyPlaylistItemRequest(
+      track: Track.fromJson(
+        readObject(
+          requiredField(json, 'track', 'AddMyPlaylistItemRequest'),
+          'AddMyPlaylistItemRequest.track',
+        ),
+      ),
+    );
+  }
+
+  final Track track;
+
+  Map<String, Object?> toJson() => <String, Object?>{'track': track.toJson()};
+}
+
+class AddMyPlaylistItemResponse {
+  const AddMyPlaylistItemResponse({required this.item});
+
+  factory AddMyPlaylistItemResponse.fromJson(Map<String, Object?> json) {
+    return AddMyPlaylistItemResponse(
+      item: MyPlaylistItem.fromJson(
+        readObject(
+          requiredField(json, 'item', 'AddMyPlaylistItemResponse'),
+          'AddMyPlaylistItemResponse.item',
+        ),
+      ),
+    );
+  }
+
+  final MyPlaylistItem item;
+
+  Map<String, Object?> toJson() => <String, Object?>{'item': item.toJson()};
+}
+
+class RemoveMyPlaylistItemsRequest {
+  const RemoveMyPlaylistItemsRequest({required this.tracks});
+
+  factory RemoveMyPlaylistItemsRequest.fromJson(Map<String, Object?> json) {
+    return RemoveMyPlaylistItemsRequest(
+      tracks:
+          readList(
+                requiredField(json, 'tracks', 'RemoveMyPlaylistItemsRequest'),
+                'RemoveMyPlaylistItemsRequest.tracks',
+              )
+              .map(
+                (item) => Track.fromJson(
+                  readObject(item, 'RemoveMyPlaylistItemsRequest.tracks[]'),
+                ),
+              )
+              .toList(growable: false),
+    );
+  }
+
+  final List<Track> tracks;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'tracks': tracks.map((item) => item.toJson()).toList(growable: false),
+  };
+}
+
+class CopyMyPlaylistItemsRequest {
+  const CopyMyPlaylistItemsRequest({required this.from, required this.tracks});
+
+  factory CopyMyPlaylistItemsRequest.fromJson(Map<String, Object?> json) {
+    return CopyMyPlaylistItemsRequest(
+      from: readString(
+        requiredField(json, 'from', 'CopyMyPlaylistItemsRequest'),
+        'CopyMyPlaylistItemsRequest.from',
+      ),
+      tracks:
+          readList(
+                requiredField(json, 'tracks', 'CopyMyPlaylistItemsRequest'),
+                'CopyMyPlaylistItemsRequest.tracks',
+              )
+              .map(
+                (item) => Track.fromJson(
+                  readObject(item, 'CopyMyPlaylistItemsRequest.tracks[]'),
+                ),
+              )
+              .toList(growable: false),
+    );
+  }
+
+  final String from;
+  final List<Track> tracks;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'from': from,
+    'tracks': tracks.map((item) => item.toJson()).toList(growable: false),
+  };
+}
+
+class CopyMyPlaylistItemsResponse {
+  const CopyMyPlaylistItemsResponse({required this.added});
+
+  factory CopyMyPlaylistItemsResponse.fromJson(Map<String, Object?> json) {
+    return CopyMyPlaylistItemsResponse(
+      added: readInt(
+        requiredField(json, 'added', 'CopyMyPlaylistItemsResponse'),
+        'CopyMyPlaylistItemsResponse.added',
+      ),
+    );
+  }
+
+  final int added;
+
+  Map<String, Object?> toJson() => <String, Object?>{'added': added};
+}
+
+class MoveMyPlaylistItemsRequest {
+  const MoveMyPlaylistItemsRequest({this.before, required this.tracks});
+
+  factory MoveMyPlaylistItemsRequest.fromJson(Map<String, Object?> json) {
+    return MoveMyPlaylistItemsRequest(
+      before: switch (optionalField(
+        json,
+        'before',
+        'MoveMyPlaylistItemsRequest',
+      )) {
+        null => null,
+        final value => Track.fromJson(
+          readObject(value, 'MoveMyPlaylistItemsRequest.before'),
+        ),
+      },
+      tracks:
+          readList(
+                requiredField(json, 'tracks', 'MoveMyPlaylistItemsRequest'),
+                'MoveMyPlaylistItemsRequest.tracks',
+              )
+              .map(
+                (item) => Track.fromJson(
+                  readObject(item, 'MoveMyPlaylistItemsRequest.tracks[]'),
+                ),
+              )
+              .toList(growable: false),
+    );
+  }
+
+  final Track? before;
+  final List<Track> tracks;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'before': ?before?.toJson(),
+    'tracks': tracks.map((item) => item.toJson()).toList(growable: false),
+  };
+}
+
+class ListMyTrackPlaylistsRequest {
+  const ListMyTrackPlaylistsRequest({required this.track});
+
+  factory ListMyTrackPlaylistsRequest.fromJson(Map<String, Object?> json) {
+    return ListMyTrackPlaylistsRequest(
+      track: Track.fromJson(
+        readObject(
+          requiredField(json, 'track', 'ListMyTrackPlaylistsRequest'),
+          'ListMyTrackPlaylistsRequest.track',
+        ),
+      ),
+    );
+  }
+
+  final Track track;
+
+  Map<String, Object?> toJson() => <String, Object?>{'track': track.toJson()};
+}
+
+class ListMyTrackPlaylistsResponse {
+  const ListMyTrackPlaylistsResponse({required this.playlistIds});
+
+  factory ListMyTrackPlaylistsResponse.fromJson(Map<String, Object?> json) {
+    return ListMyTrackPlaylistsResponse(
+      playlistIds:
+          readList(
+                requiredField(
+                  json,
+                  'playlistIds',
+                  'ListMyTrackPlaylistsResponse',
+                ),
+                'ListMyTrackPlaylistsResponse.playlistIds',
+              )
+              .map(
+                (item) => readString(
+                  item,
+                  'ListMyTrackPlaylistsResponse.playlistIds[]',
+                ),
+              )
+              .toList(growable: false),
+    );
+  }
+
+  final List<String> playlistIds;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'playlistIds': playlistIds,
+  };
+}
+
+class ImportMyPlaylistRequest {
+  const ImportMyPlaylistRequest({required this.name, required this.tracks});
+
+  factory ImportMyPlaylistRequest.fromJson(Map<String, Object?> json) {
+    return ImportMyPlaylistRequest(
+      name: readString(
+        requiredField(json, 'name', 'ImportMyPlaylistRequest'),
+        'ImportMyPlaylistRequest.name',
+      ),
+      tracks:
+          readList(
+                requiredField(json, 'tracks', 'ImportMyPlaylistRequest'),
+                'ImportMyPlaylistRequest.tracks',
+              )
+              .map(
+                (item) => ImportedTrack.fromJson(
+                  readObject(item, 'ImportMyPlaylistRequest.tracks[]'),
+                ),
+              )
+              .toList(growable: false),
+    );
+  }
+
+  final String name;
+  final List<ImportedTrack> tracks;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'name': name,
+    'tracks': tracks.map((item) => item.toJson()).toList(growable: false),
+  };
+}
+
+class ImportMyPlaylistResponse {
+  const ImportMyPlaylistResponse({
+    required this.imported,
+    required this.playlist,
+  });
+
+  factory ImportMyPlaylistResponse.fromJson(Map<String, Object?> json) {
+    return ImportMyPlaylistResponse(
+      imported: readInt(
+        requiredField(json, 'imported', 'ImportMyPlaylistResponse'),
+        'ImportMyPlaylistResponse.imported',
+      ),
+      playlist: MyPlaylist.fromJson(
+        readObject(
+          requiredField(json, 'playlist', 'ImportMyPlaylistResponse'),
+          'ImportMyPlaylistResponse.playlist',
+        ),
+      ),
+    );
+  }
+
+  final int imported;
+  final MyPlaylist playlist;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'imported': imported,
+    'playlist': playlist.toJson(),
+  };
+}
+
+class ResolveMyPlaylistLinkRequest {
+  const ResolveMyPlaylistLinkRequest({required this.link});
+
+  factory ResolveMyPlaylistLinkRequest.fromJson(Map<String, Object?> json) {
+    return ResolveMyPlaylistLinkRequest(
+      link: readString(
+        requiredField(json, 'link', 'ResolveMyPlaylistLinkRequest'),
+        'ResolveMyPlaylistLinkRequest.link',
+      ),
+    );
+  }
+
+  final String link;
+
+  Map<String, Object?> toJson() => <String, Object?>{'link': link};
+}
+
+class ResolveMyPlaylistLinkResponse {
+  const ResolveMyPlaylistLinkResponse({
+    required this.playlistId,
+    required this.source,
+  });
+
+  factory ResolveMyPlaylistLinkResponse.fromJson(Map<String, Object?> json) {
+    return ResolveMyPlaylistLinkResponse(
+      playlistId: readString(
+        requiredField(json, 'playlistId', 'ResolveMyPlaylistLinkResponse'),
+        'ResolveMyPlaylistLinkResponse.playlistId',
+      ),
+      source: Source.fromJson(
+        requiredField(json, 'source', 'ResolveMyPlaylistLinkResponse'),
+      ),
+    );
+  }
+
+  final String playlistId;
+  final Source source;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'playlistId': playlistId,
+    'source': source.toJson(),
+  };
+}
+
+class ImportMyPlatformPlaylistRequest {
+  const ImportMyPlatformPlaylistRequest({
+    required this.name,
+    required this.playlistId,
+    required this.source,
+  });
+
+  factory ImportMyPlatformPlaylistRequest.fromJson(Map<String, Object?> json) {
+    return ImportMyPlatformPlaylistRequest(
+      name: readString(
+        requiredField(json, 'name', 'ImportMyPlatformPlaylistRequest'),
+        'ImportMyPlatformPlaylistRequest.name',
+      ),
+      playlistId: readString(
+        requiredField(json, 'playlistId', 'ImportMyPlatformPlaylistRequest'),
+        'ImportMyPlatformPlaylistRequest.playlistId',
+      ),
+      source: Source.fromJson(
+        requiredField(json, 'source', 'ImportMyPlatformPlaylistRequest'),
+      ),
+    );
+  }
+
+  final String name;
+  final String playlistId;
+  final Source source;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'name': name,
+    'playlistId': playlistId,
+    'source': source.toJson(),
+  };
+}
+
+class ImportMyPlatformPlaylistResponse {
+  const ImportMyPlatformPlaylistResponse({
+    required this.imported,
+    required this.playlist,
+  });
+
+  factory ImportMyPlatformPlaylistResponse.fromJson(Map<String, Object?> json) {
+    return ImportMyPlatformPlaylistResponse(
+      imported: readInt(
+        requiredField(json, 'imported', 'ImportMyPlatformPlaylistResponse'),
+        'ImportMyPlatformPlaylistResponse.imported',
+      ),
+      playlist: MyPlaylist.fromJson(
+        readObject(
+          requiredField(json, 'playlist', 'ImportMyPlatformPlaylistResponse'),
+          'ImportMyPlatformPlaylistResponse.playlist',
+        ),
+      ),
+    );
+  }
+
+  final int imported;
+  final MyPlaylist playlist;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'imported': imported,
+    'playlist': playlist.toJson(),
+  };
 }
 
 class ListRoomsResponse {
@@ -1878,7 +2856,11 @@ class CreateTicketResponse {
 }
 
 class GetSiteResponse {
-  const GetSiteResponse({required this.brandName});
+  const GetSiteResponse({
+    required this.brandName,
+    required this.githubLogin,
+    required this.registrationOpen,
+  });
 
   factory GetSiteResponse.fromJson(Map<String, Object?> json) {
     return GetSiteResponse(
@@ -1886,12 +2868,26 @@ class GetSiteResponse {
         requiredField(json, 'brandName', 'GetSiteResponse'),
         'GetSiteResponse.brandName',
       ),
+      githubLogin: readBool(
+        requiredField(json, 'githubLogin', 'GetSiteResponse'),
+        'GetSiteResponse.githubLogin',
+      ),
+      registrationOpen: readBool(
+        requiredField(json, 'registrationOpen', 'GetSiteResponse'),
+        'GetSiteResponse.registrationOpen',
+      ),
     );
   }
 
   final String brandName;
+  final bool githubLogin;
+  final bool registrationOpen;
 
-  Map<String, Object?> toJson() => <String, Object?>{'brandName': brandName};
+  Map<String, Object?> toJson() => <String, Object?>{
+    'brandName': brandName,
+    'githubLogin': githubLogin,
+    'registrationOpen': registrationOpen,
+  };
 }
 
 class AdminListRoomsResponse {
@@ -2315,6 +3311,80 @@ class AdminSetYoutubeCredentialRequest {
   Map<String, Object?> toJson() => <String, Object?>{'cookies': cookies};
 }
 
+class AdminGetGithubCredentialResponse {
+  const AdminGetGithubCredentialResponse({
+    required this.callbackUrl,
+    required this.clientId,
+    required this.clientSecretSet,
+  });
+
+  factory AdminGetGithubCredentialResponse.fromJson(Map<String, Object?> json) {
+    return AdminGetGithubCredentialResponse(
+      callbackUrl: readString(
+        requiredField(json, 'callbackUrl', 'AdminGetGithubCredentialResponse'),
+        'AdminGetGithubCredentialResponse.callbackUrl',
+      ),
+      clientId: switch (requiredField(
+        json,
+        'clientId',
+        'AdminGetGithubCredentialResponse',
+      )) {
+        null => null,
+        final value => readString(
+          value,
+          'AdminGetGithubCredentialResponse.clientId',
+        ),
+      },
+      clientSecretSet: readBool(
+        requiredField(
+          json,
+          'clientSecretSet',
+          'AdminGetGithubCredentialResponse',
+        ),
+        'AdminGetGithubCredentialResponse.clientSecretSet',
+      ),
+    );
+  }
+
+  final String callbackUrl;
+  final String? clientId;
+  final bool clientSecretSet;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'callbackUrl': callbackUrl,
+    'clientId': clientId,
+    'clientSecretSet': clientSecretSet,
+  };
+}
+
+class AdminSetGithubCredentialRequest {
+  const AdminSetGithubCredentialRequest({
+    required this.clientId,
+    required this.clientSecret,
+  });
+
+  factory AdminSetGithubCredentialRequest.fromJson(Map<String, Object?> json) {
+    return AdminSetGithubCredentialRequest(
+      clientId: readString(
+        requiredField(json, 'clientId', 'AdminSetGithubCredentialRequest'),
+        'AdminSetGithubCredentialRequest.clientId',
+      ),
+      clientSecret: readString(
+        requiredField(json, 'clientSecret', 'AdminSetGithubCredentialRequest'),
+        'AdminSetGithubCredentialRequest.clientSecret',
+      ),
+    );
+  }
+
+  final String clientId;
+  final String clientSecret;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'clientId': clientId,
+    'clientSecret': clientSecret,
+  };
+}
+
 class AdminListMediaResponse {
   const AdminListMediaResponse({required this.items});
 
@@ -2373,6 +3443,400 @@ class AdminUpdateSiteResponse {
   final String brandName;
 
   Map<String, Object?> toJson() => <String, Object?>{'brandName': brandName};
+}
+
+class AdminOpenRegistrationRequest {
+  const AdminOpenRegistrationRequest();
+
+  factory AdminOpenRegistrationRequest.fromJson(Map<String, Object?> json) =>
+      const AdminOpenRegistrationRequest();
+
+  Map<String, Object?> toJson() => <String, Object?>{};
+}
+
+class AdminResetAccountPasswordRequest {
+  const AdminResetAccountPasswordRequest();
+
+  factory AdminResetAccountPasswordRequest.fromJson(
+    Map<String, Object?> json,
+  ) => const AdminResetAccountPasswordRequest();
+
+  Map<String, Object?> toJson() => <String, Object?>{};
+}
+
+class AdminResetAccountPasswordResponse {
+  const AdminResetAccountPasswordResponse({required this.password});
+
+  factory AdminResetAccountPasswordResponse.fromJson(
+    Map<String, Object?> json,
+  ) {
+    return AdminResetAccountPasswordResponse(
+      password: readString(
+        requiredField(json, 'password', 'AdminResetAccountPasswordResponse'),
+        'AdminResetAccountPasswordResponse.password',
+      ),
+    );
+  }
+
+  final String password;
+
+  Map<String, Object?> toJson() => <String, Object?>{'password': password};
+}
+
+class ListMyListensResponse {
+  const ListMyListensResponse({required this.items});
+
+  factory ListMyListensResponse.fromJson(Map<String, Object?> json) {
+    return ListMyListensResponse(
+      items:
+          readList(
+                requiredField(json, 'items', 'ListMyListensResponse'),
+                'ListMyListensResponse.items',
+              )
+              .map(
+                (item) => MyListen.fromJson(
+                  readObject(item, 'ListMyListensResponse.items[]'),
+                ),
+              )
+              .toList(growable: false),
+    );
+  }
+
+  final List<MyListen> items;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'items': items.map((item) => item.toJson()).toList(growable: false),
+  };
+}
+
+class RemoveMyListenRequest {
+  const RemoveMyListenRequest({required this.track});
+
+  factory RemoveMyListenRequest.fromJson(Map<String, Object?> json) {
+    return RemoveMyListenRequest(
+      track: Track.fromJson(
+        readObject(
+          requiredField(json, 'track', 'RemoveMyListenRequest'),
+          'RemoveMyListenRequest.track',
+        ),
+      ),
+    );
+  }
+
+  final Track track;
+
+  Map<String, Object?> toJson() => <String, Object?>{'track': track.toJson()};
+}
+
+class EnableListenRecordingRequest {
+  const EnableListenRecordingRequest();
+
+  factory EnableListenRecordingRequest.fromJson(Map<String, Object?> json) =>
+      const EnableListenRecordingRequest();
+
+  Map<String, Object?> toJson() => <String, Object?>{};
+}
+
+class ShareMyPlaylistRequest {
+  const ShareMyPlaylistRequest();
+
+  factory ShareMyPlaylistRequest.fromJson(Map<String, Object?> json) =>
+      const ShareMyPlaylistRequest();
+
+  Map<String, Object?> toJson() => <String, Object?>{};
+}
+
+class ShareMyPlaylistResponse {
+  const ShareMyPlaylistResponse({required this.shareId});
+
+  factory ShareMyPlaylistResponse.fromJson(Map<String, Object?> json) {
+    return ShareMyPlaylistResponse(
+      shareId: readString(
+        requiredField(json, 'shareId', 'ShareMyPlaylistResponse'),
+        'ShareMyPlaylistResponse.shareId',
+      ),
+    );
+  }
+
+  final String shareId;
+
+  Map<String, Object?> toJson() => <String, Object?>{'shareId': shareId};
+}
+
+class CopySharedPlaylistRequest {
+  const CopySharedPlaylistRequest({required this.name});
+
+  factory CopySharedPlaylistRequest.fromJson(Map<String, Object?> json) {
+    return CopySharedPlaylistRequest(
+      name: readString(
+        requiredField(json, 'name', 'CopySharedPlaylistRequest'),
+        'CopySharedPlaylistRequest.name',
+      ),
+    );
+  }
+
+  final String name;
+
+  Map<String, Object?> toJson() => <String, Object?>{'name': name};
+}
+
+class CreatePairingCodeRequest {
+  const CreatePairingCodeRequest();
+
+  factory CreatePairingCodeRequest.fromJson(Map<String, Object?> json) =>
+      const CreatePairingCodeRequest();
+
+  Map<String, Object?> toJson() => <String, Object?>{};
+}
+
+class CreatePairingCodeResponse {
+  const CreatePairingCodeResponse({
+    required this.code,
+    required this.expiresAtMs,
+    required this.qrImage,
+  });
+
+  factory CreatePairingCodeResponse.fromJson(Map<String, Object?> json) {
+    return CreatePairingCodeResponse(
+      code: readString(
+        requiredField(json, 'code', 'CreatePairingCodeResponse'),
+        'CreatePairingCodeResponse.code',
+      ),
+      expiresAtMs: readInt(
+        requiredField(json, 'expiresAtMs', 'CreatePairingCodeResponse'),
+        'CreatePairingCodeResponse.expiresAtMs',
+      ),
+      qrImage: readString(
+        requiredField(json, 'qrImage', 'CreatePairingCodeResponse'),
+        'CreatePairingCodeResponse.qrImage',
+      ),
+    );
+  }
+
+  final String code;
+  final int expiresAtMs;
+  final String qrImage;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'code': code,
+    'expiresAtMs': expiresAtMs,
+    'qrImage': qrImage,
+  };
+}
+
+class RedeemPairingCodeRequest {
+  const RedeemPairingCodeRequest({required this.code});
+
+  factory RedeemPairingCodeRequest.fromJson(Map<String, Object?> json) {
+    return RedeemPairingCodeRequest(
+      code: readString(
+        requiredField(json, 'code', 'RedeemPairingCodeRequest'),
+        'RedeemPairingCodeRequest.code',
+      ),
+    );
+  }
+
+  final String code;
+
+  Map<String, Object?> toJson() => <String, Object?>{'code': code};
+}
+
+class RedeemPairingCodeResponse {
+  const RedeemPairingCodeResponse({
+    required this.account,
+    required this.member,
+    required this.memberToken,
+  });
+
+  factory RedeemPairingCodeResponse.fromJson(Map<String, Object?> json) {
+    return RedeemPairingCodeResponse(
+      account: Account.fromJson(
+        readObject(
+          requiredField(json, 'account', 'RedeemPairingCodeResponse'),
+          'RedeemPairingCodeResponse.account',
+        ),
+      ),
+      member: Member.fromJson(
+        readObject(
+          requiredField(json, 'member', 'RedeemPairingCodeResponse'),
+          'RedeemPairingCodeResponse.member',
+        ),
+      ),
+      memberToken: readString(
+        requiredField(json, 'memberToken', 'RedeemPairingCodeResponse'),
+        'RedeemPairingCodeResponse.memberToken',
+      ),
+    );
+  }
+
+  final Account account;
+  final Member member;
+  final String memberToken;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'account': account.toJson(),
+    'member': member.toJson(),
+    'memberToken': memberToken,
+  };
+}
+
+class StartGithubLoginRequest {
+  const StartGithubLoginRequest({
+    this.client,
+    this.currentPassword,
+    required this.intent,
+    required this.nonce,
+  });
+
+  factory StartGithubLoginRequest.fromJson(Map<String, Object?> json) {
+    return StartGithubLoginRequest(
+      client: switch (optionalField(
+        json,
+        'client',
+        'StartGithubLoginRequest',
+      )) {
+        null => null,
+        final value => GitHubClient.fromJson(value),
+      },
+      currentPassword: switch (optionalField(
+        json,
+        'currentPassword',
+        'StartGithubLoginRequest',
+      )) {
+        null => null,
+        final value => readString(
+          value,
+          'StartGithubLoginRequest.currentPassword',
+        ),
+      },
+      intent: GitHubIntent.fromJson(
+        requiredField(json, 'intent', 'StartGithubLoginRequest'),
+      ),
+      nonce: readString(
+        requiredField(json, 'nonce', 'StartGithubLoginRequest'),
+        'StartGithubLoginRequest.nonce',
+      ),
+    );
+  }
+
+  final GitHubClient? client;
+  final String? currentPassword;
+  final GitHubIntent intent;
+  final String nonce;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'client': ?client?.toJson(),
+    'currentPassword': ?currentPassword,
+    'intent': intent.toJson(),
+    'nonce': nonce,
+  };
+}
+
+class StartGithubLoginResponse {
+  const StartGithubLoginResponse({required this.url});
+
+  factory StartGithubLoginResponse.fromJson(Map<String, Object?> json) {
+    return StartGithubLoginResponse(
+      url: readString(
+        requiredField(json, 'url', 'StartGithubLoginResponse'),
+        'StartGithubLoginResponse.url',
+      ),
+    );
+  }
+
+  final String url;
+
+  Map<String, Object?> toJson() => <String, Object?>{'url': url};
+}
+
+class FinishGithubLoginRequest {
+  const FinishGithubLoginRequest({required this.code, required this.nonce});
+
+  factory FinishGithubLoginRequest.fromJson(Map<String, Object?> json) {
+    return FinishGithubLoginRequest(
+      code: readString(
+        requiredField(json, 'code', 'FinishGithubLoginRequest'),
+        'FinishGithubLoginRequest.code',
+      ),
+      nonce: readString(
+        requiredField(json, 'nonce', 'FinishGithubLoginRequest'),
+        'FinishGithubLoginRequest.nonce',
+      ),
+    );
+  }
+
+  final String code;
+  final String nonce;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'code': code,
+    'nonce': nonce,
+  };
+}
+
+class FinishGithubLoginResponse {
+  const FinishGithubLoginResponse({
+    required this.account,
+    required this.member,
+    this.memberToken,
+  });
+
+  factory FinishGithubLoginResponse.fromJson(Map<String, Object?> json) {
+    return FinishGithubLoginResponse(
+      account: Account.fromJson(
+        readObject(
+          requiredField(json, 'account', 'FinishGithubLoginResponse'),
+          'FinishGithubLoginResponse.account',
+        ),
+      ),
+      member: Member.fromJson(
+        readObject(
+          requiredField(json, 'member', 'FinishGithubLoginResponse'),
+          'FinishGithubLoginResponse.member',
+        ),
+      ),
+      memberToken: switch (optionalField(
+        json,
+        'memberToken',
+        'FinishGithubLoginResponse',
+      )) {
+        null => null,
+        final value => readString(
+          value,
+          'FinishGithubLoginResponse.memberToken',
+        ),
+      },
+    );
+  }
+
+  final Account account;
+  final Member member;
+  final String? memberToken;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'account': account.toJson(),
+    'member': member.toJson(),
+    'memberToken': ?memberToken,
+  };
+}
+
+class UnbindGithubRequest {
+  const UnbindGithubRequest({required this.currentPassword});
+
+  factory UnbindGithubRequest.fromJson(Map<String, Object?> json) {
+    return UnbindGithubRequest(
+      currentPassword: readString(
+        requiredField(json, 'currentPassword', 'UnbindGithubRequest'),
+        'UnbindGithubRequest.currentPassword',
+      ),
+    );
+  }
+
+  final String currentPassword;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'currentPassword': currentPassword,
+  };
 }
 
 abstract final class RoomRequestTypes {
