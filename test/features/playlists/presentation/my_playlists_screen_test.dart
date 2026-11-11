@@ -24,11 +24,18 @@ void main() {
   late FakePlaylistFileSource files;
   late List<String> opened;
   late List<(ToastKind, String)> notices;
+  late List<Duration?> noticeDurations;
   late int accountOpened;
+
+  void notice(ToastKind kind, String text, {Duration? duration}) {
+    notices.add((kind, text));
+    noticeDurations.add(duration);
+  }
 
   setUp(() {
     opened = [];
     notices = [];
+    noticeDurations = [];
     accountOpened = 0;
     files = FakePlaylistFileSource();
     server = FakePlaylistApi()
@@ -50,7 +57,7 @@ void main() {
       MyPlaylistsScreen(
         onOpenPlaylist: opened.add,
         onOpenAccount: () => accountOpened++,
-        onNotice: (kind, text) => notices.add((kind, text)),
+        onNotice: notice,
       ),
       playlists: server,
       files: files,
@@ -400,6 +407,9 @@ void main() {
     expect(notices, [
       (ToastKind.success, '已导入 1 首到“旧歌单”。文件里超过 1000 首，只导入了前 1000 首。'),
     ]);
+    expect(noticeDurations, [
+      AlistenDurations.longToast,
+    ], reason: 'like Web, the long notice stays longer');
     expect(find.text('旧歌单'), findsOneWidget);
     expect(opened, isEmpty, reason: 'like Web, the new playlist is not opened');
   });
@@ -433,6 +443,7 @@ void main() {
     reply.complete();
     await settlePage(tester);
     expect(notices, [(ToastKind.success, '已导入 1 首到“旧歌单”')]);
+    expect(noticeDurations, [null], reason: 'a short notice keeps the default');
     expect(find.text('导入'), findsOneWidget);
     expect(files.picks, 1);
   });
@@ -734,7 +745,7 @@ void main() {
       final page = MyPlaylistsScreen(
         onOpenPlaylist: opened.add,
         onOpenAccount: () {},
-        onNotice: (kind, text) => notices.add((kind, text)),
+        onNotice: notice,
       );
       await pumpPlaylistsPage(
         tester,

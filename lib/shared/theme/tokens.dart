@@ -106,6 +106,7 @@ abstract final class AlistenDurations {
   static const theme = Duration(milliseconds: 600);
   static const backdrop = Duration(milliseconds: 800);
   static const toast = Duration(seconds: 3);
+  static const longToast = Duration(seconds: 6);
   static const auroraLoop = Duration(seconds: 24);
 
   static Duration of(BuildContext context, Duration duration) {

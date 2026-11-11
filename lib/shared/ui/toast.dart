@@ -27,10 +27,10 @@ final class ToastController extends ChangeNotifier {
 
   ToastMessage? get current => _current;
 
-  void show(ToastKind kind, String text) {
+  void show(ToastKind kind, String text, {Duration? duration}) {
     _timer?.cancel();
     _current = ToastMessage(kind, text);
-    _timer = Timer(duration, dismiss);
+    _timer = Timer(duration ?? this.duration, dismiss);
     notifyListeners();
   }
 

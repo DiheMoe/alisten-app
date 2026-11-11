@@ -83,4 +83,34 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('第二条'), findsNothing);
   });
+
+  testWidgets('a toast given its own time stays that long, and the next one '
+      'is back to 3 s', (tester) async {
+    final toasts = ToastController();
+    addTearDown(toasts.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) =>
+            ToastHost(controller: toasts, child: child!),
+        home: const SizedBox.expand(),
+      ),
+    );
+
+    toasts.show(ToastKind.success, '长提示', duration: const Duration(seconds: 6));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 5900));
+    expect(find.text('长提示'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
+    expect(find.text('长提示'), findsNothing);
+    expect(toasts.current, isNull);
+
+    toasts.show(ToastKind.info, '短提示');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2900));
+    expect(find.text('短提示'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
+    expect(find.text('短提示'), findsNothing);
+  });
 }

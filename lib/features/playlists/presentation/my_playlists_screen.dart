@@ -44,7 +44,8 @@ class MyPlaylistsScreen extends ConsumerStatefulWidget {
   final VoidCallback onOpenAccount;
 
   /// 删除和导入的结果可能在页面关闭之后才提示。
-  final PlaylistNotice onNotice;
+  final void Function(ToastKind kind, String text, {Duration? duration})
+  onNotice;
 
   @override
   ConsumerState<MyPlaylistsScreen> createState() => _MyPlaylistsScreenState();
@@ -101,18 +102,22 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
       await holdingWhile(context, myPlaylistsControllerProvider, () async {
         final result = await playlists.importFromFile();
         if (result == null) return;
-        reportPlaylistResult(
-          notice,
-          result,
-          success: switch (result) {
-            MutationSucceeded(
-              value: (:final playlist, :final imported, :final truncated),
-            ) =>
-              '已导入 $imported 首到“${playlist.name}”'
-                  '${truncated ? _truncatedText : ''}',
-            _ => null,
-          },
-        );
+        if (result case MutationSucceeded(
+          value: (:final playlist, :final imported, :final truncated),
+        )) {
+          final done = '已导入 $imported 首到“${playlist.name}”';
+          if (truncated) {
+            notice(
+              ToastKind.success,
+              '$done$_truncatedText',
+              duration: AlistenDurations.longToast,
+            );
+          } else {
+            notice(ToastKind.success, done);
+          }
+        } else {
+          reportPlaylistResult(notice, result);
+        }
       });
     } finally {
       if (mounted) setState(() => _importing = false);
