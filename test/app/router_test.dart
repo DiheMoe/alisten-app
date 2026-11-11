@@ -303,8 +303,9 @@ void main() {
 
     testWidgets('has a page under the settings, and the session ends once '
         'the page is left', (tester) async {
+      final api = FakeAlistenApi();
       final admin = FakeAdminApi();
-      await pumpAlistenApp(tester, admin: admin);
+      await pumpAlistenApp(tester, api: api, admin: admin);
       final router = appContainer(tester).read(routerProvider);
 
       router.go('/settings/admin');
@@ -322,19 +323,24 @@ void main() {
         300,
         scrollable: find.byType(Scrollable).first,
       );
-      // 验证 token 和后台首页各读一次常驻房间列表，各音源账号各读一次，YouTube
-      // Cookie 状态读一次；读取品牌名不带 token。
-      expect(admin.listRoomsCalls, 2);
+      // 验证 token 和后台首页各读一次常驻房间列表，滚动时被回收的分组还会再读；
+      // 各音源账号、YouTube Cookie 和 GitHub 登录状态各读一次，都带这个 token。
+      expect(admin.listRoomsCalls, greaterThanOrEqualTo(2));
       expect(admin.sourceAccountCalls, unorderedEquals(LoginSource.values));
       expect(admin.getYoutubeCookieCalls, 1);
-      expect(admin.tokens, List.filled(6, 't-1'));
+      expect(admin.getGithubAppCalls, 1);
+      expect(admin.tokens, isNotEmpty);
+      expect(admin.tokens, everyElement('t-1'));
       expect(active(tester), isTrue);
+      final siteReads = api.getSiteCalls;
 
       router.go('/settings');
       await tester.pumpAndSettle();
 
       expect(active(tester), isFalse);
       expect(find.byType(AdminScreen), findsNothing);
+      // 后台可能刚开关了 GitHub 登录或注册，设置页要重新读取。
+      expect(api.getSiteCalls, siteReads + 1);
 
       router.go('/settings/admin');
       await tester.pumpAndSettle();

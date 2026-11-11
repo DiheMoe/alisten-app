@@ -184,9 +184,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'admin',
                     parentNavigatorKey: rootNavigator,
-                    // 管理 token 只在后台页面存续期间有效。
+                    // 管理 token 只在后台页面存续期间有效。后台里可能开关了注册或
+                    // GitHub 登录，回到设置页时重新读取站点能力。
                     onExit: (context, state) {
                       ref.read(adminSessionProvider.notifier).end();
+                      ref.invalidate(siteCapabilitiesProvider);
                       return true;
                     },
                     pageBuilder: _page(

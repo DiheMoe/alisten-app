@@ -459,13 +459,14 @@ void main() {
     expect(notices, isEmpty);
     expect(_inRow(LoginSource.netease, '已登录'), findsOneWidget);
 
+    int qqReads() => api.sourceAccountCalls
+        .where((source) => source == LoginSource.qq)
+        .length;
+    final qqBefore = qqReads();
     await signIn(tester, LoginSource.qq);
     await tester.tapAt(const Offset(20, 40));
     await tester.pumpAndSettle();
-    expect(
-      api.sourceAccountCalls.where((source) => source == LoginSource.qq),
-      hasLength(2),
-    );
+    expect(qqReads(), qqBefore + 1);
   });
 
   sheetTest('a device clock ahead of the server by more than the life of the '

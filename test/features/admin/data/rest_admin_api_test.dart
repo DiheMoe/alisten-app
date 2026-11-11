@@ -496,6 +496,79 @@ void main() {
     expect(request.authorization, 'Bearer t');
   });
 
+  test('the GitHub OAuth App is read with its callback address, and an '
+      'unset client id means GitHub is off', () async {
+    adapter.respond(200, {
+      'clientId': 'Iv1.abc',
+      'clientSecretSet': true,
+      'callbackUrl': 'https://example.com:8443/api/auth/github/callback',
+    });
+
+    final status = await api.getGithubApp('t');
+
+    final request = adapter.requests.single;
+    expect(request.method, 'GET');
+    expect(request.path, '/api/admin/credentials/github');
+    expect(request.authorization, 'Bearer t');
+    expect(status.clientId, 'Iv1.abc');
+    expect(status.clientSecretSet, isTrue);
+    expect(status.enabled, isTrue);
+    expect(
+      status.callbackUrl,
+      'https://example.com:8443/api/auth/github/callback',
+    );
+
+    adapter.respond(200, {
+      'clientId': null,
+      'clientSecretSet': false,
+      'callbackUrl': 'https://example.com:8443/api/auth/github/callback',
+    });
+    final off = await api.getGithubApp('t');
+    expect(off.clientId, isNull);
+    expect(off.enabled, isFalse);
+  });
+
+  test('the GitHub OAuth App is put whole, and its secret never reaches the '
+      'log', () async {
+    final records = <String>[];
+    AppLog.onRecord = (name, level, message) => records.add('$name $message');
+    addTearDown(() => AppLog.onRecord = null);
+    adapter.respondRaw(204, '', null);
+
+    await api.setGithubApp('t', clientId: 'Iv1.abc', clientSecret: 'secret-1');
+
+    final request = adapter.requests.single;
+    expect(request.method, 'PUT');
+    expect(request.path, '/api/admin/credentials/github');
+    expect(request.authorization, 'Bearer t');
+    expect(request.jsonBody, {
+      'clientId': 'Iv1.abc',
+      'clientSecret': 'secret-1',
+    });
+
+    adapter.respond(400, {
+      'error': {'code': 'INVALID_ARGUMENT', 'message': 'Client ID 格式不对'},
+    });
+    await expectLater(
+      api.setGithubApp('t', clientId: 'bad id', clientSecret: 'secret-2'),
+      throwsA(
+        isA<ApiException>().having((e) => e.code, 'code', 'INVALID_ARGUMENT'),
+      ),
+    );
+    expect(records.where((r) => r.contains('secret-')), isEmpty);
+  });
+
+  test('GitHub login is closed with the admin token', () async {
+    adapter.respondRaw(204, '', null);
+
+    await api.deleteGithubApp('t');
+
+    final request = adapter.requests.single;
+    expect(request.method, 'DELETE');
+    expect(request.path, '/api/admin/credentials/github');
+    expect(request.authorization, 'Bearer t');
+  });
+
   test('an account is found by its username and its password reset', () async {
     adapter.respond(200, {
       'member': {'id': 'm-1', 'name': '大猫', 'avatarHash': ''},
@@ -596,6 +669,10 @@ void main() {
       'YouTube cookie status': () => api.getYoutubeCookie('t'),
       'YouTube cookies saved': () => api.setYoutubeCookie('t', 'c=1'),
       'YouTube cookies cleared': () => api.deleteYoutubeCookie('t'),
+      'GitHub app status': () => api.getGithubApp('t'),
+      'GitHub app saved': () =>
+          api.setGithubApp('t', clientId: 'Iv1.abc', clientSecret: 's'),
+      'GitHub app closed': () => api.deleteGithubApp('t'),
     };
     for (final MapEntry(key: name, value: call) in local.entries) {
       test('15 seconds for the $name, which the server answers by itself', () {

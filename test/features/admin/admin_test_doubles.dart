@@ -6,8 +6,8 @@ import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/admin/index.dart';
 
 /// 各 `…Gate` 不为 null 时，对应调用记录之后等它完成才回复。变更成功时像服务端
-/// 一样更新 [rooms]、[apiKeyStatus] 和 [youtubeCookie]。[createdDrafts]、
-/// [updates]、[deletedRoomIds] 和 [savedCookies] 也记录失败的调用。
+/// 一样更新 [rooms]、[apiKeyStatus]、[youtubeCookie] 和 [githubApp]。[createdDrafts]、
+/// [updates]、[deletedRoomIds]、[savedCookies] 和 [savedGithubApps] 也记录失败的调用。
 final class FakeAdminApi implements AdminApi {
   final List<String> tokens = [];
   List<RoomListing> rooms = [];
@@ -91,6 +91,22 @@ final class FakeAdminApi implements AdminApi {
   Object? deleteYoutubeCookieError;
   Completer<void>? deleteYoutubeCookieGate;
   int deleteYoutubeCookieCalls = 0;
+
+  GithubAppStatus githubApp = const GithubAppStatus(
+    clientId: null,
+    clientSecretSet: false,
+    callbackUrl: 'https://example.com:8443/api/auth/github/callback',
+  );
+  Object? getGithubAppError;
+  Completer<void>? getGithubAppGate;
+  int getGithubAppCalls = 0;
+
+  final List<({String clientId, String clientSecret})> savedGithubApps = [];
+  Object? setGithubAppError;
+  Completer<void>? setGithubAppGate;
+  Object? deleteGithubAppError;
+  Completer<void>? deleteGithubAppGate;
+  int deleteGithubAppCalls = 0;
 
   @override
   Future<List<RoomListing>> listRooms(String token) async {
@@ -315,6 +331,47 @@ final class FakeAdminApi implements AdminApi {
     await deleteYoutubeCookieGate?.future;
     if (deleteYoutubeCookieError case final error?) return Future.error(error);
     youtubeCookie = const YoutubeCookieStatus(saved: false, updatedAtMs: 0);
+  }
+
+  @override
+  Future<GithubAppStatus> getGithubApp(String token) async {
+    tokens.add(token);
+    getGithubAppCalls++;
+    final status = githubApp;
+    final error = getGithubAppError;
+    await getGithubAppGate?.future;
+    if (error != null) return Future.error(error);
+    return status;
+  }
+
+  @override
+  Future<void> setGithubApp(
+    String token, {
+    required String clientId,
+    required String clientSecret,
+  }) async {
+    tokens.add(token);
+    savedGithubApps.add((clientId: clientId, clientSecret: clientSecret));
+    await setGithubAppGate?.future;
+    if (setGithubAppError case final error?) return Future.error(error);
+    githubApp = GithubAppStatus(
+      clientId: clientId,
+      clientSecretSet: true,
+      callbackUrl: githubApp.callbackUrl,
+    );
+  }
+
+  @override
+  Future<void> deleteGithubApp(String token) async {
+    tokens.add(token);
+    deleteGithubAppCalls++;
+    await deleteGithubAppGate?.future;
+    if (deleteGithubAppError case final error?) return Future.error(error);
+    githubApp = GithubAppStatus(
+      clientId: null,
+      clientSecretSet: false,
+      callbackUrl: githubApp.callbackUrl,
+    );
   }
 }
 

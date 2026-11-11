@@ -56,6 +56,17 @@ abstract interface class AdminApi {
   Future<void> setYoutubeCookie(String token, String cookies);
 
   Future<void> deleteYoutubeCookie(String token);
+
+  Future<GithubAppStatus> getGithubApp(String token);
+
+  /// 两项都必填：服务端没有读取 Client Secret 的接口，修改时要一起重新填写。
+  Future<void> setGithubApp(
+    String token, {
+    required String clientId,
+    required String clientSecret,
+  });
+
+  Future<void> deleteGithubApp(String token);
 }
 
 final adminApiProvider = Provider<AdminApi>((ref) {

@@ -323,6 +323,48 @@ final class RestAdminApi implements AdminApi {
     );
   }
 
+  @override
+  Future<GithubAppStatus> getGithubApp(String token) {
+    return _request(
+      http.RestEndpoints.adminGetGithubCredential,
+      token: token,
+      decode: (json) {
+        final response = protocol.AdminGetGithubCredentialResponse.fromJson(
+          json,
+        );
+        return GithubAppStatus(
+          clientId: response.clientId,
+          clientSecretSet: response.clientSecretSet,
+          callbackUrl: response.callbackUrl,
+        );
+      },
+    );
+  }
+
+  @override
+  Future<void> setGithubApp(
+    String token, {
+    required String clientId,
+    required String clientSecret,
+  }) async {
+    await _transport.execute(
+      http.RestEndpoints.adminSetGithubCredential,
+      token: token,
+      body: protocol.AdminSetGithubCredentialRequest(
+        clientId: clientId,
+        clientSecret: clientSecret,
+      ).toJson(),
+    );
+  }
+
+  @override
+  Future<void> deleteGithubApp(String token) async {
+    await _transport.execute(
+      http.RestEndpoints.adminDeleteGithubCredential,
+      token: token,
+    );
+  }
+
   static SourceAccountStatus _accountStatus(
     bool saved,
     protocol.SourceAccount? account,

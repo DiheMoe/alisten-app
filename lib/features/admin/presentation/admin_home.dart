@@ -1,4 +1,5 @@
 import 'package:alisten/features/admin/presentation/accounts_group.dart';
+import 'package:alisten/features/admin/presentation/github_app_group.dart';
 import 'package:alisten/features/admin/presentation/registration_group.dart';
 import 'package:alisten/features/admin/presentation/rooms_group.dart';
 import 'package:alisten/features/admin/presentation/site_group.dart';
@@ -60,6 +61,10 @@ class AdminHome extends ConsumerWidget {
           _Group(
             title: '注册',
             child: RegistrationGroup(onNotice: onNotice),
+          ),
+          _Group(
+            title: 'GitHub 登录',
+            child: GithubAppGroup(onNotice: onNotice),
           ),
           _Group(
             title: '账号',

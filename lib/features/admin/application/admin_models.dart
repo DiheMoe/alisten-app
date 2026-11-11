@@ -105,6 +105,21 @@ final class YoutubeCookieStatus {
   final int updatedAtMs;
 }
 
+final class GithubAppStatus {
+  const GithubAppStatus({
+    required this.clientId,
+    required this.clientSecretSet,
+    required this.callbackUrl,
+  });
+
+  /// 为 null 表示没有配置，GitHub 登录没有开启。
+  final String? clientId;
+  final bool clientSecretSet;
+  final String callbackUrl;
+
+  bool get enabled => clientId != null;
+}
+
 final class AdminAccountView {
   const AdminAccountView({required this.member, required this.username});
 
