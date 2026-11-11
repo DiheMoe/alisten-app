@@ -121,6 +121,12 @@ void main() {
     );
     await tester.tap(find.text('进入后台'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('YouTube Cookie'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
   }
 
   Future<void> tap(WidgetTester tester, Finder finder) async {

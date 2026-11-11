@@ -10,6 +10,17 @@ abstract interface class AdminApi {
 
   Future<String> updateBrandName(String token, String brandName);
 
+  Future<bool> getRegistrationOpen();
+
+  Future<void> openRegistration(String token);
+
+  Future<void> closeRegistration(String token);
+
+  Future<AdminAccountView> findAccount(String token, String username);
+
+  /// 服务端只在这次回复中返回新密码，账号在所有设备上随即退出登录。
+  Future<String> resetAccountPassword(String token, String username);
+
   Future<String> createRoom(String token, RoomDraft draft);
 
   Future<void> updateRoom(String token, String roomId, RoomPatch patch);

@@ -1,3 +1,5 @@
+import 'package:alisten/domain/member/member.dart';
+
 final class RoomDraft {
   const RoomDraft({
     required this.name,
@@ -101,4 +103,11 @@ final class YoutubeCookieStatus {
 
   /// 没有保存时为 0。
   final int updatedAtMs;
+}
+
+final class AdminAccountView {
+  const AdminAccountView({required this.member, required this.username});
+
+  final Member member;
+  final String username;
 }

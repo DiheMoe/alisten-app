@@ -1,3 +1,5 @@
+import 'package:alisten/features/admin/presentation/accounts_group.dart';
+import 'package:alisten/features/admin/presentation/registration_group.dart';
 import 'package:alisten/features/admin/presentation/rooms_group.dart';
 import 'package:alisten/features/admin/presentation/site_group.dart';
 import 'package:alisten/features/admin/presentation/sources_group.dart';
@@ -54,6 +56,14 @@ class AdminHome extends ConsumerWidget {
           _Group(
             title: '站点',
             child: SiteGroup(onNotice: onNotice),
+          ),
+          _Group(
+            title: '注册',
+            child: RegistrationGroup(onNotice: onNotice),
+          ),
+          _Group(
+            title: '账号',
+            child: AccountsGroup(onNotice: onNotice),
           ),
           _Group(
             title: '常驻房间',

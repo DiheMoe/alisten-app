@@ -79,7 +79,11 @@ void main() {
 
   test('the brand name is read from the public site endpoint without any '
       'token', () async {
-    adapter.respond(200, {'brandName': '大猫听歌房'});
+    adapter.respond(200, {
+      'brandName': '大猫听歌房',
+      'registrationOpen': true,
+      'githubLogin': false,
+    });
 
     final name = await api.getBrandName();
 
@@ -93,6 +97,31 @@ void main() {
     );
     expect(name, '大猫听歌房');
   });
+
+  test(
+    'registration is read publicly and switched with the admin token',
+    () async {
+      adapter.respond(200, {
+        'brandName': 'Alisten',
+        'registrationOpen': false,
+        'githubLogin': false,
+      });
+      expect(await api.getRegistrationOpen(), isFalse);
+      expect(adapter.requests.last.authorization, isNull);
+
+      adapter.respondRaw(204, '', null);
+      await api.openRegistration('t');
+      expect(adapter.requests.last.method, 'PUT');
+      expect(adapter.requests.last.path, '/api/admin/registration');
+      expect(adapter.requests.last.authorization, 'Bearer t');
+
+      adapter.respondRaw(204, '', null);
+      await api.closeRegistration('t');
+      expect(adapter.requests.last.method, 'DELETE');
+      expect(adapter.requests.last.path, '/api/admin/registration');
+      expect(adapter.requests.last.authorization, 'Bearer t');
+    },
+  );
 
   test('a refused token keeps the error code from the server', () async {
     adapter.respond(401, {
@@ -467,6 +496,24 @@ void main() {
     expect(request.authorization, 'Bearer t');
   });
 
+  test('an account is found by its username and its password reset', () async {
+    adapter.respond(200, {
+      'member': {'id': 'm-1', 'name': '大猫', 'avatarHash': ''},
+      'username': 'mao',
+    });
+    final account = await api.findAccount('t', 'mao');
+    expect(adapter.requests.last.path, '/api/admin/accounts/mao');
+    expect(adapter.requests.last.authorization, 'Bearer t');
+    expect(account.username, 'mao');
+    expect(account.member.name, '大猫');
+
+    adapter.respond(200, {'password': 'new-secret-password'});
+    final password = await api.resetAccountPassword('t', 'mao');
+    expect(adapter.requests.last.method, 'POST');
+    expect(adapter.requests.last.path, '/api/admin/accounts/mao/password');
+    expect(password, 'new-secret-password');
+  });
+
   test('without a token nothing is sent', () async {
     await expectLater(
       api.listRooms(''),
@@ -533,6 +580,9 @@ void main() {
     final local = <String, Future<Object?> Function()>{
       'rooms': () => api.listRooms('t'),
       'brand name': () => api.getBrandName(),
+      'registration': () => api.getRegistrationOpen(),
+      'registration opened': () => api.openRegistration('t'),
+      'registration closed': () => api.closeRegistration('t'),
       'brand name saved': () => api.updateBrandName('t', '周末听歌会'),
       'new room': () =>
           api.createRoom('t', const RoomDraft(name: '大厅', description: '')),

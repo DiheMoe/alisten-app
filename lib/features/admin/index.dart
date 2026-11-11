@@ -1,5 +1,7 @@
+export 'application/admin_accounts_controller.dart';
 export 'application/admin_api.dart';
 export 'application/admin_models.dart';
+export 'application/admin_registration_controller.dart';
 export 'application/admin_rooms_controller.dart';
 export 'application/admin_session.dart';
 export 'application/admin_sign_in_controller.dart';

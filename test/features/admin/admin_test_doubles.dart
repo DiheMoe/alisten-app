@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/admin/index.dart';
 
@@ -20,6 +21,17 @@ final class FakeAdminApi implements AdminApi {
   Completer<void>? updateBrandGate;
   String? updatedBrandName;
   String? savedBrandName;
+
+  bool registrationOpen = true;
+  Object? getRegistrationError;
+  Object? setRegistrationError;
+  final List<bool> registrationCalls = [];
+
+  final Map<String, AdminAccountView> accounts = {};
+  final List<String> resetUsernames = [];
+  String resetPassword = 'reset-secret-password';
+  Object? resetPasswordError;
+  Completer<void>? resetPasswordGate;
 
   final List<RoomDraft> createdDrafts = [];
   Object? createRoomError;
@@ -94,6 +106,47 @@ final class FakeAdminApi implements AdminApi {
     getBrandCalls++;
     if (getBrandError case final error?) return Future.error(error);
     return brandName;
+  }
+
+  @override
+  Future<bool> getRegistrationOpen() async {
+    if (getRegistrationError case final error?) return Future.error(error);
+    return registrationOpen;
+  }
+
+  @override
+  Future<void> openRegistration(String token) => _setRegistration(token, true);
+
+  @override
+  Future<void> closeRegistration(String token) =>
+      _setRegistration(token, false);
+
+  Future<void> _setRegistration(String token, bool open) async {
+    tokens.add(token);
+    registrationCalls.add(open);
+    if (setRegistrationError case final error?) return Future.error(error);
+    registrationOpen = open;
+  }
+
+  @override
+  Future<AdminAccountView> findAccount(String token, String username) async {
+    tokens.add(token);
+    final account = accounts[username];
+    if (account == null) {
+      return Future.error(
+        const ApiException(code: 'NOT_FOUND', message: '账号不存在', status: 404),
+      );
+    }
+    return account;
+  }
+
+  @override
+  Future<String> resetAccountPassword(String token, String username) async {
+    tokens.add(token);
+    resetUsernames.add(username);
+    await resetPasswordGate?.future;
+    if (resetPasswordError case final error?) return Future.error(error);
+    return resetPassword;
   }
 
   @override

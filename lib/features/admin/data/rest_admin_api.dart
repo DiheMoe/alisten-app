@@ -50,6 +50,32 @@ final class RestAdminApi implements AdminApi {
   }
 
   @override
+  Future<bool> getRegistrationOpen() {
+    return _request(
+      http.RestEndpoints.getSite,
+      decode: (json) =>
+          protocol.GetSiteResponse.fromJson(json).registrationOpen,
+    );
+  }
+
+  @override
+  Future<void> openRegistration(String token) async {
+    await _transport.execute(
+      http.RestEndpoints.adminOpenRegistration,
+      token: token,
+      body: const protocol.AdminOpenRegistrationRequest().toJson(),
+    );
+  }
+
+  @override
+  Future<void> closeRegistration(String token) async {
+    await _transport.execute(
+      http.RestEndpoints.adminCloseRegistration,
+      token: token,
+    );
+  }
+
+  @override
   Future<String> createRoom(String token, RoomDraft draft) {
     return _request(
       http.RestEndpoints.adminCreateRoom,
@@ -85,6 +111,34 @@ final class RestAdminApi implements AdminApi {
       http.RestEndpoints.adminDeleteRoom,
       pathParameters: {'id': roomId},
       token: token,
+    );
+  }
+
+  @override
+  Future<AdminAccountView> findAccount(String token, String username) {
+    return _request(
+      http.RestEndpoints.adminGetAccount,
+      token: token,
+      pathParameters: {'username': username},
+      decode: (json) {
+        final account = protocol.AdminAccount.fromJson(json);
+        return AdminAccountView(
+          member: toDomainMember(account.member),
+          username: account.username,
+        );
+      },
+    );
+  }
+
+  @override
+  Future<String> resetAccountPassword(String token, String username) {
+    return _request(
+      http.RestEndpoints.adminResetAccountPassword,
+      token: token,
+      pathParameters: {'username': username},
+      body: const protocol.AdminResetAccountPasswordRequest().toJson(),
+      decode: (json) =>
+          protocol.AdminResetAccountPasswordResponse.fromJson(json).password,
     );
   }
 

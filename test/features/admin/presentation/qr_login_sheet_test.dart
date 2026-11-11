@@ -99,6 +99,12 @@ void main() {
     await tester.enterText(_field('管理 token'), 't-1');
     await tester.tap(find.text('进入后台'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('音源账号'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
   }
 
   Future<void> tap(WidgetTester tester, Finder finder) async {

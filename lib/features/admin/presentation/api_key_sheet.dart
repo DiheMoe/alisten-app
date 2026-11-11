@@ -6,6 +6,7 @@ import 'package:alisten/features/admin/application/admin_models.dart';
 import 'package:alisten/features/admin/application/admin_session.dart';
 import 'package:alisten/features/admin/application/api_key_controller.dart';
 import 'package:alisten/features/admin/presentation/admin_time.dart';
+import 'package:alisten/features/admin/presentation/secret_box.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
@@ -230,7 +231,7 @@ class _ApiKeySheetState extends ConsumerState<ApiKeySheet> {
           ],
           if (key != null) ...[
             const SizedBox(height: AlistenSpacing.md),
-            _KeyBox(apiKey: key, onCopy: () => unawaited(_copy(key))),
+            SecretBox(secret: key, onCopy: () => unawaited(_copy(key))),
             const SizedBox(height: AlistenSpacing.xs),
             PillButton(
               label: '复制',
@@ -260,71 +261,6 @@ class _ApiKeySheetState extends ConsumerState<ApiKeySheet> {
             onPressed: status == null ? null : () => unawaited(_reset(status)),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// 选择菜单只保留“全选”和“复制”，菜单复制和键盘复制都交给 [onCopy]：默认复制
-// 不带敏感标记，分享、查询、搜索网页和文本处理会把 Key 交给其他应用。读屏只
-// 读出 Key，不提供默认的复制动作。
-class _KeyBox extends StatelessWidget {
-  const _KeyBox({required this.apiKey, required this.onCopy});
-
-  final String apiKey;
-  final VoidCallback onCopy;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = AlistenColors.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.glassFill,
-        borderRadius: BorderRadius.circular(AlistenRadii.sm),
-        border: Border.all(color: colors.glassStroke),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AlistenSpacing.sm),
-        child: Semantics(
-          container: true,
-          label: apiKey,
-          child: ExcludeSemantics(
-            child: Actions(
-              actions: {
-                CopySelectionTextIntent:
-                    CallbackAction<CopySelectionTextIntent>(
-                      onInvoke: (_) {
-                        onCopy();
-                        return null;
-                      },
-                    ),
-              },
-              child: SelectableText(
-                apiKey,
-                style: AlistenTypography.bodyStrong.copyWith(
-                  color: colors.onGlass,
-                ),
-                contextMenuBuilder: (context, editable) =>
-                    AdaptiveTextSelectionToolbar.buttonItems(
-                      anchors: editable.contextMenuAnchors,
-                      buttonItems: [
-                        for (final item in editable.contextMenuButtonItems)
-                          if (item.type == ContextMenuButtonType.selectAll)
-                            item
-                          else if (item.type == ContextMenuButtonType.copy)
-                            ContextMenuButtonItem(
-                              type: ContextMenuButtonType.copy,
-                              onPressed: () {
-                                editable.hideToolbar();
-                                onCopy();
-                              },
-                            ),
-                      ],
-                    ),
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
