@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/app_config.dart';
@@ -80,7 +81,8 @@ RoomSnapshot snapshotWith(NowPlaying? nowPlaying) {
 
 /// 契约与基于 just_audio 的 audio handler 相同：事件异步到达；[load] 耗时
 /// [loadDuration]，保留播放意图后报告新音源的状态；[play] 开始播放即返回；
-/// 只有播放已加载的音源时位置才前进；[release] 停止播放并卸载音源。
+/// 只有播放已加载的音源时位置才前进，播放中 seek 之后要再过 [seekLag] 才前进；
+/// [release] 停止播放并卸载音源。
 final class FakeAudioEngine implements AudioEngine {
   FakeAudioEngine({int Function()? now}) : _now = now ?? (() => 0);
 
@@ -92,6 +94,7 @@ final class FakeAudioEngine implements AudioEngine {
 
   final List<String> calls = [];
   Duration loadDuration = Duration.zero;
+  Duration seekLag = Duration.zero;
   int loadFailures = 0;
 
   Exception loadError = Exception('load failed');
@@ -116,7 +119,7 @@ final class FakeAudioEngine implements AudioEngine {
 
   int get _positionMs {
     final since = _runningSince;
-    return since == null ? _anchorMs : _anchorMs + _now() - since;
+    return since == null ? _anchorMs : _anchorMs + math.max(0, _now() - since);
   }
 
   @override
@@ -168,7 +171,9 @@ final class FakeAudioEngine implements AudioEngine {
     seeks.add(position);
     calls.add('seek ${position.inMilliseconds}');
     _anchorMs = position.inMilliseconds;
-    if (_runningSince != null) _runningSince = _now();
+    if (_runningSince != null) {
+      _runningSince = _now() + seekLag.inMilliseconds;
+    }
   }
 
   // 模拟一次平台往返。

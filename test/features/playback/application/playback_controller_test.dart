@@ -251,6 +251,23 @@ void main() {
     });
   });
 
+  test('on a device that sounds half a second after every seek, a drift is '
+      'corrected once and not every two seconds', () {
+    run((h) {
+      h.engine.seekLag = const Duration(milliseconds: 560);
+      h.hello(nowPlayingWith(), serverNow: trackStart + 30000);
+      h.async.elapse(const Duration(seconds: 1));
+      expect(h.state.status, LocalPlaybackStatus.playing);
+      final seeks = h.engine.seeks.length;
+
+      // 例如起播或恢复时缓冲了 3 秒多。
+      h.engine.drift(-3750);
+      h.async.elapse(const Duration(seconds: 30));
+
+      expect(h.engine.seeks.length, seeks + 1);
+    });
+  });
+
   test('an interruption pauses without drift seeks, its end plays from '
       'the room position, and a system stop keeps the next track silent '
       'until the user resumes', () {
