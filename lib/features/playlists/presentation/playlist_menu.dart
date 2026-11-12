@@ -25,7 +25,8 @@ final class PlaylistMenuEntry {
   final bool? checked;
 }
 
-/// 按钮在屏幕下半部分时菜单向上展开，免得超出屏幕。选中一项时先收起菜单。
+/// 菜单朝按钮所在位置空间较大的一侧展开：按钮在屏幕下半部分时向上，在左半部分时
+/// 与按钮左边对齐、向右展开，免得超出屏幕。选中一项时先收起菜单。
 class PlaylistMenuButton extends StatefulWidget {
   const PlaylistMenuButton({
     required this.semanticLabel,
@@ -52,15 +53,17 @@ class PlaylistMenuButton extends StatefulWidget {
 class _PlaylistMenuButtonState extends State<PlaylistMenuButton> {
   bool _open = false;
   bool _upward = false;
+  bool _rightward = false;
 
   void _toggle() {
     if (!_open) {
       final box = context.findRenderObject();
-      _upward =
-          box is RenderBox &&
-          box.hasSize &&
-          box.localToGlobal(box.size.center(Offset.zero)).dy >
-              MediaQuery.sizeOf(context).height / 2;
+      final center = box is RenderBox && box.hasSize
+          ? box.localToGlobal(box.size.center(Offset.zero))
+          : null;
+      final screen = MediaQuery.sizeOf(context);
+      _upward = center != null && center.dy > screen.height / 2;
+      _rightward = center != null && center.dx < screen.width / 2;
     }
     setState(() => _open = !_open);
   }
@@ -76,8 +79,8 @@ class _PlaylistMenuButtonState extends State<PlaylistMenuButton> {
     return Popover(
       open: _open,
       onClose: _close,
-      childAnchor: _upward ? Alignment.topRight : Alignment.bottomRight,
-      contentAnchor: _upward ? Alignment.bottomRight : Alignment.topRight,
+      childAnchor: Alignment(_rightward ? -1 : 1, _upward ? -1 : 1),
+      contentAnchor: Alignment(_rightward ? -1 : 1, _upward ? 1 : -1),
       offset: Offset(0, _upward ? -AlistenSpacing.xxs : AlistenSpacing.xxs),
       // 菜单与最长的一项同宽，各项整行可点。
       content: IntrinsicWidth(

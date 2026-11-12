@@ -490,6 +490,52 @@ void main() {
   });
 
   group('the menu, more', () {
+    testWidgets('a menu at either edge of the screen stays on screen', (
+      tester,
+    ) async {
+      PlaylistMenuButton menu(IconData icon) => PlaylistMenuButton(
+        semanticLabel: '导入',
+        icon: icon,
+        entries: [
+          PlaylistMenuEntry(
+            icon: Icons.file_open_rounded,
+            label: '从文件导入',
+            onSelected: () {},
+          ),
+        ],
+      );
+      await pumpPlaylistsPage(
+        tester,
+        Scaffold(
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              menu(Icons.more_horiz_rounded),
+              menu(Icons.more_vert_rounded),
+            ],
+          ),
+        ),
+      );
+      final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+      final panel = find.ancestor(
+        of: find.text('从文件导入'),
+        matching: find.byType(IntrinsicWidth),
+      );
+
+      for (final icon in [Icons.more_horiz_rounded, Icons.more_vert_rounded]) {
+        await tester.tap(find.byIcon(icon));
+        await settlePage(tester);
+        final rect = tester.getRect(panel);
+        expect(rect.left, greaterThanOrEqualTo(0), reason: '$icon');
+        expect(rect.right, lessThanOrEqualTo(screen.width), reason: '$icon');
+
+        await tester.tapAt(screen.center(Offset.zero));
+        await settlePage(tester);
+        expect(find.text('从文件导入'), findsNothing);
+      }
+    });
+
     testWidgets('a disabled entry does not fire and keeps the menu open', (
       tester,
     ) async {
