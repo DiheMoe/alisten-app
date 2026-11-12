@@ -27,12 +27,16 @@ class PlaylistPickControl extends ConsumerWidget {
     required this.track,
     required this.title,
     required this.onPick,
+    this.hideOutsideRoom = false,
     super.key,
   });
 
   final Track track;
   final String title;
   final PickSong onPick;
+
+  /// 见 [PickControl.hideOutsideRoom]。
+  final bool hideOutsideRoom;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,6 +48,7 @@ class PlaylistPickControl extends ConsumerWidget {
       title: title,
       tone: PickTone.quiet,
       blockedReason: pickBlockedReason(track, kind),
+      hideOutsideRoom: hideOutsideRoom,
       onPick: onPick,
     );
   }

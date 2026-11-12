@@ -363,6 +363,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 AlistenSpacing.page,
                 0,
               ),
+              outsideRoom: false,
             ),
           ),
           for (final day in days.take(_dayWindow))
@@ -628,6 +629,7 @@ class _PlayRow extends StatelessWidget {
                 title: meta.title,
                 label: '再点一次《${meta.title}》',
                 tone: PickTone.quiet,
+                hideOutsideRoom: true,
                 onPick: onPick,
               ),
             ),

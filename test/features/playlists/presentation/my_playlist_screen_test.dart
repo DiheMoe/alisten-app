@@ -12,6 +12,7 @@ import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:alisten/shared/ui/toast.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -189,17 +190,19 @@ void main() {
     expect(tester.testTextInput.isVisible, isFalse);
   }
 
-  testWidgets('the header tells the songs and the dates, and the songs '
-      'cannot be picked outside a room', (tester) async {
+  testWidgets('the header tells the songs and the dates; outside a room '
+      'the songs show no pick button and no notice about it', (tester) async {
     final semantics = tester.ensureSemantics();
     await open(tester);
 
     expect(find.text('夜跑'), findsOneWidget);
     expect(find.textContaining('4 首，更新于'), findsOneWidget);
-    expect(find.text('进入房间后可点歌'), findsOneWidget);
+    expect(find.text('进入房间后可点歌'), findsNothing);
+    expect(find.bySemanticsLabel('点歌《歌a》'), findsNothing);
+    // 编辑和歌单操作在顶栏，不在封面下面。
     expect(
-      tester.getSemantics(find.bySemanticsLabel('点歌《歌a》')),
-      isSemantics(isEnabled: false, hasEnabledState: true),
+      tester.getRect(find.bySemanticsLabel('编辑')).bottom,
+      lessThan(tester.getRect(find.text('夜跑')).top),
     );
     semantics.dispose();
   });
@@ -401,7 +404,7 @@ void main() {
     final semantics = tester.ensureSemantics();
     await open(tester);
 
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await settlePage(tester);
     expect(find.text('已选 0 首'), findsOneWidget);
     for (final label in [
@@ -453,7 +456,7 @@ void main() {
       'one move', (tester) async {
     final semantics = tester.ensureSemantics();
     await open(tester);
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await settlePage(tester);
     await tester.tap(find.bySemanticsLabel('歌c'));
     await tester.tap(find.bySemanticsLabel('歌d'));
@@ -482,7 +485,7 @@ void main() {
   ) async {
     final semantics = tester.ensureSemantics();
     await open(tester);
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await settlePage(tester);
     await tester.tap(find.bySemanticsLabel('歌a'));
     await tester.pump();
@@ -498,7 +501,7 @@ void main() {
       'one', (tester) async {
     final semantics = tester.ensureSemantics();
     await open(tester);
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await settlePage(tester);
     await tester.tap(find.bySemanticsLabel('歌a'));
     await tester.tap(find.bySemanticsLabel('歌b'));
@@ -585,7 +588,7 @@ void main() {
     expect(titles, ['歌b']);
     expect(server.count('move'), 0);
 
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await settlePage(tester);
     final gesture = await tester.startGesture(
       tester.getCenter(find.byIcon(AlistenIcons.equalsBold).first),
@@ -603,15 +606,37 @@ void main() {
     expect(top(tester, '歌a'), lessThan(top(tester, '歌d')));
   });
 
-  testWidgets('selecting swaps the pick buttons and the song menus for the '
+  testWidgets('while editing a song is also dragged by holding its row, and '
+      'the hold does not tick it', (tester) async {
+    await open(tester);
+    final rowHeight = top(tester, '歌b') - top(tester, '歌a');
+    await tester.tap(find.bySemanticsLabel('编辑'));
+    await settlePage(tester);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('歌a')),
+    );
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+    for (var step = 0; step < 10; step++) {
+      await gesture.moveBy(Offset(0, rowHeight * 2.1 / 10));
+      await tester.pump();
+    }
+    await gesture.up();
+    await settlePage(tester);
+
+    expect(server.calls, contains('move pl-1 netease:a before netease:d'));
+    expect(find.text('已选 0 首'), findsOneWidget);
+  });
+
+  testWidgets('editing swaps the pick buttons and the song menus for the '
       'drag handles', (tester) async {
     final semantics = tester.ensureSemantics();
-    await open(tester);
+    await open(tester, room: RoomKind.persistent);
     expect(find.byIcon(AlistenIcons.equalsBold), findsNothing);
     expect(find.bySemanticsLabel('点歌《歌a》'), findsOneWidget);
     expect(find.bySemanticsLabel('《歌a》的更多操作'), findsOneWidget);
 
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await settlePage(tester);
 
     expect(find.byIcon(AlistenIcons.equalsBold), findsWidgets);
@@ -624,7 +649,7 @@ void main() {
       'that names it and tells whether it is chosen', (tester) async {
     final semantics = tester.ensureSemantics();
     await open(tester);
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await settlePage(tester);
 
     expect(
@@ -652,11 +677,11 @@ void main() {
       'while it slides away', (tester) async {
     final semantics = tester.ensureSemantics();
     await open(tester);
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await settlePage(tester);
     expect(find.semantics.byLabel('把选中的歌移到最前'), findsOne);
 
-    await tester.tap(find.bySemanticsLabel('退出选择'));
+    await tester.tap(find.bySemanticsLabel('完成编辑'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('移到最前'), findsOneWidget, reason: 'still sliding away');
@@ -671,7 +696,7 @@ void main() {
     tester,
   ) async {
     await open(tester);
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await settlePage(tester);
 
     await tester.binding.handlePopRoute();
@@ -692,7 +717,7 @@ void main() {
   testWidgets('a playlist removed elsewhere while selecting stops the '
       'selection and says it is gone', (tester) async {
     await open(tester);
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await settlePage(tester);
 
     // 读取曲目先说不在了，列表还没重新读到：页面上的歌单还在。
@@ -729,7 +754,7 @@ void main() {
 
     expect(find.text('夜跑'), findsOneWidget);
     expect(find.text('读取失败：${networkError.message}'), findsOneWidget);
-    expect(find.text('选择'), findsNothing);
+    expect(find.bySemanticsLabel('编辑'), findsNothing);
 
     await tester.tap(find.text('重试'));
     await settlePage(tester);
@@ -742,7 +767,7 @@ void main() {
 
     expect(find.text('这个歌单还是空的'), findsOneWidget);
     expect(find.text('在播放器、队列和播放历史里，可以把歌保存到歌单。'), findsOneWidget);
-    expect(find.text('选择'), findsNothing);
+    expect(find.bySemanticsLabel('编辑'), findsNothing);
   });
 
   testWidgets('exporting shows that it is busy and points at the menu', (
@@ -926,7 +951,7 @@ void main() {
     testWidgets('still removes the selected songs', (tester) async {
       final semantics = tester.ensureSemantics();
       await open(tester, showing: showing);
-      await tester.tap(find.text('选择'));
+      await tester.tap(find.bySemanticsLabel('编辑'));
       await settlePage(tester);
       await tester.tap(find.bySemanticsLabel('歌c'));
       await tester.tap(find.bySemanticsLabel('歌d'));
@@ -946,12 +971,32 @@ void main() {
     });
   });
 
+  testWidgets('entering edit mode keeps every title in place and fades the '
+      'row buttons into the drag handles', (tester) async {
+    await open(tester, room: RoomKind.persistent);
+    final title = tester.getRect(find.text('歌a'));
+
+    await tester.tap(find.bySemanticsLabel('编辑'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(tester.getRect(find.text('歌a')).topLeft, title.topLeft);
+    expect(find.byIcon(AlistenIcons.equalsBold), findsWidgets);
+    // 淡出途中的点歌按钮还看得见，但已经点不到。
+    expect(find.byIcon(AlistenIcons.plusBold), findsWidgets);
+    expect(find.byIcon(AlistenIcons.plusBold).hitTestable(), findsNothing);
+
+    await settlePage(tester);
+    expect(tester.getRect(find.text('歌a')).topLeft, title.topLeft);
+    expect(find.byIcon(AlistenIcons.plusBold), findsNothing);
+  });
+
   testWidgets('with reduced motion the selection bar appears at once', (
     tester,
   ) async {
     await open(tester, reduceMotion: true);
 
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await tester.pump();
     final shown = tester.getRect(find.text('移到最前'));
     await settlePage(tester);
@@ -964,7 +1009,7 @@ void main() {
   ) async {
     await open(tester);
 
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     final moving = tester.getRect(find.text('移到最前'));
@@ -978,7 +1023,7 @@ void main() {
     await open(tester, textScaler: const TextScaler.linear(2));
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('选择'));
+    await tester.tap(find.bySemanticsLabel('编辑'));
     await settlePage(tester);
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('全选'));
@@ -995,7 +1040,7 @@ void main() {
         size: const Size(320, 760),
         textScaler: TextScaler.linear(scale),
       );
-      await tester.tap(find.text('选择'));
+      await tester.tap(find.bySemanticsLabel('编辑'));
       await settlePage(tester);
       await tester.tap(find.text('全选'));
       await settlePage(tester);
@@ -1003,7 +1048,7 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('已选 4 首'), findsOneWidget);
       expect(find.text('取消全选').hitTestable(), findsOneWidget);
-      expect(find.bySemanticsLabel('退出选择').hitTestable(), findsOneWidget);
+      expect(find.bySemanticsLabel('完成编辑').hitTestable(), findsOneWidget);
     });
   }
 
@@ -1012,6 +1057,7 @@ void main() {
         'room for the menu', (tester) async {
       await open(
         tester,
+        room: RoomKind.persistent,
         size: const Size(320, 760),
         textScaler: TextScaler.linear(scale),
         overrides: [

@@ -1,6 +1,7 @@
 import 'package:alisten/domain/history/listen.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/history/index.dart';
+import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/application/pick_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
@@ -10,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../app/app_test_harness.dart';
+import '../../../domain/room/room_fixtures.dart';
 import '../../lobby/lobby_test_doubles.dart';
 
 const _song = Track(source: TrackSource.qq, id: '001');
@@ -55,6 +57,14 @@ void main() {
             pickControllerProvider.overrideWithBuild(
               (ref, _) => Picks(statuses: {trackKey(_song): picked}),
             ),
+          // 点歌按钮只在房间里显示。
+          roomControllerProvider.overrideWithBuild(
+            (ref, _) => RoomState(
+              status: RoomConnectionStatus.open,
+              activeRoomId: 'room-id',
+              snapshot: testRoomSnapshot().copyWith(term: 1, seq: 1),
+            ),
+          ),
         ],
         child: MaterialApp(
           theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),

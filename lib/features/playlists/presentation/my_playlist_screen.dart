@@ -10,6 +10,8 @@ import 'package:alisten/features/playlists/application/my_playlist_controller.da
 import 'package:alisten/features/playlists/application/my_playlists_controller.dart';
 import 'package:alisten/features/playlists/presentation/playlist_header.dart';
 import 'package:alisten/shared/ui/action_menu.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
+import 'package:alisten/shared/ui/animated_resize.dart';
 import 'package:alisten/features/playlists/presentation/playlist_name_form.dart';
 import 'package:alisten/features/playlists/presentation/playlist_song.dart';
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
@@ -18,12 +20,12 @@ import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
-import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
+import 'package:alisten/shared/ui/fade_leaving_inert.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
@@ -347,9 +349,7 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
       ];
     } else {
       slivers = [
-        SliverToBoxAdapter(
-          child: _header(playlist, list.loadedAtMs, detail, selecting),
-        ),
+        SliverToBoxAdapter(child: _header(playlist, list.loadedAtMs, detail)),
         ..._songs(detail, selecting),
       ];
     }
@@ -370,22 +370,40 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
               top: 0,
               left: 0,
               right: 0,
-              child: selecting
-                  ? _SelectingBar(
-                      count: detail.selected.length,
-                      allSelected: detail.selected.length == items.length,
-                      onClose: _detail.stopSelecting,
-                      onToggleAll: detail.selected.length == items.length
-                          ? _detail.clearSelection
-                          : _detail.selectAll,
-                    )
-                  : AlistenTopBar(
-                      leading: IconCircleButton(
-                        icon: AlistenIcons.arrowLeft,
-                        semanticLabel: '返回',
-                        onPressed: () => unawaited(Navigator.maybePop(context)),
-                      ),
-                    ),
+              // 进出编辑时两种顶栏交叉渐变，与每一行尾部的渐变同步。
+              child: AnimatedSwitcher(
+                duration: AlistenDurations.of(context, AlistenDurations.medium),
+                switchInCurve: AlistenCurves.standard,
+                switchOutCurve: AlistenCurves.exit,
+                transitionBuilder: fadeLeavingInert,
+                layoutBuilder: (current, previous) => Stack(
+                  alignment: Alignment.topCenter,
+                  children: [...previous, ?current],
+                ),
+                child: KeyedSubtree(
+                  key: ValueKey(selecting),
+                  child: selecting
+                      ? _SelectingBar(
+                          count: detail.selected.length,
+                          allSelected: detail.selected.length == items.length,
+                          onClose: _detail.stopSelecting,
+                          onToggleAll: detail.selected.length == items.length
+                              ? _detail.clearSelection
+                              : _detail.selectAll,
+                        )
+                      : AlistenTopBar(
+                          leading: IconCircleButton(
+                            icon: AlistenIcons.arrowLeft,
+                            semanticLabel: '返回',
+                            onPressed: () =>
+                                unawaited(Navigator.maybePop(context)),
+                          ),
+                          actions: playlist == null || list.guest || gone
+                              ? const []
+                              : _topActions(playlist, detail),
+                        ),
+                ),
+              ),
             ),
             Positioned(
               left: 0,
@@ -409,12 +427,7 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
     );
   }
 
-  Widget _header(
-    MyPlaylist playlist,
-    int nowMs,
-    MyPlaylistState detail,
-    bool selecting,
-  ) {
+  Widget _header(MyPlaylist playlist, int nowMs, MyPlaylistState detail) {
     final items = detail.items;
     final count = items?.length ?? playlist.trackCount;
     return PlaylistHeader(
@@ -424,42 +437,39 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
       facts:
           '$count 首，更新于${formatPlaylistDate(playlist.updatedAtMs, nowMs)}，'
           '创建于${formatPlaylistDate(playlist.createdAtMs, nowMs)}',
-      children: [
-        const SizedBox(height: AlistenSpacing.md),
-        Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: AlistenSpacing.xs,
-          runSpacing: AlistenSpacing.xs,
-          children: [
-            if (items != null && items.isNotEmpty && !selecting)
-              PillButton(
-                label: '选择',
-                icon: AlistenIcons.listChecks,
-                style: PillButtonStyle.secondary,
-                onPressed: _detail.startSelecting,
-              ),
-            if (detail.exporting)
-              const SizedBox.square(
-                dimension: AlistenSizes.minTouchTarget,
-                child: Center(
-                  child: BusyIndicator(
-                    size: AlistenSizes.iconSm,
-                    semanticLabel: '正在导出',
-                  ),
-                ),
-              ),
-            KeyedSubtree(
-              key: _menu,
-              child: ActionMenuButton(
-                semanticLabel: '“${playlist.name}”的更多操作',
-                entries: _actions(playlist, detail.exporting),
-              ),
-            ),
-          ],
-        ),
-      ],
     );
+  }
+
+  // 编辑和歌单操作放在顶栏右侧，封面下只留歌单本身的信息。
+  List<Widget> _topActions(MyPlaylist playlist, MyPlaylistState detail) {
+    final items = detail.items;
+    return [
+      if (items != null && items.isNotEmpty)
+        // 铅笔已经用在“⋯”里的重命名上；这里是勾选和排序。
+        IconCircleButton(
+          icon: AlistenIcons.listChecks,
+          semanticLabel: '编辑',
+          style: IconCircleButtonStyle.plain,
+          onPressed: _detail.startSelecting,
+        ),
+      if (detail.exporting)
+        const SizedBox.square(
+          dimension: AlistenSizes.minTouchTarget,
+          child: Center(
+            child: BusyIndicator(
+              size: AlistenSizes.iconSm,
+              semanticLabel: '正在导出',
+            ),
+          ),
+        ),
+      KeyedSubtree(
+        key: _menu,
+        child: ActionMenuButton(
+          semanticLabel: '“${playlist.name}”的更多操作',
+          entries: _actions(playlist, detail.exporting),
+        ),
+      ),
+    ];
   }
 
   List<Widget> _songs(MyPlaylistState detail, bool selecting) {
@@ -490,7 +500,9 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
     }
     final colors = AlistenColors.of(context);
     return [
-      const SliverToBoxAdapter(child: PickUnavailableNotice()),
+      const SliverToBoxAdapter(
+        child: PickUnavailableNotice(outsideRoom: false),
+      ),
       // 读屏的“移到开头”“上移”“下移”“移到末尾”由它加在每一项上，中文取自
       // WidgetsLocalizations。拖动只从选择时出现的把手开始：平时一行只留点歌和
       // “⋯”，长按留给复制歌名。
@@ -508,18 +520,13 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
         itemBuilder: (context, index) {
           final item = items[index];
           final key = trackKey(item.track);
-          if (selecting) {
-            return _SelectableSong(
-              key: ValueKey(key),
-              item: item,
-              index: index,
-              selected: detail.selected.contains(key),
-              onToggle: () => _detail.toggle(key),
-            );
-          }
           return _Song(
             key: ValueKey(key),
             item: item,
+            index: index,
+            editing: selecting,
+            selected: detail.selected.contains(key),
+            onToggle: () => _detail.toggle(key),
             onPick: _pick,
             onCopyTitle: widget.onCopyTitle,
             onSave: () =>
@@ -540,10 +547,15 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
   }
 }
 
-// 一行只留点歌一个主操作，保存和移出收进“⋯”，歌名才不被挤短。
+// 平时一行只留点歌一个主操作，保存和移出收进“⋯”，歌名才不被挤短；编辑时换成
+// 勾选和拖动把手。两种状态是同一行：切换时歌名和封面不动，只有尾部渐变过去。
 class _Song extends StatelessWidget {
   const _Song({
     required this.item,
+    required this.index,
+    required this.editing,
+    required this.selected,
+    required this.onToggle,
     required this.onPick,
     required this.onCopyTitle,
     required this.onSave,
@@ -552,6 +564,10 @@ class _Song extends StatelessWidget {
   });
 
   final TrackSummary item;
+  final int index;
+  final bool editing;
+  final bool selected;
+  final VoidCallback onToggle;
   final PickSong onPick;
   final ValueChanged<String> onCopyTitle;
   final VoidCallback onSave;
@@ -559,116 +575,20 @@ class _Song extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final meta = item.meta;
-    final subtitle = playlistSongSubtitle(meta);
-    void copy() => onCopyTitle(meta.title);
-    // 列表的移动操作加在包住这一项的节点上：歌名和“复制歌名”并进同一个节点，
-    // 读屏在这首歌上就能找到它们，而不是停在一个没有名字的外层节点上。
-    return Semantics(
-      label: subtitle == null ? meta.title : '${meta.title}\n$subtitle',
-      onLongPress: copy,
-      onLongPressHint: copyTitleHint,
-      child: Row(
-        children: [
-          Expanded(
-            child: ExcludeSemantics(
-              child: TrackRow(
-                title: meta.title,
-                subtitle: subtitle,
-                coverUrl: meta.coverUrl,
-                onLongPress: copy,
-                padding: const EdgeInsetsDirectional.fromSTEB(
-                  AlistenSpacing.page,
-                  AlistenSpacing.xxs,
-                  0,
-                  AlistenSpacing.xxs,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: AlistenSpacing.xs),
-          // 写出点歌结果的按钮要一百多 dp，320 dp 宽、字号更大时歌名会被挤得只剩
-          // 一两个字。结果另作为按钮的值读出。
-          MediaQuery.withClampedTextScaling(
-            maxScaleFactor: 1.5,
-            child: PlaylistPickControl(
-              track: item.track,
-              title: meta.title,
-              onPick: onPick,
-            ),
-          ),
-          ActionMenuButton(
-            semanticLabel: '《${meta.title}》的更多操作',
-            iconSize: AlistenSizes.iconSm,
-            entries: [
-              ActionMenuEntry(
-                icon: AlistenIcons.listPlus,
-                label: '保存到歌单',
-                onSelected: onSave,
-              ),
-              ActionMenuEntry(
-                icon: AlistenIcons.copy,
-                label: copyTitleHint,
-                onSelected: copy,
-              ),
-              // 单首移出不确认，与 Web 相同。
-              ActionMenuEntry(
-                icon: AlistenIcons.minusCircle,
-                label: '移出这个歌单',
-                danger: true,
-                onSelected: onRemove,
-              ),
-            ],
-          ),
-          const SizedBox(width: AlistenSpacing.xxs),
-        ],
-      ),
-    );
-  }
-}
-
-// 与 [_Song] 一样，歌名和勾选状态并进列表加了移动操作的那个节点。
-class _SelectableSong extends StatelessWidget {
-  const _SelectableSong({
-    required this.item,
-    required this.index,
-    required this.selected,
-    required this.onToggle,
-    super.key,
-  });
-
-  final TrackSummary item;
-  final int index;
-  final bool selected;
-  final VoidCallback onToggle;
-
-  @override
-  Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     final meta = item.meta;
     final subtitle = playlistSongSubtitle(meta);
-    return Semantics(
-      label: meta.title,
-      checked: selected,
-      onTap: onToggle,
-      child: ExcludeSemantics(
-        child: Pressable(
-          onPressed: onToggle,
-          button: false,
-          child: TrackRow(
-            title: meta.title,
-            subtitle: subtitle,
-            coverUrl: meta.coverUrl,
-            padding: const EdgeInsetsDirectional.fromSTEB(
-              AlistenSpacing.page,
-              AlistenSpacing.xs,
-              AlistenSpacing.xxs,
-              AlistenSpacing.xs,
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox.square(
+    void copy() => onCopyTitle(meta.title);
+    final duration = AlistenDurations.of(context, AlistenDurations.medium);
+    final Widget trailing = editing
+        ? Row(
+            key: const ValueKey('editing'),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Pressable(
+                onPressed: onToggle,
+                button: false,
+                child: SizedBox.square(
                   dimension: AlistenSizes.minTouchTarget,
                   child: Icon(
                     selected
@@ -677,20 +597,114 @@ class _SelectableSong extends StatelessWidget {
                     color: selected ? colors.success : colors.onGlassMuted,
                   ),
                 ),
-                ReorderableDragStartListener(
-                  index: index,
-                  child: SizedBox.square(
-                    dimension: AlistenSizes.minTouchTarget,
-                    child: Icon(
-                      AlistenIcons.equalsBold,
-                      size: AlistenSizes.iconSm,
-                      color: colors.onGlassMuted,
-                    ),
+              ),
+              ReorderableDragStartListener(
+                index: index,
+                child: SizedBox.square(
+                  dimension: AlistenSizes.minTouchTarget,
+                  child: Icon(
+                    AlistenIcons.equalsBold,
+                    size: AlistenSizes.iconSm,
+                    color: colors.onGlassMuted,
                   ),
                 ),
-              ],
+              ),
+            ],
+          )
+        : Row(
+            key: const ValueKey('using'),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 写出点歌结果的按钮要一百多 dp，320 dp 宽、字号更大时歌名会被挤得
+              // 只剩一两个字。结果另作为按钮的值读出。
+              MediaQuery.withClampedTextScaling(
+                maxScaleFactor: 1.5,
+                child: PlaylistPickControl(
+                  track: item.track,
+                  title: meta.title,
+                  hideOutsideRoom: true,
+                  onPick: onPick,
+                ),
+              ),
+              ActionMenuButton(
+                semanticLabel: '《${meta.title}》的更多操作',
+                iconSize: AlistenSizes.iconSm,
+                entries: [
+                  ActionMenuEntry(
+                    icon: AlistenIcons.listPlus,
+                    label: '保存到歌单',
+                    onSelected: onSave,
+                  ),
+                  ActionMenuEntry(
+                    icon: AlistenIcons.copy,
+                    label: copyTitleHint,
+                    onSelected: copy,
+                  ),
+                  // 单首移出不确认，与 Web 相同。
+                  ActionMenuEntry(
+                    icon: AlistenIcons.minusCircle,
+                    label: '移出这个歌单',
+                    danger: true,
+                    onSelected: onRemove,
+                  ),
+                ],
+              ),
+            ],
+          );
+    // 列表的移动操作加在包住这一项的节点上，歌名并进这个节点，读屏在这首歌上就能
+    // 找到它们。编辑时整行是一个可勾选的节点；平时点歌和“⋯”是各自的按钮。
+    return Semantics(
+      label: editing || subtitle == null
+          ? meta.title
+          : '${meta.title}\n$subtitle',
+      checked: editing ? selected : null,
+      onTap: editing ? onToggle : null,
+      onLongPress: editing ? null : copy,
+      onLongPressHint: editing ? null : copyTitleHint,
+      child: ReorderableDelayedDragStartListener(
+        index: index,
+        enabled: editing,
+        child: Row(
+          children: [
+            Expanded(
+              child: ExcludeSemantics(
+                child: TrackRow(
+                  title: meta.title,
+                  subtitle: subtitle,
+                  coverUrl: meta.coverUrl,
+                  onPressed: editing ? onToggle : null,
+                  onLongPress: editing ? null : copy,
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                    AlistenSpacing.page,
+                    AlistenSpacing.xxs,
+                    0,
+                    AlistenSpacing.xxs,
+                  ),
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: AlistenSpacing.xs),
+            AnimatedResize(
+              duration: duration,
+              curve: AlistenCurves.emphasized,
+              alignment: AlignmentDirectional.centerEnd,
+              child: ExcludeSemantics(
+                excluding: editing,
+                child: AnimatedSwitcher(
+                  duration: duration,
+                  switchInCurve: AlistenCurves.standard,
+                  switchOutCurve: AlistenCurves.exit,
+                  transitionBuilder: fadeLeavingInert,
+                  layoutBuilder: (current, previous) => Stack(
+                    alignment: AlignmentDirectional.centerEnd,
+                    children: [...previous, ?current],
+                  ),
+                  child: trailing,
+                ),
+              ),
+            ),
+            const SizedBox(width: AlistenSpacing.xxs),
+          ],
         ),
       ),
     );
@@ -728,7 +742,7 @@ class _SelectingBar extends StatelessWidget {
               children: [
                 IconCircleButton(
                   icon: AlistenIcons.x,
-                  semanticLabel: '退出选择',
+                  semanticLabel: '完成编辑',
                   style: IconCircleButtonStyle.plain,
                   onPressed: onClose,
                 ),

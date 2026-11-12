@@ -160,10 +160,16 @@ class PickUnavailableNotice extends ConsumerWidget {
       AlistenSpacing.page,
       AlistenSpacing.xs,
     ),
+    this.outsideRoom = true,
     super.key,
   });
 
   final EdgeInsetsGeometry padding;
+
+  /// 为 false 时只在进了房间、还没连上时提示。房间外打开的列表本就不点歌，
+  /// 点歌按钮也一并隐藏（见 [PickControl.hideOutsideRoom]），常驻的提示只会
+  /// 让人困惑。
+  final bool outsideRoom;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -172,7 +178,9 @@ class PickUnavailableNotice extends ConsumerWidget {
         (room) => (room.status, room.activeRoomId != null),
       ),
     );
-    if (connection == RoomConnectionStatus.open) return const SizedBox.shrink();
+    if (connection == RoomConnectionStatus.open || (!entered && !outsideRoom)) {
+      return const SizedBox.shrink();
+    }
     final stopped = connection == RoomConnectionStatus.stopped;
     return Padding(
       padding: padding,
@@ -215,6 +223,7 @@ class PickControl extends ConsumerWidget {
     this.expand = false,
     this.tone = PickTone.tonal,
     this.blockedReason,
+    this.hideOutsideRoom = false,
     super.key,
   });
 
@@ -222,6 +231,10 @@ class PickControl extends ConsumerWidget {
   final String title;
   final PickSong onPick;
   final PickTone tone;
+
+  /// 不在房间里时不显示：用于从房间外打开的列表，这时整列不可用的按钮只是
+  /// 干扰。进了房间、还在连接时照常显示为不可用。
+  final bool hideOutsideRoom;
 
   final String? label;
 
@@ -236,6 +249,10 @@ class PickControl extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final entered = ref.watch(
+      roomControllerProvider.select((room) => room.activeRoomId != null),
+    );
+    if (hideOutsideRoom && !entered) return const SizedBox.shrink();
     final status = ref.watch(
       pickControllerProvider.select((picks) => picks.of(track)),
     );

@@ -607,15 +607,9 @@ void main() {
     final semantics = tester.ensureSemantics();
     final opened = await _openHistory(tester, [heard('晴天', at: _now)]);
     final again = find.bySemanticsLabel('再点一次《晴天》');
-    expect(find.text('进入房间后可点歌'), findsOneWidget);
-    expect(
-      tester.widget<PickControl>(find.byType(PickControl)).tone,
-      PickTone.quiet,
-    );
-    expect(
-      tester.getSemantics(again),
-      isSemantics(hasEnabledState: true, isEnabled: false, hasTapAction: false),
-    );
+    // 房间外打开时没有点歌按钮，也没有常驻的提示。
+    expect(find.text('进入房间后可点歌'), findsNothing);
+    expect(again, findsNothing);
 
     unawaited(
       opened.container.read(roomControllerProvider.notifier).openRoom('listen'),
@@ -624,6 +618,10 @@ void main() {
     _emitRoom(opened.rooms);
     await _settle(tester);
     expect(find.text('进入房间后可点歌'), findsNothing);
+    expect(
+      tester.widget<PickControl>(find.byType(PickControl)).tone,
+      PickTone.quiet,
+    );
     opened.rooms.last.responses['queue.add'] = {'entry': entryJson('晴天')};
 
     await tester.tap(again);
