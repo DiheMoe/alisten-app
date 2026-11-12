@@ -28,7 +28,6 @@ import 'package:alisten/shared/ui/cover_backdrop.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
-import 'package:alisten/shared/ui/page_glow.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/section_header.dart';
@@ -245,7 +244,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     // 有搜索结果时链接只占一行，不把结果推到下面去。
     final offers = _offers(typed, compact: !home && typed == null);
     return AlistenScaffold(
-      background: const PageGlow(),
       // 提示显示在输入框和筛选项下方，以免搜下一首歌时挡住它们。
       topBar: ToastClearance(
         child: Column(

@@ -16,7 +16,6 @@ import 'package:alisten/shared/ui/collapsible.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
-import 'package:alisten/shared/ui/page_glow.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/pull_refresh.dart';
@@ -24,8 +23,6 @@ import 'package:alisten/shared/ui/section_header.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-const _createSpace = AlistenSizes.largeTouchTarget + 2 * AlistenSpacing.md;
 
 class LobbyScreen extends ConsumerStatefulWidget {
   const LobbyScreen({
@@ -183,13 +180,10 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         (state) => state.member?.avatarUrl(AlistenSizes.avatar),
       ),
     );
-    // 必须在 scaffold 之外读取：scaffold 会从页面中去掉键盘高度。
-    final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
     final listError = lobby.listError;
     final busy = lobby.busy || _joinSheetShown;
     final loading = lobby.loading && !_pulling;
     return AlistenScaffold(
-      background: const PageGlow(),
       body: Builder(
         builder: (context) {
           // 已包含悬浮在安全区之上的迷你播放条。
@@ -270,6 +264,15 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                               style: IconCircleButtonStyle.plain,
                               onPressed: () => unawaited(_lobby.load()),
                             ),
+                          // 创建房间和找房间、刷新排在一起，不再悬浮在列表上面。
+                          IconCircleButton(
+                            icon: AlistenIcons.plusBold,
+                            semanticLabel: '创建房间',
+                            style: IconCircleButtonStyle.plain,
+                            onPressed: busy
+                                ? null
+                                : () => unawaited(_showCreate()),
+                          ),
                         ],
                       ),
                     ),
@@ -296,20 +299,9 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                         ),
                       ),
                     ),
-                  ..._rooms(lobby, loading, bottom + _createSpace),
+                  ..._rooms(lobby, loading, bottom),
                 ],
               ),
-              if (!typing)
-                PositionedDirectional(
-                  end: AlistenSpacing.page,
-                  bottom: bottom + AlistenSpacing.md,
-                  child: PillButton(
-                    label: '创建房间',
-                    icon: AlistenIcons.plusBold,
-                    large: true,
-                    onPressed: busy ? null : () => unawaited(_showCreate()),
-                  ),
-                ),
             ],
           );
         },
@@ -631,7 +623,6 @@ class _RoomRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
-    final identity = AlistenColors.identity(room.id);
     final name = room.name.trim();
     final online = room.onlineCount > 0;
     return Pressable(
@@ -648,7 +639,7 @@ class _RoomRow extends StatelessWidget {
                 width: AlistenSizes.rowCover,
                 height: AlistenSizes.rowCover,
                 decoration: BoxDecoration(
-                  color: identity.fill,
+                  color: colors.onGlass.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(AlistenRadii.sm),
                 ),
                 alignment: Alignment.center,
@@ -659,7 +650,7 @@ class _RoomRow extends StatelessWidget {
                   style: AlistenTypography.weighted(
                     AlistenTypography.title,
                     FontWeight.w800,
-                  ).copyWith(color: identity.ink),
+                  ).copyWith(color: colors.onGlass),
                 ),
               ),
             ),

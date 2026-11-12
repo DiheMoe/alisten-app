@@ -6,6 +6,10 @@ abstract final class AlistenRadii {
   static const double lg = 28;
   static const double joined = 6;
   static const double pill = 999;
+
+  /// 按钮、标签、分段控件和输入框：小圆角矩形。全圆角只留给开关、状态标记这类
+  /// 本来就是圆的东西。
+  static const double control = 14;
 }
 
 abstract final class AlistenSpacing {

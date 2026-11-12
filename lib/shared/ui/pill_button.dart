@@ -68,7 +68,7 @@ class PillButton extends StatelessWidget {
       // 忙碌不等于不可用，不变淡。
       dimWhenDisabled: !busy,
       expanded: expanded,
-      focusRadius: BorderRadius.circular(AlistenRadii.pill),
+      focusRadius: BorderRadius.circular(AlistenRadii.control),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           minHeight: large
@@ -78,7 +78,7 @@ class PillButton extends StatelessWidget {
         ),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AlistenRadii.pill),
+            borderRadius: BorderRadius.circular(AlistenRadii.control),
             color: switch (style) {
               PillButtonStyle.primary => colors.brand,
               PillButtonStyle.secondary => colors.glassFill,

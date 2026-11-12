@@ -15,7 +15,6 @@ import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
-import 'package:alisten/shared/ui/page_glow.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
@@ -83,7 +82,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       color: colors.onGlassMuted,
     );
     return AlistenScaffold(
-      background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
           icon: AlistenIcons.arrowLeft,

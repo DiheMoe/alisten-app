@@ -75,7 +75,6 @@ Future<void> _stage(
               nowPlaying: nowPlaying ?? testNowPlaying,
               compact: compact,
               connected: true,
-              onAddSong: () {},
               onVoteSkipped: (_) {},
               body: const SizedBox.expand(),
               saveToPlaylist: _saveButton,
@@ -113,7 +112,6 @@ void main() {
               nowPlaying: testNowPlaying,
               compact: compact,
               connected: true,
-              onAddSong: () {},
               onVoteSkipped: (_) {},
               body: compact ? const SizedBox.expand() : null,
               saveToPlaylist: withSlot

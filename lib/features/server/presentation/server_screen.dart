@@ -12,7 +12,6 @@ import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
-import 'package:alisten/shared/ui/page_glow.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
@@ -109,7 +108,6 @@ class _ServerScreenState extends ConsumerState<ServerScreen> {
     final directory = ref.watch(serverDirectoryProvider);
     final working = _working;
     return AlistenScaffold(
-      background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
           icon: AlistenIcons.arrowLeft,

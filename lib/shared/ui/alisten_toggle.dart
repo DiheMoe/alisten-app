@@ -52,7 +52,8 @@ class AlistenToggle extends StatelessWidget {
                 height: _knob,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: colors.knob,
+                  // 打开时轨道是强调色，圆钮用它上面的文字色才分得清。
+                  color: value ? colors.onBrand : colors.knob,
                   boxShadow: [
                     BoxShadow(
                       color: Theme.of(context).colorScheme.shadow

@@ -20,7 +20,6 @@ import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
-import 'package:alisten/shared/ui/page_glow.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
@@ -164,7 +163,6 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
       body = _list(sortPlaylists(playlists, view.sort), view, list.loadedAtMs);
     }
     return AlistenScaffold(
-      background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
           icon: AlistenIcons.arrowLeft,

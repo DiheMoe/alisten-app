@@ -63,11 +63,8 @@ void main() {
   Color roomCover(String cover, [Brightness brightness = Brightness.dark]) =>
       _FakeCoverLoader.scheme(cover, brightness).primary;
 
-  ColorScheme brand(Brightness brightness) => ColorScheme.fromSeed(
-    seedColor: const Color(0xFF6D5BFF),
-    brightness: brightness,
-    dynamicSchemeVariant: DynamicSchemeVariant.vibrant,
-  );
+  ColorScheme brand(Brightness brightness) =>
+      AlistenColors.brandScheme(brightness);
 
   test('without a playing cover the brand colours are shown', () async {
     final container = await open();

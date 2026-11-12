@@ -223,7 +223,6 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
     Widget content(RoomMode page) => switch (page) {
       RoomMode.lyrics || RoomMode.player => const LyricsView(),
       RoomMode.queue => QueueView(
-        onAddSong: _addSong,
         onResult: reportQueue,
         onCopyTitle: copyTitle,
         onSaveToPlaylist: saveToPlaylist,
@@ -253,7 +252,6 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
       nowPlaying: nowPlaying,
       compact: !twoPanes && mode != RoomMode.player,
       connected: room.status == RoomConnectionStatus.open,
-      onAddSong: _addSong,
       onVoteSkipped: (result) => _reportVote(toasts, result),
       onExpand: () => _show(RoomMode.player),
       onCopyTitle: copyTitle,

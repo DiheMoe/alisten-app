@@ -17,7 +17,6 @@ import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
-import 'package:alisten/shared/ui/page_glow.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:alisten/shared/ui/track_row.dart';
@@ -207,7 +206,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     // 已包含悬浮在安全区之上的迷你播放条。
     final bottom = MediaQuery.paddingOf(context).bottom;
     return AlistenScaffold(
-      background: const PageGlow(),
       // 提示出现在筛选框下方，不挡住正在输入的内容。
       topBar: ToastClearance(
         child: Column(

@@ -68,7 +68,7 @@ void main() {
       isSemantics(isHeader: true),
       reason: 'the lobby title is announced as the heading of the page',
     );
-    expect(find.text('创建房间'), findsOneWidget);
+    expect(find.bySemanticsLabel('创建房间'), findsOneWidget);
     semantics.dispose();
     await tester.pumpWidget(const SizedBox());
   });
@@ -279,7 +279,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('创建房间'), findsOneWidget);
+    expect(find.bySemanticsLabel('创建房间'), findsOneWidget);
     final container = ProviderScope.containerOf(
       tester.element(find.byType(AlistenApp)),
     );

@@ -131,7 +131,7 @@ class _AlistenTextFieldState extends State<AlistenTextField> {
     final label = widget.label;
     final hint = widget.hint;
     final radius = BorderRadius.circular(
-      widget.pill ? AlistenRadii.pill : AlistenRadii.sm,
+      widget.pill ? AlistenRadii.control : AlistenRadii.sm,
     );
     final minHeight = widget.pill
         ? AlistenSizes.largeTouchTarget

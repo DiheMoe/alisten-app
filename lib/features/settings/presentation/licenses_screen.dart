@@ -9,7 +9,6 @@ import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/async_state_view.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
-import 'package:alisten/shared/ui/page_glow.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -38,7 +37,6 @@ class _LicensesScreenState extends ConsumerState<LicensesScreen> {
     final licenses = ref.watch(openSourceLicensesProvider);
     final packages = licenses.value ?? const [];
     return AlistenScaffold(
-      background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
           icon: AlistenIcons.arrowLeft,

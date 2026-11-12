@@ -21,7 +21,6 @@ import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
-import 'package:alisten/shared/ui/page_glow.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
@@ -199,7 +198,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final identity = ref.watch(identityControllerProvider);
     final member = identity.member;
     return AlistenScaffold(
-      background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
           icon: AlistenIcons.arrowLeft,

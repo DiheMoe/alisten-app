@@ -29,7 +29,7 @@ void main() {
     await pumpAlistenApp(tester, releases: releases, overrides: [_clock]);
 
     expect(find.text(_title), findsOneWidget);
-    expect(find.text('创建房间'), findsOneWidget);
+    expect(find.bySemanticsLabel('创建房间'), findsOneWidget);
     expect(releases.calls, 1);
     expect(
       appContainer(tester)
@@ -154,7 +154,7 @@ void main() {
       ],
     );
 
-    expect(find.text('创建房间'), findsOneWidget);
+    expect(find.bySemanticsLabel('创建房间'), findsOneWidget);
     expect(find.text(_title), findsNothing);
     expect(records, isNotEmpty);
     expect(records.map((record) => record.$1), everyElement(500));
@@ -171,7 +171,7 @@ void main() {
     expect(releases.calls, 1);
     expect(find.text(_title), findsNothing);
     expect(find.textContaining('检查更新'), findsNothing);
-    expect(find.text('创建房间'), findsOneWidget);
+    expect(find.bySemanticsLabel('创建房间'), findsOneWidget);
   });
 
   testWidgets('the room of the launch link is opened first, and the panel '

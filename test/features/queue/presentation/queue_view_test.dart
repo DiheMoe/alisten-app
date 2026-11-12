@@ -91,7 +91,6 @@ final class _Room {
   final Completer<void>? hold;
 
   int sent = 0;
-  int added = 0;
   final reported = <_Result>[];
   final copied = <String>[];
 
@@ -133,7 +132,6 @@ final class _Room {
       _app(
         QueueView(
           onCopyTitle: copied.add,
-          onAddSong: () => added++,
           onResult: (result, success) =>
               reported.add((result: result, success: success)),
         ),
@@ -300,25 +298,25 @@ void main() {
   });
 
   testWidgets('a room without songs invites to add one', (tester) async {
-    final room = await _pumpQueue(tester, _snapshot());
+    await _pumpQueue(tester, _snapshot());
 
     expect(find.byType(EmptyState), findsOneWidget);
     expect(find.text('还没有歌，点一首吧'), findsOneWidget);
     expect(find.text('等待中 0 首'), findsNothing);
-    await tester.tap(find.text('点歌'));
-    expect(room.added, 1);
+    // 点歌只在底栏有入口，队列里不再放第二个按钮。
+    expect(find.text('点歌'), findsNothing);
   });
 
   testWidgets('with a song playing, nothing waiting is said under its own '
       'header', (tester) async {
-    final room = await _pumpQueue(tester, _snapshot(playing: _entry('a')));
+    await _pumpQueue(tester, _snapshot(playing: _entry('a')));
 
     expect(find.text('正在播放'), findsOneWidget);
     expect(find.text('等待中 0 首'), findsOneWidget);
     expect(find.byType(EmptyState), findsNothing);
     expect(find.text('还没有歌，点一首吧'), findsOneWidget);
-    await tester.tap(find.text('点歌'));
-    expect(room.added, 1);
+    // 点歌只在底栏有入口，队列里不再放第二个按钮。
+    expect(find.text('点歌'), findsNothing);
   });
 
   testWidgets('the queue has no vote to skip', (tester) async {

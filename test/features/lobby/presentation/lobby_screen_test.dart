@@ -323,7 +323,7 @@ void main() {
       'is tapped', (tester) async {
     await _Lobby.open(tester);
 
-    await tester.tap(find.text('创建房间'));
+    await tester.tap(find.bySemanticsLabel('创建房间'));
     await tester.pumpAndSettle();
     expect(_field('房间名称'), findsOneWidget);
     expect(_focused, findsNothing);
@@ -352,7 +352,9 @@ void main() {
     expect(find.bySemanticsLabel('正在进入'), findsOneWidget);
     expect(
       tester
-          .widget<PillButton>(find.widgetWithText(PillButton, '创建房间'))
+          .widget<IconCircleButton>(
+            find.widgetWithIcon(IconCircleButton, AlistenIcons.plusBold),
+          )
           .onPressed,
       isNull,
     );
@@ -408,7 +410,7 @@ void main() {
     final api = FakeAlistenApi()..createMemberGate = Completer<void>();
     final lobby = await _Lobby.open(tester, api: api);
 
-    await tester.tap(find.text('创建房间'));
+    await tester.tap(find.bySemanticsLabel('创建房间'));
     await tester.pumpAndSettle();
     await tester.enterText(_field('房间名称'), '新房间');
     await tester.tap(find.text('创建并进入'));
@@ -439,7 +441,7 @@ void main() {
       ..createRoomError = const FormatException('新房间 secret');
     final lobby = await _Lobby.open(tester, api: api);
 
-    await tester.tap(find.text('创建房间'));
+    await tester.tap(find.bySemanticsLabel('创建房间'));
     await tester.pumpAndSettle();
     await tester.enterText(_field('房间名称'), '新房间');
     await tester.enterText(_field('密码（可选）'), 'secret');
@@ -523,7 +525,7 @@ void main() {
 
     await tester.tapAt(const Offset(20, 40));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('创建房间'));
+    await tester.tap(find.bySemanticsLabel('创建房间'));
     await tester.pumpAndSettle();
     expect(find.text('房间密码错误'), findsNothing);
   });

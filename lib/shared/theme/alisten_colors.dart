@@ -54,14 +54,25 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
     final (usual, other) = dark
         ? (underDeep, underWhite)
         : (underWhite, underDeep);
-    final brand = usual.shift <= _tolerableShift || usual.shift <= other.shift
+    // 没有色相的配色（界面自己的黑白灰）不能硬提饱和度，否则灰会变成红。
+    final colorless = HSLColor.fromColor(scheme.primary).saturation < 0.05;
+    final brand = colorless
+        ? (
+            start: scheme.onSurface,
+            end: scheme.onSurface,
+            ink: scheme.surface,
+            shift: 0.0,
+          )
+        : usual.shift <= _tolerableShift || usual.shift <= other.shift
         ? usual
         : other;
-    Color vivid(Color color) => _saturated(
-      color,
-      lightness: dark ? 0.6 : 0.56,
-      minSaturation: 0.62,
-    ).toColor();
+    Color vivid(Color color) => colorless
+        ? HSLColor.fromColor(color).withLightness(dark ? 0.6 : 0.56).toColor()
+        : _saturated(
+            color,
+            lightness: dark ? 0.6 : 0.56,
+            minSaturation: 0.62,
+          ).toColor();
     final surface = scheme.surface;
     final glow = vivid(scheme.primary);
     final lightRoom = immersive && !dark;
@@ -100,12 +111,14 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
       // 深色房间没有封面时，极光是深色底上的一抹颜色，不能亮到压过白字。
       aurora: List.unmodifiable([
         for (final color in [scheme.primary, scheme.tertiary, scheme.secondary])
-          immersive && dark
+          immersive && dark && !colorless
               ? _saturated(
                   color,
                   lightness: 0.42,
                   minSaturation: 0.62,
                 ).toColor()
+              : immersive && dark
+              ? HSLColor.fromColor(color).withLightness(0.3).toColor()
               : vivid(color),
       ]),
       scrim: LinearGradient(
@@ -175,8 +188,6 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
     return (fill: legible.start, ink: legible.ink);
   }
 
-  static const brandSeed = Color(0xFF6D5BFF);
-
   /// 鲜艳变体的主色保持来源的色相。
   static const schemeVariant = DynamicSchemeVariant.vibrant;
 
@@ -185,38 +196,16 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
   static const scanSurface = Color(0xFFFFFFFF);
   static const scanInk = Color(0x8A000000);
 
-  /// 强调色取品牌紫的鲜艳方案，底色、面板和文字取中性方案：房间外的页面只让
-  /// 品牌紫出现在可操作的地方。
+  /// 界面自己不带颜色：黑白灰，与黑底的应用图标一致。颜色只来自封面。
   static ColorScheme brandScheme(Brightness brightness) {
-    final vivid = ColorScheme.fromSeed(
-      seedColor: brandSeed,
+    return ColorScheme.fromSeed(
+      seedColor: const Color(0xFF808080),
       brightness: brightness,
-      dynamicSchemeVariant: schemeVariant,
-    );
-    final quiet = ColorScheme.fromSeed(
-      seedColor: brandSeed,
-      brightness: brightness,
-      dynamicSchemeVariant: DynamicSchemeVariant.neutral,
-    );
-    return vivid.copyWith(
-      surface: quiet.surface,
-      onSurface: quiet.onSurface,
-      onSurfaceVariant: quiet.onSurfaceVariant,
-      surfaceDim: quiet.surfaceDim,
-      surfaceBright: quiet.surfaceBright,
-      surfaceContainerLowest: quiet.surfaceContainerLowest,
-      surfaceContainerLow: quiet.surfaceContainerLow,
-      surfaceContainer: quiet.surfaceContainer,
-      surfaceContainerHigh: quiet.surfaceContainerHigh,
-      surfaceContainerHighest: quiet.surfaceContainerHighest,
-      outline: quiet.outline,
-      outlineVariant: quiet.outlineVariant,
-      inverseSurface: quiet.inverseSurface,
-      onInverseSurface: quiet.onInverseSurface,
+      dynamicSchemeVariant: DynamicSchemeVariant.monochrome,
     );
   }
 
-  /// 主要按钮、开关、自己的消息等唯一的强调填充。房间里取自封面，房间外是品牌紫。
+  /// 主要按钮、开关、自己的消息等唯一的强调填充。房间里取自封面，房间外是文字色。
   final Color brand;
 
   /// 与 [brand] 的对比度不低于 4.5:1。

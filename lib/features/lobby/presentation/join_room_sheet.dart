@@ -189,7 +189,6 @@ class _RoomSummary extends StatelessWidget {
     final colors = AlistenColors.of(context);
     final room = this.room;
     final name = room?.name.trim() ?? '';
-    final identity = room == null ? null : AlistenColors.identity(room.id);
     final description = room?.description.trim() ?? '';
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -199,11 +198,11 @@ class _RoomSummary extends StatelessWidget {
             width: AlistenSizes.rowCover,
             height: AlistenSizes.rowCover,
             decoration: BoxDecoration(
-              color: identity?.fill ?? colors.glassFill,
+              color: colors.onGlass.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(AlistenRadii.sm),
             ),
             alignment: Alignment.center,
-            child: identity == null
+            child: room == null
                 ? Icon(
                     AlistenIcons.lockSimpleFill,
                     size: AlistenSizes.icon,
@@ -216,7 +215,7 @@ class _RoomSummary extends StatelessWidget {
                     style: AlistenTypography.weighted(
                       AlistenTypography.title,
                       FontWeight.w800,
-                    ).copyWith(color: identity.ink),
+                    ).copyWith(color: colors.onGlass),
                   ),
           ),
         ),

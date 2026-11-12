@@ -370,7 +370,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('创建房间'), findsOneWidget);
+    expect(find.bySemanticsLabel('创建房间'), findsOneWidget);
     final errors = [
       for (final record in records)
         if (record.$2 >= 1000) record,

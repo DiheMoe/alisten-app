@@ -89,7 +89,6 @@ Future<void> _pump(
         ),
         home: Scaffold(
           body: QueueView(
-            onAddSong: () {},
             onResult: (_, _) {},
             onCopyTitle: (_) {},
             onSaveToPlaylist: save,

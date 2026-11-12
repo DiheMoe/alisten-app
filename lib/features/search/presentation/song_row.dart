@@ -331,7 +331,7 @@ class _PickButtonState extends State<PickButton>
     final status = widget.status;
     final wide = widget.wide;
     final short = AlistenDurations.of(context, AlistenDurations.short);
-    final pill = BorderRadius.circular(AlistenRadii.pill);
+    final pill = BorderRadius.circular(AlistenRadii.control);
 
     final unpicked = status == null || status == PickStatus.sending;
     final tone = unpicked ? widget.tone : null;

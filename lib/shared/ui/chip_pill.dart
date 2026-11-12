@@ -24,7 +24,7 @@ class ChipPill extends StatelessWidget {
     final surface = Theme.of(context).colorScheme.surface;
     final ink = selected ? surface : colors.onGlass;
     final icon = this.icon ?? (selected ? AlistenIcons.checkBold : null);
-    final pill = BorderRadius.circular(AlistenRadii.pill);
+    final pill = BorderRadius.circular(AlistenRadii.control);
     return Pressable(
       onPressed: onPressed,
       selected: selected,

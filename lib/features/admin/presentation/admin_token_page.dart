@@ -12,7 +12,6 @@ import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
-import 'package:alisten/shared/ui/page_glow.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
 import 'package:flutter/material.dart';
@@ -52,7 +51,6 @@ class _AdminTokenPageState extends ConsumerState<AdminTokenPage> {
     final cooling = signIn.cooldownSeconds > 0;
     final error = signIn.error;
     return AlistenScaffold(
-      background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
           icon: AlistenIcons.arrowLeft,

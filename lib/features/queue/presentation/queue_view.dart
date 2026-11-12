@@ -14,7 +14,6 @@ import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
-import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/section_header.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
@@ -73,14 +72,12 @@ typedef SaveTrackCallback = void Function(
 /// 按钮，歌名就只剩几个字。
 class QueueView extends ConsumerWidget {
   const QueueView({
-    required this.onAddSong,
     required this.onResult,
     required this.onCopyTitle,
     this.onSaveToPlaylist,
     super.key,
   });
 
-  final VoidCallback onAddSong;
   final QueueResultCallback onResult;
   final ValueChanged<String> onCopyTitle;
 
@@ -248,11 +245,6 @@ class QueueView extends ConsumerWidget {
                         child: EmptyState(
                           icon: AlistenIcons.queue,
                           title: _noSongs,
-                          action: PillButton(
-                            label: '点歌',
-                            icon: AlistenIcons.plusBold,
-                            onPressed: onAddSong,
-                          ),
                         ),
                       ),
                     ),
@@ -267,7 +259,7 @@ class QueueView extends ConsumerWidget {
                 ),
               ),
               if (waiting.isEmpty)
-                _faded(_NoneWaiting(onAddSong: onAddSong))
+                _faded(const _NoneWaiting())
               else
                 SliverList.builder(
                   itemCount: waiting.length,
@@ -284,7 +276,6 @@ class QueueView extends ConsumerWidget {
                       key: ValueKey(entry.id),
                       child: RepaintBoundary(
                         child: _Panel(
-                          first: index == 0,
                           last: index == waiting.length - 1,
                           child: _EntryRow(
                             entry: entry,
@@ -330,6 +321,7 @@ class QueueView extends ConsumerWidget {
   }
 }
 
+// 点歌的入口只有底栏（平板在顶栏）那一个，这里不再放按钮。
 const _noSongs = '还没有歌，点一首吧';
 
 // 字体较大时选项换到标签下方，选项文字才不会被截断。
@@ -394,23 +386,20 @@ class _PlayModeRow extends StatelessWidget {
 }
 
 // 同一列表的各行拼成一整块面板：首行圆上角，末行圆下角，行间有细分隔线。
+// 队列的行直接排在房间背景上，只用细线隔开，不再套一层玻璃卡片。
 class _Panel extends StatelessWidget {
-  const _Panel({required this.child, this.first = true, this.last = true});
+  const _Panel({required this.child, this.last = true});
 
   final Widget child;
-  final bool first;
   final bool last;
 
   @override
   Widget build(BuildContext context) {
-    final colors = AlistenColors.of(context);
     return Padding(
       padding: _panelMargin,
       child: CustomPaint(
         painter: _PanelPainter(
-          fill: colors.glassFill,
-          stroke: colors.glassStroke,
-          first: first,
+          stroke: AlistenColors.of(context).glassStroke,
           last: last,
         ),
         child: child,
@@ -420,55 +409,27 @@ class _Panel extends StatelessWidget {
 }
 
 class _PanelPainter extends CustomPainter {
-  const _PanelPainter({
-    required this.fill,
-    required this.stroke,
-    required this.first,
-    required this.last,
-  });
+  const _PanelPainter({required this.stroke, required this.last});
 
-  final Color fill;
   final Color stroke;
-  final bool first;
   final bool last;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 把与相邻行相接处的圆角推出裁剪区域，两侧描边才能连续贯通。
-    const overhang = AlistenRadii.md * 2;
-    final outline = RRect.fromLTRBR(
-      0,
-      first ? 0 : -overhang,
-      size.width,
-      size.height + (last ? 0 : overhang),
-      const Radius.circular(AlistenRadii.md),
-    );
+    if (last) return;
     const width = AlistenSizes.hairline;
-    final hairline = Paint()
-      ..color = stroke
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = width;
-    canvas
-      ..save()
-      ..clipRect(Offset.zero & size)
-      ..drawRRect(outline, Paint()..color = fill)
-      ..drawRRect(outline.deflate(width / 2), hairline)
-      ..restore();
-    if (!last) {
-      canvas.drawLine(
-        Offset(_dividerInset, size.height - width / 2),
-        Offset(size.width - AlistenSpacing.sm, size.height - width / 2),
-        hairline,
-      );
-    }
+    canvas.drawLine(
+      Offset(_dividerInset, size.height - width / 2),
+      Offset(size.width - AlistenSpacing.sm, size.height - width / 2),
+      Paint()
+        ..color = stroke
+        ..strokeWidth = width,
+    );
   }
 
   @override
   bool shouldRepaint(_PanelPainter oldDelegate) {
-    return fill != oldDelegate.fill ||
-        stroke != oldDelegate.stroke ||
-        first != oldDelegate.first ||
-        last != oldDelegate.last;
+    return stroke != oldDelegate.stroke || last != oldDelegate.last;
   }
 }
 
@@ -569,33 +530,18 @@ class _EntryMenu extends StatelessWidget {
 }
 
 class _NoneWaiting extends StatelessWidget {
-  const _NoneWaiting({required this.onAddSong});
-
-  final VoidCallback onAddSong;
+  const _NoneWaiting();
 
   @override
   Widget build(BuildContext context) {
     return _Panel(
       child: Padding(
         padding: _rowPadding,
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                _noSongs,
-                style: AlistenTypography.body.copyWith(
-                  color: AlistenColors.of(context).onGlassMuted,
-                ),
-              ),
-            ),
-            const SizedBox(width: AlistenSpacing.xs),
-            PillButton(
-              label: '点歌',
-              icon: AlistenIcons.plusBold,
-              style: PillButtonStyle.secondary,
-              onPressed: onAddSong,
-            ),
-          ],
+        child: Text(
+          _noSongs,
+          style: AlistenTypography.body.copyWith(
+            color: AlistenColors.of(context).onGlassMuted,
+          ),
         ),
       ),
     );

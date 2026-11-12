@@ -13,11 +13,9 @@ import 'package:alisten/features/playback/presentation/player_controls.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
-import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/fade_leaving_inert.dart';
-import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/track_row.dart';
@@ -32,7 +30,6 @@ class NowPlayingHeader extends ConsumerStatefulWidget {
     required this.nowPlaying,
     required this.compact,
     required this.connected,
-    required this.onAddSong,
     required this.onVoteSkipped,
     this.onExpand,
     this.onCopyTitle,
@@ -44,7 +41,6 @@ class NowPlayingHeader extends ConsumerStatefulWidget {
   final NowPlaying? nowPlaying;
   final bool compact;
   final bool connected;
-  final VoidCallback onAddSong;
   final ValueChanged<MutationResult<VoteSkipResult>> onVoteSkipped;
   final VoidCallback? onExpand;
   final ValueChanged<String>? onCopyTitle;
@@ -218,14 +214,8 @@ class _NowPlayingHeaderState extends ConsumerState<NowPlayingHeader>
                   child: _Interactive(
                     enabled: !compact,
                     child: nowPlaying == null
-                        ? Center(
-                            child: PillButton(
-                              label: '点歌',
-                              icon: AlistenIcons.plusBold,
-                              large: true,
-                              onPressed: widget.onAddSong,
-                            ),
-                          )
+                        // 标题已经说明没有歌，点歌的入口在底栏（平板在顶栏）。
+                        ? const SizedBox.shrink()
                         : Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -115,7 +115,7 @@ class _ModeTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
-    final pill = BorderRadius.circular(AlistenRadii.pill);
+    final pill = BorderRadius.circular(AlistenRadii.control);
     final chosen = RoomModeBar.modes.indexOf(mode);
     final motion = AlistenDurations.of(context, AlistenDurations.medium);
     return LayoutBuilder(
@@ -231,7 +231,7 @@ class _Tab extends StatelessWidget {
       onPressed: onPressed,
       semanticLabel: label,
       selected: selected,
-      focusRadius: BorderRadius.circular(AlistenRadii.pill),
+      focusRadius: BorderRadius.circular(AlistenRadii.control),
       child: ConstrainedBox(
         constraints: const BoxConstraints(
           minHeight: AlistenSizes.minTouchTarget,

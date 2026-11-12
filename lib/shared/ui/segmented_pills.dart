@@ -50,7 +50,7 @@ class SegmentedPills<T> extends StatelessWidget {
     final count = segments.length;
     final chosen = segments.indexWhere((segment) => segment.value == selected);
     final onChanged = this.onChanged;
-    final pill = BorderRadius.circular(AlistenRadii.pill);
+    final pill = BorderRadius.circular(AlistenRadii.control);
     final track = DecoratedBox(
       decoration: BoxDecoration(
         color: colors.glassFill,
@@ -144,7 +144,7 @@ class _Segment<T> extends StatelessWidget {
       selected: selected,
       inMutuallyExclusiveGroup: true,
       semanticLabel: showLabel ? null : segment.label,
-      focusRadius: BorderRadius.circular(AlistenRadii.pill),
+      focusRadius: BorderRadius.circular(AlistenRadii.control),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           minWidth: showLabel ? 0 : AlistenSizes.minTouchTarget,
