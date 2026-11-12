@@ -53,6 +53,15 @@ const _weWillRockYou = [
   TapBeat.short,
 ];
 
+const _weWillRockYouInverted = [
+  TapBeat.short,
+  TapBeat.short,
+  TapBeat.long,
+  TapBeat.short,
+  TapBeat.short,
+  TapBeat.long,
+];
+
 const _fateMotif = [
   TapBeat.short,
   TapBeat.short,
@@ -354,6 +363,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 patterns: [
                   RhythmPattern(
                     beats: _weWillRockYou,
+                    onMatched: widget.onOpenServers,
+                  ),
+                  RhythmPattern(
+                    beats: _weWillRockYouInverted,
                     onMatched: widget.onOpenServers,
                   ),
                   RhythmPattern(

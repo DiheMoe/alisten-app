@@ -537,8 +537,9 @@ void main() {
     expect(preferences.getBool('alisten.play-history.enabled'), isFalse);
   });
 
-  testWidgets('long long short long long short on the version row opens the '
-      'servers, and the row still reads as the version alone', (tester) async {
+  testWidgets('long long short long long short, or short short long short '
+      'short long, on the version row opens the servers, and the row still '
+      'reads as the version alone', (tester) async {
     final semantics = tester.ensureSemantics();
     tester.view
       ..physicalSize = const Size(360, 780) * 3
@@ -582,22 +583,20 @@ void main() {
       allOf(contains('版本'), contains(appVersion)),
     );
 
-    for (final (index, long) in [
-      true,
-      true,
-      false,
-      true,
-      true,
-      false,
+    for (final (times, beats) in [
+      [true, true, false, true, true, false],
+      [false, false, true, false, false, true],
     ].indexed) {
-      expect(opened, 0, reason: 'before beat ${index + 1}');
-      final gesture = await tester.startGesture(tester.getCenter(row));
-      await tester.pump(Duration(milliseconds: long ? 500 : 100));
-      await gesture.up();
-      await tester.pump(const Duration(milliseconds: 200));
+      for (final (index, long) in beats.indexed) {
+        expect(opened, times, reason: 'before beat ${index + 1} of $beats');
+        final gesture = await tester.startGesture(tester.getCenter(row));
+        await tester.pump(Duration(milliseconds: long ? 500 : 100));
+        await gesture.up();
+        await tester.pump(const Duration(milliseconds: 200));
+      }
+      expect(opened, times + 1, reason: '$beats');
     }
 
-    expect(opened, 1);
     expectNoTap();
     await tester.pumpWidget(const SizedBox());
     semantics.dispose();
