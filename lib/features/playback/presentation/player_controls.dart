@@ -23,10 +23,8 @@ class PlayerControls extends ConsumerStatefulWidget {
     this.vote,
     this.voting = false,
     this.interactive = true,
-    this.labelled = true,
-    this.labels,
     super.key,
-  }) : assert(compact || labels != null, '播放器的控件需要两侧文字的尺寸');
+  });
 
   final bool compact;
   final VoidCallback? onVoteSkip;
@@ -36,83 +34,14 @@ class PlayerControls extends ConsumerStatefulWidget {
   /// 为 false 时不接收触摸，也不被屏幕阅读器读出。
   final bool interactive;
 
-  /// 两侧控件下方是否显示文字；宽度不足以完整显示时也不显示。屏幕阅读器始终
-  /// 读出控件名称。
-  final bool labelled;
-
-  /// 与 [vote] 对应的文字尺寸。
-  final PlayerSideLabels? labels;
-
-  static double heightOf({
-    required double width,
-    required bool labelled,
-    required PlayerSideLabels labels,
-  }) {
-    final shown = _showsLabels(width, labelled: labelled, labels: labels);
-    final side =
-        _SideControl.inset +
-        AlistenSizes.minTouchTarget +
-        (shown ? AlistenSpacing.xs + labels.height : 0);
-    return math.max(_PlayButton.target(large: true), side);
-  }
-
-  static const _volumeLabel = '音量';
+  /// 完整播放器上这一行的高度。
+  static double get height => _PlayButton.target(large: true);
 
   static String? _voteValue(VoteSkipResult? vote) =>
       vote == null ? null : '已投 ${vote.votes}/${vote.requiredVotes}';
 
-  static String _voteText(VoteSkipResult? vote) => _voteValue(vote) ?? '投票切歌';
-
-  // 两侧的文字要么都完整显示，要么都不显示，不出现被截断的半句。
-  static bool _showsLabels(
-    double width, {
-    required bool labelled,
-    required PlayerSideLabels labels,
-  }) {
-    final side = (width - _PlayButton.target(large: true)) / 2;
-    return labelled && labels.width <= side;
-  }
-
   @override
   ConsumerState<PlayerControls> createState() => _PlayerControlsState();
-}
-
-/// 字号和文字不变时只量一次，键盘升降使布局每帧重建时无须重新排版。
-final class PlayerSideLabels {
-  const PlayerSideLabels._({required this.width, required this.height});
-
-  factory PlayerSideLabels.measure({
-    required TextScaler scaler,
-    required TextDirection direction,
-    required VoteSkipResult? vote,
-  }) {
-    final painter = TextPainter(
-      textDirection: direction,
-      textScaler: scaler,
-      maxLines: 1,
-    );
-    var width = 0.0;
-    for (final label in [
-      PlayerControls._volumeLabel,
-      PlayerControls._voteText(vote),
-    ]) {
-      painter
-        ..text = TextSpan(text: label, style: _SideControl._labelStyle)
-        ..layout();
-      width = math.max(width, painter.width);
-    }
-    painter.dispose();
-    final style = _SideControl._labelStyle;
-    // 文字只占一行，按字号算出的高度与实际排版一致。
-    return PlayerSideLabels._(
-      width: width,
-      height: scaler.scale(style.fontSize!) * style.height!,
-    );
-  }
-
-  /// 两段文字中较宽者的宽度。
-  final double width;
-  final double height;
 }
 
 class _PlayerControlsState extends ConsumerState<PlayerControls> {
@@ -150,55 +79,36 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
         ],
       );
     } else {
-      final voteLabel = PlayerControls._voteText(vote);
-      final labels = widget.labels!;
-      controls = LayoutBuilder(
-        builder: (context, constraints) {
-          final labelHeight =
-              PlayerControls._showsLabels(
-                constraints.maxWidth,
-                labelled: widget.labelled,
-                labels: labels,
-              )
-              ? labels.height
-              : null;
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Align(
-                  alignment: AlignmentDirectional.topStart,
-                  heightFactor: 1,
-                  child: _Volume(
-                    open: _volumeOpen,
-                    label: PlayerControls._volumeLabel,
-                    labelHeight: labelHeight,
-                    onToggle: () => setState(() => _volumeOpen = !_volumeOpen),
-                    onClose: () => setState(() => _volumeOpen = false),
-                  ),
-                ),
+      // 两侧只放图标，左右对称；名称由屏幕阅读器读出，票数在角标上。
+      controls = Row(
+        children: [
+          Expanded(
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: _Volume(
+                open: _volumeOpen,
+                onToggle: () => setState(() => _volumeOpen = !_volumeOpen),
+                onClose: () => setState(() => _volumeOpen = false),
               ),
-              _PlayButton(status: status, large: true, onPressed: toggle),
-              Expanded(
-                child: Align(
-                  alignment: AlignmentDirectional.topEnd,
-                  heightFactor: 1,
-                  child: _SideControl(
-                    icon: Icons.skip_next_rounded,
-                    label: voteLabel,
-                    semanticLabel: '投票切歌',
-                    semanticValue: voteValue,
-                    labelHeight: labelHeight,
-                    active: vote != null,
-                    busy: widget.voting,
-                    nudge: vote,
-                    onPressed: onVoteSkip,
-                  ),
-                ),
+            ),
+          ),
+          _PlayButton(status: status, large: true, onPressed: toggle),
+          Expanded(
+            child: Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: _SideControl(
+                icon: Icons.skip_next_rounded,
+                semanticLabel: '投票切歌',
+                semanticValue: voteValue,
+                active: vote != null,
+                busy: widget.voting,
+                nudge: vote,
+                badge: vote,
+                onPressed: onVoteSkip,
               ),
-            ],
-          );
-        },
+            ),
+          ),
+        ],
       );
     }
     return IgnorePointer(
@@ -248,15 +158,6 @@ class _PlayButton extends StatelessWidget {
             shape: BoxShape.circle,
             color: large ? colors.onGlass : colors.glassFill,
             border: large ? null : Border.all(color: colors.glassStroke),
-            boxShadow: large
-                ? [
-                    BoxShadow(
-                      color: colors.glow.withValues(alpha: 0.35),
-                      blurRadius: diameter / 2,
-                      offset: Offset(0, diameter / 10),
-                    ),
-                  ]
-                : null,
           ),
           child: Center(
             child: pending
@@ -301,15 +202,11 @@ class _PlayButton extends StatelessWidget {
 class _Volume extends ConsumerWidget {
   const _Volume({
     required this.open,
-    required this.label,
-    required this.labelHeight,
     required this.onToggle,
     required this.onClose,
   });
 
   final bool open;
-  final String label;
-  final double? labelHeight;
   final VoidCallback onToggle;
   final VoidCallback onClose;
 
@@ -333,9 +230,7 @@ class _Volume extends ConsumerWidget {
       content: const _VolumePanel(),
       child: _SideControl(
         icon: silent ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-        label: label,
         semanticLabel: '调节本机音量',
-        labelHeight: labelHeight,
         expanded: open,
         active: open,
         onPressed: onToggle,
@@ -397,24 +292,19 @@ class _VolumePanel extends ConsumerWidget {
 class _SideControl extends StatelessWidget {
   const _SideControl({
     required this.icon,
-    required this.label,
     required this.semanticLabel,
-    required this.labelHeight,
     required this.onPressed,
     this.semanticValue,
     this.expanded,
     this.active = false,
     this.busy = false,
     this.nudge,
+    this.badge,
   });
 
   final IconData icon;
-  final String label;
   final String semanticLabel;
   final String? semanticValue;
-
-  /// 为 null 时不在圆形按钮下方显示 [label]。
-  final double? labelHeight;
   final VoidCallback? onPressed;
 
   /// 只有会展开内容的控件才非 null。
@@ -427,82 +317,61 @@ class _SideControl extends StatelessWidget {
   /// 变成新的非空值时，图标向前推一下，表示操作已计入。
   final Object? nudge;
 
-  /// 使圆形按钮与播放按钮中心对齐的上方留白。
-  static const inset =
-      (AlistenSizes.playControl - AlistenSizes.minTouchTarget) / 2;
-
-  static final _labelStyle = AlistenTypography.weighted(
-    AlistenTypography.secondary,
-    FontWeight.w600,
-  );
+  final VoteSkipResult? badge;
 
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     const disc = AlistenSizes.minTouchTarget;
-    final labelHeight = this.labelHeight;
+    final badge = this.badge;
     return Pressable(
       onPressed: onPressed,
       semanticLabel: semanticLabel,
       // 忙碌或投票已计入时不可点按，但并非不可用，不变暗。
       dimWhenDisabled: !busy && !active,
       expanded: expanded,
-      focusRadius: BorderRadius.circular(AlistenRadii.sm),
+      focusRadius: BorderRadius.circular(disc / 2),
       child: Semantics(
         value: busy ? busySemanticValue : semanticValue,
-        child: Padding(
-          padding: const EdgeInsets.only(top: inset),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedContainer(
-                duration: AlistenDurations.of(context, AlistenDurations.short),
-                curve: AlistenCurves.standard,
-                width: disc,
-                height: disc,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            AnimatedContainer(
+              duration: AlistenDurations.of(context, AlistenDurations.short),
+              curve: AlistenCurves.standard,
+              width: disc,
+              height: disc,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: active
+                    ? colors.onGlass.withValues(alpha: 0.2)
+                    : colors.glassFill,
+                border: Border.all(
                   color: active
-                      ? colors.onGlass.withValues(alpha: 0.2)
-                      : colors.glassFill,
-                  border: Border.all(
-                    color: active
-                        ? colors.onGlass.withValues(alpha: 0.3)
-                        : colors.glassStroke,
-                  ),
-                ),
-                child: Center(
-                  child: busy
-                      ? const BusyIndicator(size: AlistenSizes.iconSm)
-                      : Nudge(
-                          trigger: nudge,
-                          child: Icon(
-                            icon,
-                            size: AlistenSizes.icon,
-                            color: colors.onGlass,
-                          ),
-                        ),
+                      ? colors.onGlass.withValues(alpha: 0.3)
+                      : colors.glassStroke,
                 ),
               ),
-              if (labelHeight != null) ...[
-                const SizedBox(height: AlistenSpacing.xs),
-                SizedBox(
-                  height: labelHeight,
-                  child: ExcludeSemantics(
-                    child: Text(
-                      label,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      softWrap: false,
-                      style: _labelStyle.copyWith(
-                        color: active ? colors.onGlass : colors.onGlassMuted,
+              child: Center(
+                child: busy
+                    ? const BusyIndicator(size: AlistenSizes.iconSm)
+                    : Nudge(
+                        trigger: nudge,
+                        child: Icon(
+                          icon,
+                          size: AlistenSizes.icon,
+                          color: colors.onGlass,
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
+              ),
+            ),
+            if (badge != null)
+              PositionedDirectional(
+                top: -AlistenSpacing.xxs / 2,
+                end: -AlistenSpacing.xxs / 2,
+                child: _VoteBadge(vote: badge),
+              ),
+          ],
         ),
       ),
     );
@@ -567,32 +436,42 @@ class _CompactVote extends StatelessWidget {
                 PositionedDirectional(
                   top: 0,
                   end: 0,
-                  child: ExcludeSemantics(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: colors.brand,
-                        borderRadius: BorderRadius.circular(AlistenRadii.pill),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AlistenSpacing.xxs,
-                        ),
-                        child: Text(
-                          '${vote.votes}/${vote.requiredVotes}',
-                          // 徽标附着在固定尺寸的按钮上，所以限制缩放；票数
-                          // 另作为按钮的值读出。
-                          textScaler: MediaQuery.textScalerOf(context)
-                              .clamp(maxScaleFactor: _badgeMaxScale),
-                          style: AlistenTypography.timecode.copyWith(
-                            fontSize: AlistenTypography.caption.fontSize,
-                            color: colors.onBrand,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: _VoteBadge(vote: vote),
                 ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 票数另作为按钮的值读出，角标本身不读。
+class _VoteBadge extends StatelessWidget {
+  const _VoteBadge({required this.vote});
+
+  final VoteSkipResult vote;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AlistenColors.of(context);
+    return ExcludeSemantics(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.brand,
+          borderRadius: BorderRadius.circular(AlistenRadii.pill),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AlistenSpacing.xxs),
+          child: Text(
+            '${vote.votes}/${vote.requiredVotes}',
+            // 徽标附着在固定尺寸的按钮上，所以限制缩放。
+            textScaler: MediaQuery.textScalerOf(context)
+                .clamp(maxScaleFactor: _badgeMaxScale),
+            style: AlistenTypography.timecode.copyWith(
+              fontSize: AlistenTypography.caption.fontSize,
+              color: colors.onBrand,
+            ),
           ),
         ),
       ),

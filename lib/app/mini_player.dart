@@ -227,11 +227,12 @@ class MiniPlayer extends StatelessWidget {
               color: colors.raised,
               borderRadius: BorderRadius.circular(AlistenRadii.md),
               border: Border.all(color: colors.glassStroke, width: _stroke),
+              // 浅色页面上的深色条本身已足够醒目，阴影只用来托起它。
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.24),
-                  blurRadius: AlistenSpacing.xl,
-                  offset: const Offset(0, AlistenSpacing.xs),
+                  color: Colors.black.withValues(alpha: 0.16),
+                  blurRadius: AlistenSpacing.lg,
+                  offset: const Offset(0, AlistenSpacing.xxs),
                 ),
               ],
             ),
@@ -285,10 +286,11 @@ class MiniPlayer extends StatelessWidget {
                     ],
                   ),
                 ),
+                // 只占底边的直线段，不被圆角切掉。
                 if (nowPlaying != null)
                   const Positioned(
-                    left: 0,
-                    right: 0,
+                    left: AlistenRadii.md,
+                    right: AlistenRadii.md,
                     bottom: 0,
                     child: MiniPlayerProgress(),
                   ),
@@ -411,6 +413,7 @@ class MiniPlayerProgress extends ConsumerWidget {
       painter: _ProgressPainter(
         played: (position / duration).clamp(0.0, 1.0),
         ink: colors.onGlass,
+        track: colors.onGlass.withValues(alpha: _trackAlpha),
         glow: colors.glow,
         rtl: Directionality.of(context) == TextDirection.rtl,
       ),
@@ -418,21 +421,27 @@ class MiniPlayerProgress extends ConsumerWidget {
   }
 }
 
+/// 未播放的部分只是一道淡痕，与边框一起看仍是一个整体。
+const _trackAlpha = 0.14;
+
 class _ProgressPainter extends CustomPainter {
   _ProgressPainter({
     required this.played,
     required this.ink,
+    required this.track,
     required this.glow,
     required this.rtl,
   });
 
   final double played;
   final Color ink;
+  final Color track;
   final Color glow;
   final bool rtl;
 
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = track);
     if (played <= 0) return;
     final width = size.width * played;
     final filled = rtl
@@ -451,6 +460,7 @@ class _ProgressPainter extends CustomPainter {
   bool shouldRepaint(_ProgressPainter oldDelegate) {
     return oldDelegate.played != played ||
         oldDelegate.ink != ink ||
+        oldDelegate.track != track ||
         oldDelegate.glow != glow ||
         oldDelegate.rtl != rtl;
   }

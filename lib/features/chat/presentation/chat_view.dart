@@ -1223,28 +1223,33 @@ class _SendButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     const size = AlistenSizes.minTouchTarget;
+    // 不能发送时换成玻璃底，而不是整体变暗：变暗的封面色在深色房间里发浑。
+    // 发送中保持原色：它在工作，并非不可用。
+    final idle = onPressed == null && !sending;
     return Pressable(
       onPressed: sending ? null : onPressed,
       semanticLabel: '发送',
-      // 发送中按钮保持原色：它在工作，并非不可用。
-      dimWhenDisabled: !sending,
+      dimWhenDisabled: false,
       focusRadius: BorderRadius.circular(size / 2),
       child: Semantics(
         value: sending ? busySemanticValue : null,
-        child: Container(
+        child: AnimatedContainer(
+          duration: AlistenDurations.of(context, AlistenDurations.short),
+          curve: AlistenCurves.standard,
           width: size,
           height: size,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: colors.brand,
+            color: idle ? colors.glassFill : colors.brand,
+            border: Border.all(color: idle ? colors.glassStroke : colors.brand),
           ),
           child: sending
               ? BusyIndicator(size: AlistenSizes.iconSm, color: colors.onBrand)
               : Icon(
                   Icons.arrow_upward_rounded,
                   size: AlistenSizes.icon,
-                  color: colors.onBrand,
+                  color: idle ? colors.onGlassMuted : colors.onBrand,
                 ),
         ),
       ),

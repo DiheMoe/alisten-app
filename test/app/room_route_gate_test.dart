@@ -9,6 +9,7 @@ import 'package:alisten/features/lobby/presentation/join_room_sheet.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
+import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
 import 'package:flutter/widgets.dart';
@@ -512,6 +513,33 @@ void main() {
     await settle();
     expect(sheet, findsNothing);
     expect(rooms.roomIds, [_roomId]);
+  });
+
+  testWidgets('waiting for a room shows the backdrop of the room, never a '
+      'blank page', (tester) async {
+    final rooms = FakeRoomTransportFactory();
+    await pumpAlistenApp(
+      tester,
+      api: FakeAlistenApi()..rooms = [roomListing(id: _roomId, slug: 'listen')],
+      credentials: FakeCredentialStore()..tickets[_roomId] = 'saved-ticket',
+      rooms: rooms,
+    );
+    final backdrop = find.descendant(
+      of: find.byType(RoomRouteGate),
+      matching: find.byType(FlowingCoverBackdrop),
+    );
+    appContainer(tester).read(routerProvider).go('/r/listen');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('正在连接房间'), findsOneWidget);
+    expect(backdrop, findsOneWidget);
+
+    final transport = rooms.last..disconnect();
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('暂时连不上房间'), findsOneWidget);
+    expect(backdrop, findsOneWidget);
+    unawaited(transport.stop());
   });
 
   testWidgets('a room whose first connection fails says so, counts down to '

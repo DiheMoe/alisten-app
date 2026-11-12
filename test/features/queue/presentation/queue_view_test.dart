@@ -11,6 +11,7 @@ import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
+import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
 import 'package:alisten/shared/ui/track_row.dart';
 import 'package:flutter/material.dart';
@@ -181,6 +182,22 @@ bool _tappable(WidgetTester tester, String label) {
   ).getSemanticsData().hasAction(ui.SemanticsAction.tap);
 }
 
+Future<void> _settle(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
+}
+
+/// 打开《歌[id]》的“⋯”菜单，返回其中“移除”是否可点；没有这一项时为 null。
+Future<bool?> _removable(WidgetTester tester, String id) async {
+  await tester.tap(find.bySemanticsLabel('《歌$id》的更多操作'));
+  await _settle(tester);
+  final remove = find.bySemanticsLabel('移除');
+  final result = remove.evaluate().isEmpty ? null : _tappable(tester, '^移除\$');
+  await tester.tapAt(const Offset(4, 4));
+  await _settle(tester);
+  return result;
+}
+
 void main() {
   testWidgets('every entry shows its cover, and an automatic one says so', (
     tester,
@@ -328,7 +345,61 @@ void main() {
     );
 
     expect(find.bySemanticsLabel(RegExp('^点赞')), findsOneWidget);
-    expect(find.bySemanticsLabel(RegExp('^移除')), findsOneWidget);
+    expect(await _removable(tester, 'a'), isNull);
+    expect(await _removable(tester, 'b'), isNull);
+    expect(await _removable(tester, 'c'), isTrue);
+    semantics.dispose();
+  });
+
+  testWidgets('removing from the menu asks first, and is sent only once '
+      'confirmed', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final room = await _pumpQueue(
+      tester,
+      _snapshot(playing: _entry('a'), items: [_entry('c')]),
+    );
+
+    Future<void> chooseRemove() async {
+      await tester.tap(find.bySemanticsLabel('《歌c》的更多操作'));
+      await _settle(tester);
+      await tester.tap(find.text('移除'));
+      await _settle(tester);
+    }
+
+    await chooseRemove();
+    expect(find.text('移除这首歌？'), findsOneWidget);
+    expect(find.text('《歌c》会从等待的歌里移除。'), findsOneWidget);
+    await tester.tapAt(const Offset(4, 4));
+    await _settle(tester);
+    expect(room.sent, 0);
+
+    await chooseRemove();
+    await tester.tap(find.widgetWithText(PillButton, '移除'));
+    await _settle(tester);
+    expect(room.sent, 1);
+    expect(room.reported.single.success, '已移除');
+    semantics.dispose();
+  });
+
+  testWidgets('copying a title is also in every menu', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final room = await _pumpQueue(
+      tester,
+      _snapshot(
+        playing: _entry('a'),
+        pending: _entry('b'),
+        items: [_entry('c')],
+      ),
+    );
+
+    for (final id in ['a', 'b', 'c']) {
+      await tester.tap(find.bySemanticsLabel('《歌$id》的更多操作'));
+      await _settle(tester);
+      await tester.tap(find.text('复制歌名'));
+      await _settle(tester);
+    }
+
+    expect(room.copied, ['歌a', '歌b', '歌c']);
     semantics.dispose();
   });
 
@@ -374,14 +445,14 @@ void main() {
     expect(room.sent, 1);
     expect(_node(tester, '^点赞').value, '进行中');
     expect(_tappable(tester, '^点赞'), isFalse);
-    expect(_tappable(tester, '^移除'), isFalse);
+    expect(await _removable(tester, 'c'), isFalse);
 
     await room.unmount();
     await room.mount();
 
     expect(_node(tester, '^点赞').value, '进行中');
     expect(_tappable(tester, '^点赞'), isFalse);
-    expect(_tappable(tester, '^移除'), isFalse);
+    expect(await _removable(tester, 'c'), isFalse);
     await tester.tap(find.bySemanticsLabel(RegExp('^点赞')));
     await tester.pump();
     expect(room.sent, 1);
@@ -392,7 +463,7 @@ void main() {
     expect(room.reported, hasLength(1));
     expect(_node(tester, '^点赞').value, isEmpty);
     expect(_tappable(tester, '^点赞'), isTrue);
-    expect(_tappable(tester, '^移除'), isTrue);
+    expect(await _removable(tester, 'c'), isTrue);
     semantics.dispose();
   });
 

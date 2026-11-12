@@ -13,10 +13,14 @@ import 'package:flutter/widgets.dart';
 
 enum LyricLinePhase { upcoming, focused, past }
 
-const _idleAlpha = 0.3;
+// 房间总是深色底：当前行是白字，其余行退到一半以下。
+const _idleAlpha = 0.4;
 const _scrollingIdleAlpha = 0.55;
-const _unsungAlpha = 0.25;
-const _translationAlpha = 0.5;
+const _unsungAlpha = 0.4;
+const _translationAlpha = 0.6;
+
+/// 不是当前行时，翻译比原文再暗一些。
+const _idleTranslationShare = 0.7;
 const _idleScale = 0.98;
 const _featherEm = 0.6;
 
@@ -300,8 +304,8 @@ class RenderLyricLine extends RenderBox {
   double get _targetBlur =>
       lyricBlurEm(phase: _phase, distance: _distance, scrolling: _scrolling);
 
-  // 离开当前行时先清晰地淡出再模糊：快照里原文和翻译是同一个透明度，提前换上
-  // 翻译会突然变亮，上浮的字也会一下落回去。
+  // 离开当前行时先清晰地淡出再模糊：快照里翻译与原文的明暗比例是固定的，提前
+  // 换上翻译会突然变亮，上浮的字也会一下落回去。
   void _startBlur() {
     if (_selectionStart != null && !_focused) return;
     final target = _targetBlur;
@@ -495,7 +499,12 @@ class RenderLyricLine extends RenderBox {
     final translation = layout.translation;
     if (translation == null) return;
     final alpha =
-        ui.lerpDouble(_idle, _translationAlpha, _selection)! * opacity;
+        ui.lerpDouble(
+          _idle * _idleTranslationShare,
+          _translationAlpha,
+          _selection,
+        )! *
+        opacity;
     _withOpacity(canvas, bounds, alpha, () {
       translation.paint(canvas, layout.translationOffset);
     });
@@ -648,7 +657,20 @@ class RenderLyricLine extends RenderBox {
         ..scale(ratio)
         ..translate(-rect.left, -rect.top);
       layout.main.paint(canvas, Offset.zero);
-      layout.translation?.paint(canvas, layout.translationOffset);
+      if (layout.translation case final translation?) {
+        canvas.saveLayer(
+          rect,
+          Paint()
+            ..color = const Color.fromRGBO(
+              255,
+              255,
+              255,
+              _idleTranslationShare,
+            ),
+        );
+        translation.paint(canvas, layout.translationOffset);
+        canvas.restore();
+      }
       canvas.restore();
       final picture = recorder.endRecording();
       final image = picture.toImageSync(width, height);

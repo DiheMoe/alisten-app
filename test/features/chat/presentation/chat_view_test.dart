@@ -260,6 +260,30 @@ void main() {
     );
   });
 
+  testWidgets('the send button stays quiet until there is something to send', (
+    tester,
+  ) async {
+    final room = _Room(tester);
+    await room.open();
+    await room.showChat();
+    final colors = AlistenColors.of(tester.element(find.byType(ChatView)));
+    Color? disc() {
+      final button = tester.widget<AnimatedContainer>(
+        find.ancestor(
+          of: find.byIcon(Icons.arrow_upward_rounded),
+          matching: find.byType(AnimatedContainer),
+        ),
+      );
+      return (button.decoration! as BoxDecoration).color;
+    }
+
+    expect(disc(), colors.glassFill);
+    await tester.enterText(find.byType(TextField), '在吗');
+    await tester.pump();
+    expect(disc(), colors.brand);
+    unawaited(room.transport.stop());
+  });
+
   testWidgets('sending waits for the room to be connected', (tester) async {
     final semantics = tester.ensureSemantics();
     final room = _Room(tester);

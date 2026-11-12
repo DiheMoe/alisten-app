@@ -209,13 +209,15 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
     void copyTitle(String title) => copySongTitle(toasts, title);
     // 面板在根导航器上，换到另一个房间时它仍开着，这个页面却可能已被换下。
     final router = GoRouter.of(context);
-    Widget Function(Track track, String title) saveButton(double iconSize) =>
-        (track, title) => SaveToPlaylistButton(
-          track: track,
-          title: title,
-          onOpenAccount: () => router.go('/settings'),
-          onNotice: toasts.show,
-          iconSize: iconSize,
+    void openAccount() => router.go('/settings');
+    void saveToPlaylist(BuildContext context, Track track, String title) =>
+        unawaited(
+          showSaveToPlaylistSheet(
+            context,
+            SaveOneTrack(track: track, title: title),
+            onOpenAccount: openAccount,
+            onNotice: toasts.show,
+          ),
         );
     Widget content(RoomMode page) => switch (page) {
       RoomMode.lyrics || RoomMode.player => const LyricsView(),
@@ -223,7 +225,7 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
         onAddSong: _addSong,
         onResult: reportQueue,
         onCopyTitle: copyTitle,
-        saveToPlaylist: saveButton(AlistenSizes.iconSm),
+        onSaveToPlaylist: saveToPlaylist,
       ),
       RoomMode.chat => const ChatView(),
     };
@@ -254,7 +256,12 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
       onVoteSkipped: (result) => _reportVote(toasts, result),
       onExpand: () => _show(RoomMode.player),
       onCopyTitle: copyTitle,
-      saveToPlaylist: saveButton(AlistenSizes.icon),
+      saveToPlaylist: (track, title) => SaveToPlaylistButton(
+        track: track,
+        title: title,
+        onOpenAccount: openAccount,
+        onNotice: toasts.show,
+      ),
       body: twoPanes
           ? null
           : RoomPager(

@@ -7,11 +7,11 @@ import 'package:alisten/features/queue/application/queue_controller.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
-import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
@@ -60,13 +60,22 @@ Widget _faded(Widget child) {
   return SliverToBoxAdapter(child: EdgeFadeItem(child: child));
 }
 
+typedef SaveTrackCallback = void Function(
+  BuildContext context,
+  Track track,
+  String title,
+);
+
 /// 列表只随房间快照变化，发起变更时不做乐观更新。
+///
+/// 每行只露出一个操作（等待中的歌是点赞），其余收进“⋯”：窄屏大字号下多露一个
+/// 按钮，歌名就只剩几个字。
 class QueueView extends ConsumerWidget {
   const QueueView({
     required this.onAddSong,
     required this.onResult,
     required this.onCopyTitle,
-    this.saveToPlaylist,
+    this.onSaveToPlaylist,
     super.key,
   });
 
@@ -74,15 +83,21 @@ class QueueView extends ConsumerWidget {
   final QueueResultCallback onResult;
   final ValueChanged<String> onCopyTitle;
 
-  /// 歌单功能依赖队列，这里反过来依赖它会形成循环，所以按钮由 app 层传入。
-  final Widget Function(Track track, String title)? saveToPlaylist;
+  /// 歌单功能依赖队列，这里反过来依赖它会形成循环，所以由 app 层传入。传入的
+  /// context 是这一行的，从它打开的面板沿用房间的配色。
+  final SaveTrackCallback? onSaveToPlaylist;
 
-  Widget _withSave(QueueEntry entry, Widget trailing) {
-    final save = saveToPlaylist;
-    if (save == null) return trailing;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [save(entry.track, entry.meta.title), trailing],
+  Widget _menu(
+    QueueEntry entry, {
+    bool removable = false,
+    VoidCallback? onRemove,
+  }) {
+    return _EntryMenu(
+      entry: entry,
+      onCopyTitle: onCopyTitle,
+      onSaveToPlaylist: onSaveToPlaylist,
+      removable: removable,
+      onRemove: onRemove,
     );
   }
 
@@ -178,9 +193,12 @@ class QueueView extends ConsumerWidget {
                     entry: playing,
                     mine: mine,
                     onCopyTitle: onCopyTitle,
-                    trailing: _withSave(
-                      playing,
-                      _Playing(likes: playing.likes),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _Playing(likes: playing.likes),
+                        _menu(playing),
+                      ],
                     ),
                   ),
                 ),
@@ -202,9 +220,12 @@ class QueueView extends ConsumerWidget {
                     entry: pending,
                     mine: mine,
                     onCopyTitle: onCopyTitle,
-                    trailing: _withSave(
-                      pending,
-                      _LikeCount(likes: pending.likes),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _LikeCount(likes: pending.likes),
+                        _menu(pending),
+                      ],
                     ),
                   ),
                 ),
@@ -271,10 +292,6 @@ class QueueView extends ConsumerWidget {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                ?saveToPlaylist?.call(
-                                  entry.track,
-                                  entry.meta.title,
-                                ),
                                 _LikeButton(
                                   likes: entry.likes,
                                   label:
@@ -284,21 +301,14 @@ class QueueView extends ConsumerWidget {
                                       ? () => _like(queue, entry)
                                       : null,
                                 ),
-                                MergeSemantics(
-                                  child: Semantics(
-                                    value: inFlight ? busySemanticValue : null,
-                                    child: IconCircleButton(
-                                      icon: Icons.close_rounded,
-                                      semanticLabel: '移除《${entry.meta.title}》',
-                                      style: IconCircleButtonStyle.plain,
-                                      iconSize: AlistenSizes.iconSm,
-                                      onPressed: enabled
-                                          ? () => unawaited(
-                                              _remove(context, queue, entry),
-                                            )
-                                          : null,
-                                    ),
-                                  ),
+                                _menu(
+                                  entry,
+                                  removable: true,
+                                  onRemove: enabled
+                                      ? () => unawaited(
+                                          _remove(context, queue, entry),
+                                        )
+                                      : null,
                                 ),
                               ],
                             ),
@@ -507,6 +517,56 @@ class _EntryRow extends StatelessWidget {
   }
 }
 
+class _EntryMenu extends StatelessWidget {
+  const _EntryMenu({
+    required this.entry,
+    required this.onCopyTitle,
+    required this.onSaveToPlaylist,
+    required this.removable,
+    required this.onRemove,
+  });
+
+  final QueueEntry entry;
+  final ValueChanged<String> onCopyTitle;
+  final SaveTrackCallback? onSaveToPlaylist;
+
+  /// 只有等待中的歌可以移除；[onRemove] 为 null 时这一项暂不可用（如未连接）。
+  final bool removable;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = entry.meta.title;
+    final save = onSaveToPlaylist;
+    final remove = onRemove;
+    return ActionMenuButton(
+      semanticLabel: '《$title》的更多操作',
+      iconSize: AlistenSizes.iconSm,
+      entries: [
+        if (save != null)
+          ActionMenuEntry(
+            icon: Icons.playlist_add_rounded,
+            label: '保存到歌单',
+            onSelected: () => save(context, entry.track, title),
+          ),
+        ActionMenuEntry(
+          icon: Icons.content_copy_rounded,
+          label: copyTitleHint,
+          onSelected: () => onCopyTitle(title),
+        ),
+        if (removable)
+          ActionMenuEntry(
+            icon: Icons.remove_circle_outline_rounded,
+            label: '移除',
+            danger: true,
+            enabled: remove != null,
+            onSelected: () => remove?.call(),
+          ),
+      ],
+    );
+  }
+}
+
 class _NoneWaiting extends StatelessWidget {
   const _NoneWaiting({required this.onAddSong});
 
@@ -577,7 +637,6 @@ class _Playing extends StatelessWidget {
             color: Theme.of(context).colorScheme.primary,
           ),
         ),
-        const SizedBox(width: AlistenSpacing.xs),
       ],
     );
   }
@@ -596,7 +655,7 @@ class _LikeCount extends StatelessWidget {
       label: '$likes 个赞',
       child: ExcludeSemantics(
         child: Padding(
-          padding: const EdgeInsets.only(right: AlistenSpacing.xs),
+          padding: const EdgeInsetsDirectional.only(end: AlistenSpacing.xs),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

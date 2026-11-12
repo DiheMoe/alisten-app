@@ -115,9 +115,40 @@ void main() {
 
   group('lyricIdleAlpha', () {
     test('lines dim, and come back while the user scrolls', () {
-      expect(lyricIdleAlpha(scrolling: false), 0.3);
+      expect(lyricIdleAlpha(scrolling: false), 0.4);
       expect(lyricIdleAlpha(scrolling: true), 0.55);
     });
+  });
+
+  testWidgets('a line not being sung keeps its translation dimmer than its '
+      'text', (tester) async {
+    final rows = await _setUp(tester);
+    await tester.pumpWidget(
+      _column([
+        _row(
+          rows,
+          line: const LyricLine(
+            timeMs: 0,
+            endMs: 1000,
+            text: '故事',
+            translation: 'story',
+          ),
+          phase: LyricLinePhase.upcoming,
+          distance: 1,
+          scrolling: true,
+        ),
+      ]),
+    );
+
+    final layers = <double>[];
+    expect(
+      find.byType(LyricLineRow),
+      paints..everything((method, arguments) {
+        if (method == #saveLayer) layers.add((arguments[1] as Paint).color.a);
+        return true;
+      }),
+    );
+    expect(layers, [closeTo(0.55, 1e-3), closeTo(0.55 * 0.7, 1e-3)]);
   });
 
   testWidgets('a word-synced focused line repaints alone as the song moves', (

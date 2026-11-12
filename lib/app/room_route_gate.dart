@@ -12,6 +12,7 @@ import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
+import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:flutter/material.dart';
@@ -193,7 +194,9 @@ final class _RoomRouteGateState extends ConsumerState<RoomRouteGate> {
       _shown = null;
       return widget.child;
     }
+    // 与房间页同一片暗色极光，进入房间时不会闪过一页空白。
     return _shown = AlistenScaffold(
+      background: const FlowingCoverBackdrop(url: null),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
           icon: Icons.arrow_back_rounded,

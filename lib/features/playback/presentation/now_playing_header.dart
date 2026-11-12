@@ -151,18 +151,12 @@ class _NowPlayingHeaderState extends ConsumerState<NowPlayingHeader>
     final rowTitleHeight = _TitleBlock.heightOf(scaler, compact: true);
     final playerTitleLine = _TitleBlock.firstLineOf(scaler);
     final save = widget.saveToPlaylist;
-    final sideLabels = PlayerSideLabels.measure(
-      scaler: scaler,
-      direction: Directionality.of(context),
-      vote: vote,
-    );
     return LayoutBuilder(
       builder: (context, constraints) {
         final fit = _PlayerFit.of(
           context,
           constraints.biggest,
           titleHeight: playerTitleHeight,
-          labels: sideLabels,
         );
         return CustomMultiChildLayout(
           delegate: _StageLayout(
@@ -243,8 +237,6 @@ class _NowPlayingHeaderState extends ConsumerState<NowPlayingHeader>
                               PlayerControls(
                                 compact: false,
                                 interactive: !compact,
-                                labelled: fit.labelled,
-                                labels: sideLabels,
                                 vote: vote,
                                 voting: voting,
                                 onVoteSkip: onVoteSkip,
@@ -679,9 +671,6 @@ const _titleToControls = AlistenSpacing.lg;
 /// 封面占满高度时播放器上下的留白。
 const _breathing = AlistenSpacing.md;
 
-/// 播放器在剩余高度中的纵向位置，略高于正中。
-const _playerBias = 0.42;
-
 /// 播放器控件淡出时下沉、body 淡入时上升的距离。
 const _drift = AlistenSpacing.xxxl;
 
@@ -695,77 +684,78 @@ const _sideMinColumn =
     AlistenSizes.playControl +
     2 * (AlistenSizes.minTouchTarget + AlistenSpacing.xl);
 
-/// 宽大于高时封面与标题、控件并排；高度不够时先去掉两侧控件的文字，再收紧
-/// 间距。
+/// 竖排的封面已到最大、高度还有富余时，拉开间距的上限和所用的富余比例：
+/// 只放大上下留白的话，高屏上整组控件下方会空出一大块。
+const _maxStretch = AlistenSpacing.xxxl;
+const _stretchShare = 0.5;
+
+/// 宽大于高时封面与标题、控件并排；高度不够时收紧间距。
 @immutable
 final class _PlayerFit {
   const _PlayerFit({
     required this.sideBySide,
-    required this.labelled,
     required this.tight,
+    this.stretch = 0,
   });
 
-  /// 选出放得下的最完整的一档；都放不下时用最紧凑的一档，由布局把控件保持在
+  /// 选出放得下的最宽松的一档；都放不下时用最紧凑的一档，由布局把控件保持在
   /// 可见范围内。
   factory _PlayerFit.of(
     BuildContext context,
     Size size, {
     required double titleHeight,
-    required PlayerSideLabels labels,
   }) {
     final sideBySide = size.width > size.height;
     final progress = PlaybackProgressBar.heightOf(context);
-    final steps = [
-      for (final (labelled, tight) in const [
-        (true, false),
-        (false, false),
-        (false, true),
-      ])
-        _PlayerFit(sideBySide: sideBySide, labelled: labelled, tight: tight),
-    ];
     _Arrangement arrange(_PlayerFit fit) => _arrange(
       size,
       fit,
       titleHeight: titleHeight,
-      controlsHeightAt: (column) =>
-          progress +
-          fit.progressToControls +
-          PlayerControls.heightOf(
-            width: column,
-            labelled: fit.labelled,
-            labels: labels,
-          ),
+      controlsHeightAt: (_) =>
+          progress + fit.progressToControls + PlayerControls.height,
     );
+    final roomy = _PlayerFit(sideBySide: sideBySide, tight: false);
+    final tight = _PlayerFit(sideBySide: sideBySide, tight: true);
     // 竖排时先找能保留封面的一档，找不到再接受隐藏封面。
     for (final keepCover in sideBySide ? const [false] : const [true, false]) {
-      for (final fit in steps) {
+      for (final fit in [roomy, tight]) {
         final arranged = arrange(fit);
-        if (arranged.spare >= 0 && (!keepCover || !arranged.cover.isEmpty)) {
-          return fit;
+        if (arranged.spare < 0 || (keepCover && arranged.cover.isEmpty)) {
+          continue;
         }
+        // 封面没到最大时 spare 为 0，富余已用来放大封面。
+        if (fit.tight || sideBySide || arranged.cover.isEmpty) return fit;
+        return _PlayerFit(
+          sideBySide: false,
+          tight: false,
+          stretch: math.min(arranged.spare * _stretchShare, _maxStretch),
+        );
       }
     }
-    return steps.last;
+    return tight;
   }
 
   final bool sideBySide;
-  final bool labelled;
   final bool tight;
 
+  /// 加到封面与标题、进度与控件之间的总高度，两处各一半。
+  final double stretch;
+
   double get breathing => tight ? 0 : _breathing;
+  double get coverToTitle => _coverToTitle + stretch / 2;
   double get titleToControls => tight ? AlistenSpacing.sm : _titleToControls;
   double get progressToControls =>
-      tight ? AlistenSpacing.xs : AlistenSpacing.md;
+      (tight ? AlistenSpacing.xs : AlistenSpacing.md) + stretch / 2;
 
   @override
   bool operator ==(Object other) =>
       other is _PlayerFit &&
       other.sideBySide == sideBySide &&
-      other.labelled == labelled &&
-      other.tight == tight;
+      other.tight == tight &&
+      other.stretch == stretch;
 
   @override
-  int get hashCode => Object.hash(sideBySide, labelled, tight);
+  int get hashCode => Object.hash(sideBySide, tight, stretch);
 }
 
 /// [spare] 是按 [_PlayerFit] 留出上下空白后余下的高度，小于 0 表示放不下。
@@ -819,13 +809,14 @@ _Arrangement _arrange(
     columnStart = (width - column) / 2;
     controls = controlsHeightAt(column);
     final text = titleHeight + fit.titleToControls + controls;
-    var side = (height - text - _coverToTitle - 2 * fit.breathing).clamp(
+    var side = (height - text - fit.coverToTitle - 2 * fit.breathing).clamp(
       0.0,
       column,
     );
     if (side < _minCover) side = 0;
-    final gap = side == 0 ? 0.0 : _coverToTitle;
-    final top = math.max(0.0, (height - side - gap - text) * _playerBias);
+    final gap = side == 0 ? 0.0 : fit.coverToTitle;
+    // 间距拉开后余下的留白上下平分：偏上时底栏上方会空出一块。
+    final top = math.max(0.0, (height - side - gap - text) / 2);
     cover = Rect.fromLTWH((width - side) / 2, top, side, side);
     textTop = cover.bottom + gap;
     spare = height - 2 * fit.breathing - side - gap - text;

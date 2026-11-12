@@ -20,7 +20,6 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -615,9 +614,6 @@ void main() {
       tester.getRect(find.text('夜曲')).top,
       greaterThanOrEqualTo(tester.getRect(topBar).bottom),
     );
-    // 两侧放不下完整文字时只显示图标，名称仍由屏幕阅读器读出。
-    expect(find.text('投票切歌'), findsNothing);
-    expect(find.text('音量'), findsNothing);
 
     router.go('/r/listen/chat');
     await settle();
@@ -658,35 +654,79 @@ void main() {
     );
     final progress = find.byType(PlaybackProgressBar);
     final context = tester.element(controls);
-    final player = tester.widget<PlayerControls>(controls);
 
     expect(
       tester.getSize(controls).height,
-      moreOrLessEquals(
-        PlayerControls.heightOf(
-          width: tester.getSize(controls).width,
-          labelled: player.labelled,
-          labels: player.labels!,
-        ),
-        epsilon: 0.01,
-      ),
+      moreOrLessEquals(PlayerControls.height, epsilon: 0.01),
     );
     expect(
       tester.getSize(progress).height,
       moreOrLessEquals(PlaybackProgressBar.heightOf(context), epsilon: 0.01),
     );
-    for (final label
-        in find
-            .text('投票切歌')
-            .evaluate()
-            .followedBy(find.text('音量').evaluate())) {
-      final paragraph = label.renderObject! as RenderParagraph;
-      expect(
-        paragraph.getMaxIntrinsicWidth(double.infinity),
-        lessThanOrEqualTo(paragraph.size.width + 0.01),
-      );
-    }
   }, variant: _playerCases);
+
+  testWidgets('on a tall phone the player spreads out and sits halfway '
+      'between the bars, its side controls mirrored around play', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    tester.view.padding = const FakeViewPadding(top: 47 * 3, bottom: 34 * 3);
+    await enterRoom(tester, size: const Size(376, 896), nowPlaying: _nocturne);
+    final stage = tester.getRect(find.byType(NowPlayingHeader));
+    final cover = tester.getRect(_cover('entry-a'));
+    final title = tester.getRect(
+      find.ancestor(of: find.text('夜曲'), matching: find.byType(Column)).first,
+    );
+    final progress = tester.getRect(find.byType(PlaybackProgressBar));
+    final controls = tester.getRect(
+      find.byWidgetPredicate(
+        (widget) => widget is PlayerControls && !widget.compact,
+      ),
+    );
+
+    expect(
+      cover.top - stage.top,
+      moreOrLessEquals(stage.bottom - controls.bottom, epsilon: 0.5),
+    );
+    expect(title.top - cover.bottom, greaterThan(AlistenSpacing.xl));
+    expect(controls.top - progress.bottom, greaterThan(AlistenSpacing.md));
+    expect(
+      progress.top - title.bottom,
+      moreOrLessEquals(AlistenSpacing.lg, epsilon: 0.01),
+    );
+
+    final play = tester.getCenter(find.bySemanticsLabel('暂停本机播放'));
+    final volume = tester.getRect(find.bySemanticsLabel('调节本机音量'));
+    final vote = tester.getRect(find.bySemanticsLabel('投票切歌'));
+    expect(volume.size, vote.size);
+    expect((volume.center.dx + vote.center.dx) / 2, moreOrLessEquals(play.dx));
+    expect(volume.center.dy, moreOrLessEquals(play.dy));
+    expect(find.text('音量'), findsNothing);
+    expect(find.text('投票切歌'), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('a vote counted shows the tally on the button, and says it', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final (:rooms, router: _, :settle) = await _enterRoom(tester);
+    rooms.last.responses['playback.voteSkip'] = {
+      'votes': 1,
+      'required': 3,
+      'skipped': false,
+    };
+
+    await tester.tap(find.bySemanticsLabel('投票切歌'));
+    await settle();
+
+    expect(find.text('1/3'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('投票切歌')),
+      isSemantics(value: '已投 1/3', hasTapAction: false),
+    );
+    semantics.dispose();
+  });
 
   testWidgets('the title is placed by its laid out height, exactly the '
       "player's spacing above the progress", (tester) async {
@@ -1363,8 +1403,8 @@ Rect _tab(WidgetTester tester, String label) => tester.getRect(
       .first,
 );
 
-/// 只统计播放器控件取缩放字号的次数，它每次排版文字或估算文字高度都会取一次。
-/// 其他组件本来就会随键盘重建，不计入。
+/// 只统计播放器为预知排版而量取文字高度的次数。其他组件本来就会随键盘重建，
+/// 不计入。
 final class _CountingScaler extends TextScaler {
   const _CountingScaler(this._count);
 
@@ -1372,7 +1412,9 @@ final class _CountingScaler extends TextScaler {
 
   @override
   double scale(double fontSize) {
-    if (StackTrace.current.toString().contains('player_controls.dart')) {
+    final trace = StackTrace.current.toString();
+    if (trace.contains('now_playing_header.dart') &&
+        trace.contains('AlistenTypography.lineHeight')) {
       _count.value++;
     }
     return fontSize;
@@ -1390,8 +1432,7 @@ final class _Count {
 /// 1.3 倍时字号乘行高不是整数，排版会对行高取整。
 final _titleScales = ValueVariant({1.0, 1.3});
 
-/// 竖屏手机两侧控件带文字，横屏手机不带，各取一倍和两倍字号。窄手机在两倍
-/// 字号下高度够放文字，宽度却不够。
+/// 竖屏和横屏手机各取一倍和两倍字号，另加最窄的手机两倍字号。
 final _playerCases = ValueVariant({
   for (final size in const [Size(360, 780), Size(780, 360)])
     for (final scale in const [1.0, 2.0]) (size, scale),

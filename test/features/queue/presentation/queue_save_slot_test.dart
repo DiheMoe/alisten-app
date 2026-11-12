@@ -5,8 +5,7 @@ import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
-import 'package:alisten/shared/theme/tokens.dart';
-import 'package:alisten/shared/ui/icon_circle_button.dart';
+import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/track_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -53,7 +52,7 @@ final _snapshot = testRoomSnapshot().copyWith(
 
 Future<void> _pump(
   WidgetTester tester, {
-  Widget Function(Track track, String title)? save,
+  SaveTrackCallback? save,
   TextScaler textScaler = TextScaler.noScaling,
   Size size = const Size(360, 640),
   RoomSnapshot? snapshot,
@@ -92,7 +91,7 @@ Future<void> _pump(
             onAddSong: () {},
             onResult: (_, _) {},
             onCopyTitle: (_) {},
-            saveToPlaylist: save,
+            onSaveToPlaylist: save,
           ),
         ),
       ),
@@ -101,122 +100,115 @@ Future<void> _pump(
   await tester.pump();
 }
 
+Finder _menuOf(String id, {bool skipOffstage = true}) => find.byWidgetPredicate(
+  (widget) =>
+      widget is ActionMenuButton &&
+      widget.semanticLabel == '《一首名字很长很长很长很长的歌$id》的更多操作',
+  skipOffstage: skipOffstage,
+);
+
+Future<void> _openMenu(WidgetTester tester, String id) async {
+  await tester.ensureVisible(_menuOf(id, skipOffstage: false));
+  await tester.pump();
+  await tester.tap(_menuOf(id));
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
+}
+
+Future<void> _closeMenu(WidgetTester tester) async {
+  await tester.tapAt(const Offset(4, 4));
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
+}
+
 void main() {
-  testWidgets('without a slot the rows have no save button', (tester) async {
+  testWidgets('without a way to save, the menus offer copying alone', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
     await _pump(tester);
 
-    expect(find.byIcon(Icons.playlist_add_rounded), findsNothing);
+    await _openMenu(tester, 'c');
+    expect(find.text('复制歌名'), findsOneWidget);
+    expect(find.text('保存到歌单'), findsNothing);
+    semantics.dispose();
   });
 
-  testWidgets('every row puts the slot first at its end, with its own '
-      'song', (tester) async {
+  testWidgets('every row saves its own song from its menu, handing over the '
+      'row to open the panel from', (tester) async {
     final semantics = tester.ensureSemantics();
-    final asked = <(String, String)>[];
+    final asked = <(String, String, bool)>[];
     await _pump(
       tester,
-      save: (track, title) {
-        asked.add((track.id, title));
-        return IconCircleButton(
-          icon: Icons.playlist_add_rounded,
-          semanticLabel: '保存${track.id}',
-          style: IconCircleButtonStyle.plain,
-          iconSize: AlistenSizes.iconSm,
-          onPressed: () {},
-        );
-      },
+      save: (context, track, title) => asked.add((
+        track.id,
+        title,
+        context.findAncestorWidgetOfExactType<TrackRow>() != null,
+      )),
     );
 
-    expect(asked.toSet(), {
-      for (final id in ['a', 'b', 'c']) (id, '一首名字很长很长很长很长的歌$id'),
-    });
-    Finder inRow(String id, Finder finder) => find.descendant(
-      of: find.ancestor(
-        of: find.text('一首名字很长很长很长很长的歌$id'),
-        matching: find.byType(TrackRow),
-      ),
-      matching: finder,
+    for (final id in ['a', 'b', 'c']) {
+      await _openMenu(tester, id);
+      await tester.tap(find.text('保存到歌单'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    expect(asked, [
+      for (final id in ['a', 'b', 'c']) (id, '一首名字很长很长很长很长的歌$id', true),
+    ]);
+    expect(find.text('保存到歌单'), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('a waiting row shows its like and a menu, nothing else to '
+      'squeeze its title', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _pump(tester, save: (_, _, _) {});
+
+    expect(find.byIcon(Icons.playlist_add_rounded), findsNothing);
+    expect(find.byIcon(Icons.close_rounded), findsNothing);
+    final row = find.ancestor(
+      of: find.text('一首名字很长很长很长很长的歌c'),
+      matching: find.byType(TrackRow),
     );
-    double saveEnd(String id) =>
-        tester.getRect(find.bySemanticsLabel('保存$id')).right;
-    final likes = find.byIcon(Icons.favorite_border_rounded);
+    final like = find.bySemanticsLabel(RegExp('^点赞《'));
     expect(
-      saveEnd('a'),
-      lessThanOrEqualTo(tester.getRect(inRow('a', likes)).left),
+      tester.getRect(like).right,
+      lessThanOrEqualTo(tester.getRect(_menuOf('c')).left),
     );
     expect(
-      saveEnd('a'),
-      lessThanOrEqualTo(
-        tester.getRect(inRow('a', find.byIcon(Icons.graphic_eq_rounded))).left,
-      ),
-    );
-    expect(
-      saveEnd('b'),
-      lessThanOrEqualTo(tester.getRect(inRow('b', likes)).left),
-    );
-    expect(
-      saveEnd('c'),
-      lessThanOrEqualTo(
-        tester.getRect(find.bySemanticsLabel(RegExp('^点赞《'))).left,
-      ),
+      tester.getRect(_menuOf('c')).right,
+      lessThanOrEqualTo(tester.getRect(row).right),
     );
     semantics.dispose();
   });
 
-  testWidgets('a narrow phone at twice the text size keeps the buttons and '
-      'cuts the title', (tester) async {
-    await _pump(
-      tester,
-      textScaler: const TextScaler.linear(2),
-      save: (track, title) => IconCircleButton(
-        icon: Icons.playlist_add_rounded,
-        semanticLabel: '保存',
-        style: IconCircleButtonStyle.plain,
-        iconSize: AlistenSizes.iconSm,
-        onPressed: () {},
-      ),
-    );
-
-    expect(tester.takeException(), isNull);
-    final saves = find.ancestor(
-      of: find.byIcon(Icons.playlist_add_rounded),
-      matching: find.byType(IconCircleButton),
-    );
-    expect(saves, findsNWidgets(3));
-    for (final save in saves.evaluate()) {
-      expect(save.size, const Size.square(AlistenSizes.minTouchTarget));
-    }
-    expect(
-      tester
-          .renderObject<RenderParagraph>(find.text('一首名字很长很长很长很长的歌c'))
-          .didExceedMaxLines,
-      isTrue,
-    );
-  });
-
   for (final scale in [2.0, 3.0]) {
-    testWidgets('the smallest phone at ${scale}x text keeps the waiting row '
-        'inside its width, with the remove button reachable', (tester) async {
+    testWidgets('the smallest phone at ${scale}x text keeps every row inside '
+        'its width, with removing reachable from the menu', (tester) async {
+      final semantics = tester.ensureSemantics();
       await _pump(
         tester,
         size: const Size(320, 760),
         textScaler: TextScaler.linear(scale),
-        save: (track, title) => IconCircleButton(
-          icon: Icons.playlist_add_rounded,
-          semanticLabel: '保存',
-          style: IconCircleButtonStyle.plain,
-          iconSize: AlistenSizes.iconSm,
-          onPressed: () {},
-        ),
+        save: (_, _, _) {},
       );
       expect(tester.takeException(), isNull);
-
-      await tester.ensureVisible(
-        find.byIcon(Icons.close_rounded, skipOffstage: false),
+      expect(
+        tester
+            .renderObject<RenderParagraph>(
+              find.text('一首名字很长很长很长很长的歌c', skipOffstage: false),
+            )
+            .didExceedMaxLines,
+        isTrue,
       );
-      await tester.pump();
 
+      await _openMenu(tester, 'c');
       expect(tester.takeException(), isNull);
-      expect(find.byIcon(Icons.close_rounded).hitTestable(), findsOneWidget);
+      expect(find.text('移除').hitTestable(), findsOneWidget);
+      await _closeMenu(tester);
+      semantics.dispose();
     });
   }
 
@@ -233,18 +225,12 @@ void main() {
           pending: _entry('b', likes: 128),
           items: [_entry('c', likes: 128)],
         ),
-        save: (track, title) => IconCircleButton(
-          icon: Icons.playlist_add_rounded,
-          semanticLabel: '保存',
-          style: IconCircleButtonStyle.plain,
-          iconSize: AlistenSizes.iconSm,
-          onPressed: () {},
-        ),
+        save: (_, _, _) {},
       );
       expect(tester.takeException(), isNull);
 
       await tester.ensureVisible(
-        find.byIcon(Icons.close_rounded, skipOffstage: false),
+        find.text('一首名字很长很长很长很长的歌c', skipOffstage: false),
       );
       await tester.pump();
 

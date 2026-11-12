@@ -5,6 +5,7 @@ import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../features/lobby/lobby_test_doubles.dart';
@@ -185,11 +186,21 @@ void main() {
     expect(find.bySemanticsLabel('把《歌曲》保存到歌单'), findsOneWidget);
     expect(iconSizes(tester), [AlistenSizes.icon]);
 
-    // 队列里正在播放和等待中的都是这首歌；收拢的播放器上没有按钮。
+    // 队列里正在播放和等待中的都是这首歌，保存在各行的“⋯”里；收拢的播放器上
+    // 没有按钮。从房间打开的面板沿用房间的深色。
     router.go('/r/listen/queue');
     await settle();
-    expect(find.bySemanticsLabel('把《歌曲》保存到歌单'), findsNWidgets(2));
-    expect(iconSizes(tester), [AlistenSizes.iconSm, AlistenSizes.iconSm]);
+    expect(find.byType(SaveToPlaylistButton), findsNothing);
+    expect(find.bySemanticsLabel('《歌曲》的更多操作'), findsNWidgets(2));
+    await tester.tap(find.bySemanticsLabel('《歌曲》的更多操作').first);
+    await settle();
+    await tester.tap(find.text('保存到歌单'));
+    await settle();
+    expect(find.text('去账号设置'), findsOneWidget);
+    expect(
+      Theme.of(tester.element(find.text('去账号设置'))).brightness,
+      Brightness.dark,
+    );
     semantics.dispose();
   });
 
