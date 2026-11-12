@@ -18,10 +18,10 @@ import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
-import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/section_header.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
@@ -551,6 +551,31 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('the rooms are rows of one panel, split by a hairline', (
+    tester,
+  ) async {
+    await _Lobby.open(
+      tester,
+      api: FakeAlistenApi()
+        ..rooms = [
+          roomListing(),
+          roomListing(id: 'other', slug: 'other', name: '另一间'),
+        ],
+    );
+    Rect row(String name) => tester.getRect(
+      find
+          .ancestor(of: find.text(name), matching: find.byType(Pressable))
+          .first,
+    );
+
+    expect(
+      row('另一间').top - row('一起听').bottom,
+      moreOrLessEquals(AlistenSizes.hairline),
+    );
+    expect(row('另一间').left, row('一起听').left);
+    expect(find.byType(DecoratedSliver), findsOneWidget);
+  });
+
   testWidgets('a room that cannot be joined from its card says why', (
     tester,
   ) async {
@@ -701,11 +726,10 @@ void main() {
           tester,
           api: FakeAlistenApi()..rooms = [roomListing()],
         );
-        // 筛选框的高度按分区标题与第一张房间卡片的间距计算。
-        final card = find.ancestor(
-          of: find.text('一起听'),
-          matching: find.byType(GlassPanel),
-        );
+        // 筛选框的高度按分区标题与第一行房间的间距计算。
+        final card = find
+            .ancestor(of: find.text('一起听'), matching: find.byType(Pressable))
+            .first;
         double slot() =>
             tester.getTopLeft(card).dy -
             tester.getBottomLeft(find.byType(SectionHeader)).dy;

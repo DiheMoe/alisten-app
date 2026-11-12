@@ -12,4 +12,4 @@ export 'presentation/playlist_screen.dart';
 export 'presentation/search_screen.dart';
 export 'presentation/share_link_card.dart';
 export 'presentation/song_row.dart'
-    show PickControl, PickSong, PickUnavailableNotice, pickSong;
+    show PickControl, PickSong, PickTone, PickUnavailableNotice, pickSong;

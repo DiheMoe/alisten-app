@@ -204,6 +204,7 @@ class _ToastCapsule extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final (icon, ink) = switch (message.kind) {
       ToastKind.info => (Icons.info_rounded, colors.onGlass),
       ToastKind.success => (Icons.check_circle_rounded, colors.success),
@@ -218,10 +219,16 @@ class _ToastCapsule extends StatelessWidget {
           color: colors.raised,
           borderRadius: BorderRadius.circular(AlistenRadii.pill),
           border: Border.all(color: colors.glassStroke),
+          // 提示常压在卡片和文字上：贴边的短阴影勾出轮廓，外圈的柔光把它托离
+          // 页面。深色背景上阴影要更浓才看得出。
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).colorScheme.shadow
-                  .withValues(alpha: 0.24),
+              color: Colors.black.withValues(alpha: dark ? 0.36 : 0.08),
+              blurRadius: AlistenSpacing.xxs / 2,
+              offset: const Offset(0, AlistenSpacing.xxs / 4),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: dark ? 0.48 : 0.14),
               blurRadius: AlistenSpacing.xl,
               offset: const Offset(0, AlistenSpacing.xs),
             ),

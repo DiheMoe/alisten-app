@@ -193,6 +193,18 @@ class PickUnavailableNotice extends ConsumerWidget {
   }
 }
 
+/// 未点和点歌中时按钮的样子；点过之后按结果着色，与样式无关。
+enum PickTone {
+  /// 品牌色实底：卡片上突出显示的那一首，或叠在封面上、要实底才看得清的地方。
+  filled,
+
+  /// 玻璃底、品牌色图标：一屏有许多行都能点歌时，一列实心圆点太抢眼。
+  tonal,
+
+  /// 玻璃底、文字色图标：点歌不是主操作的地方，例如播放历史和歌单。
+  quiet,
+}
+
 class PickControl extends ConsumerWidget {
   const PickControl({
     required this.track,
@@ -201,7 +213,7 @@ class PickControl extends ConsumerWidget {
     this.label,
     this.wide = false,
     this.expand = false,
-    this.subtle = false,
+    this.tone = PickTone.tonal,
     this.blockedReason,
     super.key,
   });
@@ -209,10 +221,7 @@ class PickControl extends ConsumerWidget {
   final Track track;
   final String title;
   final PickSong onPick;
-
-  /// 未点时用玻璃底而不是品牌渐变，用于整页都是可点歌行、点歌不是主操作的地方，
-  /// 例如播放历史。
-  final bool subtle;
+  final PickTone tone;
 
   final String? label;
 
@@ -243,7 +252,7 @@ class PickControl extends ConsumerWidget {
       label: blocked ?? label ?? '点歌《$title》',
       wide: wide,
       expand: expand,
-      subtle: subtle,
+      tone: tone,
       onPressed: usable && blocked == null ? () => onPick(track, title) : null,
     );
   }
@@ -257,7 +266,7 @@ class PickButton extends StatefulWidget {
     required this.onPressed,
     this.wide = false,
     this.expand = false,
-    this.subtle = false,
+    this.tone = PickTone.tonal,
     super.key,
   });
 
@@ -268,7 +277,7 @@ class PickButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final bool wide;
   final bool expand;
-  final bool subtle;
+  final PickTone tone;
 
   @override
   State<PickButton> createState() => _PickButtonState();
@@ -325,9 +334,12 @@ class _PickButtonState extends State<PickButton>
     final pill = BorderRadius.circular(AlistenRadii.pill);
 
     final unpicked = status == null || status == PickStatus.sending;
-    final subtle = widget.subtle && unpicked;
-    final branded = !widget.subtle && unpicked;
-    final plain = subtle ? colors.onGlass : colors.onBrand;
+    final tone = unpicked ? widget.tone : null;
+    final plain = switch (widget.tone) {
+      PickTone.filled => colors.onBrand,
+      PickTone.tonal => colors.brand,
+      PickTone.quiet => colors.onGlass,
+    };
     final (IconData? icon, String? words, Color ink) = switch (status) {
       null => (Icons.add_rounded, wide ? '点歌' : null, plain),
       PickStatus.sending => (null, '点歌中', plain),
@@ -395,17 +407,17 @@ class _PickButtonState extends State<PickButton>
       ),
       decoration: BoxDecoration(
         borderRadius: pill,
-        color: branded
-            ? colors.brand
-            : subtle
-            ? colors.glassFill
-            : ink.withValues(alpha: 0.14),
+        color: switch (tone) {
+          PickTone.filled => colors.brand,
+          PickTone.tonal || PickTone.quiet => colors.glassFill,
+          null => ink.withValues(alpha: 0.14),
+        },
         border: Border.all(
-          color: branded
-              ? Colors.transparent
-              : subtle
-              ? colors.glassStroke
-              : ink.withValues(alpha: 0.35),
+          color: switch (tone) {
+            PickTone.filled => Colors.transparent,
+            PickTone.tonal || PickTone.quiet => colors.glassStroke,
+            null => ink.withValues(alpha: 0.35),
+          },
         ),
       ),
       child: AnimatedResize(

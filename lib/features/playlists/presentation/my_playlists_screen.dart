@@ -10,18 +10,17 @@ import 'package:alisten/features/playlists/application/my_playlists_controller.d
 import 'package:alisten/features/playlists/application/playlist_view_controller.dart';
 import 'package:alisten/features/playlists/presentation/import_link_sheet.dart';
 import 'package:alisten/features/playlists/presentation/playlist_cover.dart';
-import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/features/playlists/presentation/playlist_name_form.dart';
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
+import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/page_glow.dart';
-import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
-import 'package:alisten/shared/ui/segmented_pills.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -183,7 +182,6 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
     PlaylistViewPreference view,
     int nowMs,
   ) {
-    final colors = AlistenColors.of(context);
     // 已包含悬浮在安全区之上的迷你播放条。
     final bottom = MediaQuery.paddingOf(context).bottom;
     return CustomScrollView(
@@ -196,53 +194,51 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
             AlistenSpacing.md,
           ),
           sliver: SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Row(
               children: [
-                Text(
-                  '${playlists.length} 个歌单',
-                  style: AlistenTypography.secondary.copyWith(
-                    color: colors.onGlassMuted,
+                Expanded(
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: _SortMenu(count: playlists.length, view: view),
                   ),
                 ),
-                const SizedBox(height: AlistenSpacing.sm),
-                _Controls(view: view),
-                const SizedBox(height: AlistenSpacing.sm),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: AlistenSpacing.xs,
-                  runSpacing: AlistenSpacing.xs,
-                  children: [
-                    ActionMenuButton(
-                      semanticLabel: '导入',
-                      entries: [
-                        ActionMenuEntry(
-                          icon: Icons.file_open_rounded,
-                          label: '从文件导入',
-                          onSelected: () => unawaited(_importFile()),
-                        ),
-                        ActionMenuEntry(
-                          icon: Icons.link_rounded,
-                          label: '从链接导入',
-                          onSelected: () => unawaited(_importLink()),
-                        ),
-                      ],
-                      trigger: (open, toggle) => PillButton(
-                        label: _importing ? '正在导入…' : '导入',
-                        icon: Icons.download_rounded,
-                        style: PillButtonStyle.secondary,
-                        busy: _importing,
-                        expanded: open,
-                        onPressed: _importing ? null : toggle,
+                const SizedBox(width: AlistenSpacing.xs),
+                _ViewToggle(view: view.view),
+                if (_importing)
+                  const SizedBox.square(
+                    dimension: AlistenSizes.minTouchTarget,
+                    child: Center(
+                      child: BusyIndicator(
+                        size: AlistenSizes.iconSm,
+                        semanticLabel: '正在导入',
                       ),
                     ),
-                    PillButton(
-                      label: '新建歌单',
-                      icon: Icons.add_rounded,
-                      onPressed: () => unawaited(_create()),
-                    ),
-                  ],
+                  )
+                else
+                  ActionMenuButton(
+                    semanticLabel: '导入',
+                    icon: Icons.download_rounded,
+                    iconSize: AlistenSizes.iconSm,
+                    entries: [
+                      ActionMenuEntry(
+                        icon: Icons.file_open_rounded,
+                        label: '从文件导入',
+                        onSelected: () => unawaited(_importFile()),
+                      ),
+                      ActionMenuEntry(
+                        icon: Icons.link_rounded,
+                        label: '从链接导入',
+                        onSelected: () => unawaited(_importLink()),
+                      ),
+                    ],
+                  ),
+                IconCircleButton(
+                  icon: Icons.add_rounded,
+                  semanticLabel: '新建歌单',
+                  style: IconCircleButtonStyle.brand,
+                  diameter: AlistenSizes.rowAction,
+                  iconSize: AlistenSizes.iconSm,
+                  onPressed: () => unawaited(_create()),
                 ),
               ],
             ),
@@ -344,86 +340,65 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
   }
 }
 
-class _Controls extends ConsumerWidget {
-  const _Controls({required this.view});
+class _SortMenu extends ConsumerWidget {
+  const _SortMenu({required this.count, required this.view});
 
+  final int count;
   final PlaylistViewPreference view;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(playlistViewProvider.notifier);
     final sort = view.sort;
-    final sortLabel = '排序方式：${sortKeyLabel(sort.key)}';
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      spacing: AlistenSpacing.xs,
-      children: [
-        SegmentedPills<PlaylistView>(
-          segments: const [
-            PillSegment(
-              value: PlaylistView.grid,
-              label: '网格',
-              icon: Icons.grid_view_rounded,
-            ),
-            PillSegment(
-              value: PlaylistView.list,
-              label: '列表',
-              icon: Icons.view_list_rounded,
-            ),
-          ],
-          selected: view.view,
-          onChanged: controller.setView,
-          showLabels: false,
-        ),
-        Flexible(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: AlistenSpacing.xs,
-            children: [
-              Flexible(
-                child: ActionMenuButton(
-                  semanticLabel: sortLabel,
-                  entries: [
-                    for (final key in PlaylistSortKey.values)
-                      ActionMenuEntry(
-                        icon: Icons.sort_rounded,
-                        label: sortKeyLabel(key),
-                        checked: key == sort.key,
-                        onSelected: () => controller.setSortKey(key),
-                      ),
-                  ],
-                  trigger: (open, toggle) => _SortButton(
-                    label: sortKeyLabel(sort.key),
-                    semanticLabel: sortLabel,
-                    open: open,
-                    onPressed: toggle,
-                  ),
-                ),
-              ),
-              IconCircleButton(
-                icon: sort.order == SortOrder.ascending
-                    ? Icons.arrow_upward_rounded
-                    : Icons.arrow_downward_rounded,
-                semanticLabel: sortOrderLabel(sort),
-                onPressed: controller.reverse,
-              ),
-            ],
+    final semanticLabel =
+        '$count 个歌单，排序方式：${sortKeyLabel(sort.key)}，${sortOrderLabel(sort)}';
+    void order(SortOrder order) {
+      if (order != sort.order) controller.reverse();
+    }
+
+    return ActionMenuButton(
+      semanticLabel: semanticLabel,
+      entries: [
+        for (final key in PlaylistSortKey.values)
+          ActionMenuEntry(
+            icon: Icons.sort_rounded,
+            label: sortKeyLabel(key),
+            checked: key == sort.key,
+            onSelected: () => controller.setSortKey(key),
           ),
-        ),
+        for (final (direction, icon) in const [
+          (SortOrder.descending, Icons.arrow_downward_rounded),
+          (SortOrder.ascending, Icons.arrow_upward_rounded),
+        ])
+          ActionMenuEntry(
+            icon: icon,
+            label: sortOrderLabel(PlaylistSort(sort.key, direction)),
+            checked: direction == sort.order,
+            onSelected: () => order(direction),
+          ),
       ],
+      trigger: (open, toggle) => _SortTrigger(
+        count: count,
+        sort: sort,
+        semanticLabel: semanticLabel,
+        open: open,
+        onPressed: toggle,
+      ),
     );
   }
 }
 
-class _SortButton extends StatelessWidget {
-  const _SortButton({
-    required this.label,
+class _SortTrigger extends StatelessWidget {
+  const _SortTrigger({
+    required this.count,
+    required this.sort,
     required this.semanticLabel,
     required this.open,
     required this.onPressed,
   });
 
-  final String label;
+  final int count;
+  final PlaylistSort sort;
   final String semanticLabel;
   final bool open;
   final VoidCallback onPressed;
@@ -431,46 +406,76 @@ class _SortButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
-    final pill = BorderRadius.circular(AlistenRadii.pill);
+    final muted = AlistenTypography.secondary.copyWith(
+      color: colors.onGlassMuted,
+    );
     return Pressable(
       onPressed: onPressed,
       semanticLabel: semanticLabel,
       expanded: open,
-      focusRadius: pill,
+      focusRadius: BorderRadius.circular(AlistenRadii.sm),
       child: ExcludeSemantics(
-        child: Container(
+        child: ConstrainedBox(
           constraints: const BoxConstraints(
             minHeight: AlistenSizes.minTouchTarget,
           ),
-          padding: const EdgeInsets.symmetric(horizontal: AlistenSpacing.md),
-          decoration: BoxDecoration(
-            color: colors.glassFill,
-            borderRadius: pill,
-            border: Border.all(color: colors.glassStroke),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.sort_rounded,
-                size: AlistenSizes.iconSm,
-                color: colors.onGlass,
-              ),
-              const SizedBox(width: AlistenSpacing.xxs),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AlistenTypography.bodyStrong.copyWith(
-                    color: colors.onGlass,
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            widthFactor: 1,
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: '$count 个歌单 · '),
+                  TextSpan(
+                    text: sortKeyLabel(sort.key),
+                    style: AlistenTypography.weighted(
+                      AlistenTypography.secondary,
+                      FontWeight.w600,
+                    ).copyWith(color: colors.onGlass),
                   ),
-                ),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.only(
+                        start: AlistenSpacing.xxs / 2,
+                      ),
+                      child: Icon(
+                        sort.order == SortOrder.ascending
+                            ? Icons.arrow_upward_rounded
+                            : Icons.arrow_downward_rounded,
+                        size: MediaQuery.textScalerOf(context)
+                            .scale(AlistenSizes.inlineIcon),
+                        color: colors.onGlass,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+              style: muted,
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ViewToggle extends ConsumerWidget {
+  const _ViewToggle({required this.view});
+
+  final PlaylistView view;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final grid = view == PlaylistView.grid;
+    return IconCircleButton(
+      icon: grid ? Icons.view_list_rounded : Icons.grid_view_rounded,
+      semanticLabel: grid ? '以列表显示' : '以网格显示',
+      style: IconCircleButtonStyle.plain,
+      iconSize: AlistenSizes.iconSm,
+      onPressed: () => ref
+          .read(playlistViewProvider.notifier)
+          .setView(grid ? PlaylistView.list : PlaylistView.grid),
     );
   }
 }

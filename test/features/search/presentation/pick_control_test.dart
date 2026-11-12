@@ -52,4 +52,62 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     semantics.dispose();
   });
+
+  testWidgets('a pick button of a row is glass with a brand icon; a featured '
+      'one is filled with the brand', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: await alistenAppOverrides(),
+        child: MaterialApp(
+          theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
+          home: Scaffold(
+            body: Column(
+              children: [
+                PickControl(
+                  key: const ValueKey('row'),
+                  track: const Track(source: TrackSource.netease, id: '1'),
+                  title: '晴天',
+                  onPick: (_, _) {},
+                ),
+                PickControl(
+                  key: const ValueKey('featured'),
+                  track: const Track(source: TrackSource.netease, id: '2'),
+                  title: '七里香',
+                  tone: PickTone.filled,
+                  onPick: (_, _) {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    final colors = AlistenColors.of(tester.element(find.byType(Column)));
+    Color? fill(String key) =>
+        (tester
+                    .widget<AnimatedContainer>(
+                      find.descendant(
+                        of: find.byKey(ValueKey(key)),
+                        matching: find.byType(AnimatedContainer),
+                      ),
+                    )
+                    .decoration!
+                as BoxDecoration)
+            .color;
+    Color? ink(String key) => tester
+        .widget<Icon>(
+          find.descendant(
+            of: find.byKey(ValueKey(key)),
+            matching: find.byIcon(Icons.add_rounded),
+          ),
+        )
+        .color;
+
+    expect(fill('row'), colors.glassFill);
+    expect(ink('row'), colors.brand);
+    expect(fill('featured'), colors.brand);
+    expect(ink('featured'), colors.onBrand);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

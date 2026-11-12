@@ -15,6 +15,7 @@ import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
@@ -153,7 +154,7 @@ class SharedPlaylistScreen extends ConsumerWidget {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 点歌结果写出来时要两百多 dp，3 倍字号下会挤掉保存按钮。结果另
+                    // 点歌结果写出来时要两百多 dp，3 倍字号下会挤掉“⋯”。结果另
                     // 作为按钮的值读出。
                     MediaQuery.withClampedTextScaling(
                       maxScaleFactor: 2,
@@ -164,12 +165,31 @@ class SharedPlaylistScreen extends ConsumerWidget {
                             unawaited(pickSong(ref, onResult, track, title)),
                       ),
                     ),
-                    SaveToPlaylistButton(
-                      track: item.track,
-                      title: meta.title,
-                      onOpenAccount: onOpenAccount,
-                      onNotice: onNotice,
+                    ActionMenuButton(
+                      semanticLabel: '《${meta.title}》的更多操作',
                       iconSize: AlistenSizes.iconSm,
+                      entries: [
+                        ActionMenuEntry(
+                          icon: Icons.playlist_add_rounded,
+                          label: '保存到歌单',
+                          onSelected: () => unawaited(
+                            showSaveToPlaylistSheet(
+                              context,
+                              SaveOneTrack(
+                                track: item.track,
+                                title: meta.title,
+                              ),
+                              onOpenAccount: onOpenAccount,
+                              onNotice: onNotice,
+                            ),
+                          ),
+                        ),
+                        ActionMenuEntry(
+                          icon: Icons.content_copy_rounded,
+                          label: copyTitleHint,
+                          onSelected: () => onCopyTitle(meta.title),
+                        ),
+                      ],
                     ),
                   ],
                 ),

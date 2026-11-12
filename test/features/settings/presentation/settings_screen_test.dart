@@ -15,6 +15,7 @@ import 'package:alisten/features/settings/index.dart';
 import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/alisten_toggle.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
@@ -41,6 +42,11 @@ Finder _field(String label) => find.descendant(
   of: find.widgetWithText(AlistenTextField, label),
   matching: find.byType(EditableText),
 );
+
+Future<void> _openProfileSheet(WidgetTester tester) async {
+  await tester.tap(find.text('编辑资料'));
+  await tester.pumpAndSettle();
+}
 
 Future<void> _openSettings(
   WidgetTester tester, {
@@ -264,8 +270,14 @@ void main() {
     );
     await _show(tester, _recordToggle);
 
-    expect(find.text('保存在服务器上，登录这个账号的设备共用'), findsOneWidget);
+    final description = find.text('存在服务器上，同一账号的设备共用');
+    expect(description, findsOneWidget);
     expect(find.text('保存在服务器上'), findsNothing);
+    // 一行放得下，不在行尾单独剩下一个字。
+    expect(
+      tester.getSize(description).height,
+      lessThan(2 * AlistenTypography.secondary.fontSize!),
+    );
   });
 
   testWidgets('a play history switch the server refuses goes back and says '
@@ -1067,7 +1079,59 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.getMeCalls, 2);
+    expect(find.text('听众'), findsOneWidget);
+    await _openProfileSheet(tester);
     expect(tester.widget<EditableText>(_field('昵称')).controller.text, '听众');
+  });
+
+  testWidgets('a server switch closes the profile sheet, so what was typed '
+      'never reaches the next identity', (tester) async {
+    final api = FakeAlistenApi();
+    await _openSettings(
+      tester,
+      api: api,
+      credentials: FakeCredentialStore()..memberToken = 'stored-token',
+    );
+    await _openProfileSheet(tester);
+    await tester.enterText(_field('昵称'), '新昵称');
+    await tester.pump();
+
+    unawaited(
+      appContainer(tester)
+          .read(identityControllerProvider.notifier)
+          .resetForServerChange(),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EditableText), findsNothing);
+    expect(api.updateMeCalls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the account group shows the profile and leads to a sheet that '
+      'edits it, saving only once something changed', (tester) async {
+    final api = FakeAlistenApi();
+    await _openSettings(
+      tester,
+      api: api,
+      credentials: FakeCredentialStore()..memberToken = 'stored-token',
+    );
+
+    expect(find.text('听众'), findsOneWidget);
+    expect(find.byType(EditableText), findsNothing);
+    await _openProfileSheet(tester);
+    expect(find.text('编辑资料'), findsNWidgets(2), reason: 'row and sheet');
+    PillButton save() =>
+        tester.widget<PillButton>(find.widgetWithText(PillButton, '保存资料'));
+    expect(save().onPressed, isNull);
+
+    await tester.enterText(_field('昵称'), '新昵称');
+    await tester.pump();
+    expect(save().onPressed, isNotNull);
+    await tester.enterText(_field('昵称'), '听众');
+    await tester.pump();
+    expect(save().onPressed, isNull);
+    expect(api.updateMeCalls, 0);
   });
 
   testWidgets('the profile is saved with its own button, and settings are '
@@ -1082,6 +1146,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.updateMeCalls, 0);
 
+    await _openProfileSheet(tester);
     await tester.enterText(_field('昵称'), '新昵称');
     await tester.pump();
     await tester.tap(find.text('保存资料'));
@@ -1091,6 +1156,8 @@ void main() {
     expect(api.updatedName, '新昵称');
     expect(api.updatedEmail, isNull);
     expect(find.text('资料已保存'), findsOneWidget);
+    expect(find.byType(EditableText), findsNothing, reason: 'sheet closed');
+    expect(find.text('新昵称'), findsOneWidget);
   });
 
   testWidgets('a save that breaks unexpectedly says so and can be tried '
@@ -1107,6 +1174,7 @@ void main() {
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
 
+    await _openProfileSheet(tester);
     await tester.enterText(_field('昵称'), '新昵称');
     await tester.enterText(_field('Gravatar 邮箱'), 'me@example.com');
     await tester.pump();
@@ -1147,6 +1215,7 @@ void main() {
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
+    await _openProfileSheet(tester);
     await tester.enterText(_field('昵称'), '新昵称');
     await tester.enterText(_field('Gravatar 邮箱'), 'me@example.com');
     await tester.pump();

@@ -1,3 +1,4 @@
+import 'package:alisten/shared/theme/tokens.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -45,6 +46,58 @@ void main() {
     await page.settle();
     expect(find.text('已点歌《晴天》'), findsOneWidget);
     expect(find.text(_clipboardHeading), findsNothing);
+  });
+
+  testWidgets('once results show, a song link on the clipboard takes one line '
+      'that still names where it came from and picks the song', (tester) async {
+    final page = await SearchPage.open(
+      tester,
+      clipboard: FakeClipboardSource(neteaseShareText),
+    );
+    await page.search('七里香');
+
+    expect(find.text(_clipboardHeading), findsNothing);
+    final offer = find.bySemanticsLabel(RegExp('^$_clipboardHeading'));
+    expect(offer, findsOneWidget);
+    expect(
+      tester.getRect(offer).height,
+      lessThanOrEqualTo(AlistenSizes.largeTouchTarget),
+    );
+    expect(find.text('晴天'), findsOneWidget);
+    expect(find.bySemanticsLabel('不点这条链接'), findsOneWidget);
+
+    page.holdAdds();
+    await tester.tap(find.bySemanticsLabel('点歌《晴天》'));
+    await tester.pump();
+    expect(_picked(page), [('netease', '186016')]);
+    page.answerAdd('晴天');
+    await page.settle();
+    expect(offer, findsNothing);
+
+    await tester.enterText(find.byType(EditableText), '');
+    await page.settle();
+    expect(find.text(_clipboardHeading), findsNothing, reason: 'picked once');
+  });
+
+  testWidgets('on the smallest phone at 3x text the one-line offer of a QQ '
+      'Music link still fits beside the results', (tester) async {
+    final page = await SearchPage.open(
+      tester,
+      system: const MediaQueryData(textScaler: TextScaler.linear(3)),
+      clipboard: FakeClipboardSource(
+        'https://y.qq.com/n/ryqq/songDetail/0039MnYb0qxYhV',
+      ),
+    );
+    tester.view.physicalSize = const Size(320, 640) * 3;
+    await page.search('七里香');
+
+    expect(tester.takeException(), isNull);
+    expect(find.text(_clipboardHeading), findsNothing, reason: 'one line');
+    expect(
+      find.bySemanticsLabel(RegExp('^$_clipboardHeading')),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('不点这条链接').hitTestable(), findsOneWidget);
   });
 
   testWidgets('what the clipboard held is offered once, and read once until '

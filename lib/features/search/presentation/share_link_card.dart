@@ -35,6 +35,7 @@ class ShareLinkCard extends ConsumerWidget {
     this.onDismiss,
     this.onEnterRoom,
     this.framed = true,
+    this.compact = false,
     super.key,
   });
 
@@ -61,6 +62,10 @@ class ShareLinkCard extends ConsumerWidget {
 
   /// 放在面板里时为 false，面板本身已有底板。
   final bool framed;
+
+  /// 能点的歌只占一行：徽标、歌名或链接、点歌和关闭。房间、歌单链接和点不了的
+  /// 链接仍显示完整卡片，它们的说明放不进一行。
+  final bool compact;
 
   Future<void> _pick(WidgetRef ref, Track track, String title) async {
     final picked = onPicked;
@@ -129,7 +134,7 @@ class ShareLinkCard extends ConsumerWidget {
         ),
       );
     } else {
-      action = PickControl(
+      final pick = PickControl(
         track: track,
         title: name ?? '',
         label: name != null
@@ -137,10 +142,21 @@ class ShareLinkCard extends ConsumerWidget {
             : track.source == TrackSource.link
             ? '点这条链接'
             : '点这首歌',
-        wide: true,
-        expand: true,
+        wide: !compact,
+        expand: !compact,
+        tone: compact ? PickTone.tonal : PickTone.filled,
         onPick: (track, title) => unawaited(_pick(ref, track, title)),
       );
+      if (compact) {
+        return _CompactOffer(
+          heading: heading,
+          platform: share?.platform ?? LinkPlatform.web,
+          text: name ?? _withoutScheme(share!.link),
+          action: pick,
+          onDismiss: onDismiss,
+        );
+      }
+      action = pick;
     }
 
     final content = Column(
@@ -194,7 +210,7 @@ class ShareLinkCard extends ConsumerWidget {
           Padding(
             padding: EdgeInsets.only(top: name == null ? AlistenSpacing.xs : 0),
             child: Text(
-              share.link.replaceFirst(RegExp('^https?://'), ''),
+              _withoutScheme(share.link),
               maxLines: name == null ? 2 : 1,
               overflow: TextOverflow.ellipsis,
               style: muted,
@@ -235,6 +251,75 @@ class ShareLinkCard extends ConsumerWidget {
   }
 }
 
+String _withoutScheme(String link) =>
+    link.replaceFirst(RegExp('^https?://'), '');
+
+class _CompactOffer extends StatelessWidget {
+  const _CompactOffer({
+    required this.heading,
+    required this.platform,
+    required this.text,
+    required this.action,
+    required this.onDismiss,
+  });
+
+  final String heading;
+  final LinkPlatform platform;
+  final String text;
+  final Widget action;
+  final VoidCallback? onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AlistenColors.of(context);
+    // 一行里放不下标题，读屏仍从标题读起，知道这一行从哪里来。
+    return Semantics(
+      container: true,
+      label: heading,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.glassFill,
+          borderRadius: BorderRadius.circular(AlistenRadii.md),
+          border: Border.all(color: colors.glassStroke),
+        ),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.only(start: AlistenSpacing.sm),
+          child: Row(
+            children: [
+              // 徽标不随行变窄，最小的屏幕上 3 倍字号会把歌名挤没，所以限制缩放。
+              MediaQuery.withClampedTextScaling(
+                maxScaleFactor: 2,
+                child: _PlatformBadge(platform: platform),
+              ),
+              const SizedBox(width: AlistenSpacing.xs),
+              Expanded(
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AlistenTypography.secondary.copyWith(
+                    color: colors.onGlass,
+                  ),
+                ),
+              ),
+              action,
+              if (onDismiss case final dismiss?)
+                IconCircleButton(
+                  icon: Icons.close_rounded,
+                  semanticLabel: '不点这条链接',
+                  style: IconCircleButtonStyle.plain,
+                  iconSize: AlistenSizes.iconSm,
+                  diameter: AlistenSizes.rowAction,
+                  onPressed: dismiss,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PlatformBadge extends StatelessWidget {
   const _PlatformBadge({required this.platform});
 
@@ -242,11 +327,11 @@ class _PlatformBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = platformLabel(platform);
-    final identity = AlistenColors.identity(label);
+    final colors = AlistenColors.of(context);
+    // 不着色：旁边的点歌按钮已取了封面的颜色，两种颜色挨着会互相抢。
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: identity.fill,
+        color: colors.onGlass.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AlistenRadii.pill),
       ),
       child: Padding(
@@ -255,11 +340,11 @@ class _PlatformBadge extends StatelessWidget {
           vertical: AlistenSpacing.xxs,
         ),
         child: Text(
-          label,
+          platformLabel(platform),
           style: AlistenTypography.weighted(
             AlistenTypography.caption,
             FontWeight.w700,
-          ).copyWith(color: identity.ink),
+          ).copyWith(color: colors.onGlassMuted),
         ),
       ),
     );

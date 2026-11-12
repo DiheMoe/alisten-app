@@ -490,49 +490,43 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
     final colors = AlistenColors.of(context);
     return [
       const SliverToBoxAdapter(child: PickUnavailableNotice()),
-      if (selecting)
-        SliverList.builder(
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final item = items[index];
-            final key = trackKey(item.track);
+      // 读屏的“移到开头”“上移”“下移”“移到末尾”由它加在每一项上，中文取自
+      // WidgetsLocalizations。拖动只从选择时出现的把手开始：平时一行只留点歌和
+      // “⋯”，长按留给复制歌名。
+      SliverReorderableList(
+        itemCount: items.length,
+        onReorderItem: (from, to) => _drag(items, from, to),
+        proxyDecorator: (child, _, _) => DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.raised,
+            borderRadius: BorderRadius.circular(AlistenRadii.md),
+            border: Border.all(color: colors.glassStroke),
+          ),
+          child: child,
+        ),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final key = trackKey(item.track);
+          if (selecting) {
             return _SelectableSong(
               key: ValueKey(key),
               item: item,
+              index: index,
               selected: detail.selected.contains(key),
               onToggle: () => _detail.toggle(key),
             );
-          },
-        )
-      else
-        // 读屏的“移到开头”“上移”“下移”“移到末尾”由它加在每一项上，中文取自
-        // WidgetsLocalizations。拖动只从把手开始，长按留给复制歌名。
-        SliverReorderableList(
-          itemCount: items.length,
-          onReorderItem: (from, to) => _drag(items, from, to),
-          proxyDecorator: (child, _, _) => DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.raised,
-              borderRadius: BorderRadius.circular(AlistenRadii.md),
-              border: Border.all(color: colors.glassStroke),
-            ),
-            child: child,
-          ),
-          itemBuilder: (context, index) {
-            final item = items[index];
-            return _Song(
-              key: ValueKey(trackKey(item.track)),
-              item: item,
-              index: index,
-              onPick: _pick,
-              onCopyTitle: widget.onCopyTitle,
-              onSave: () => _save(
-                SaveOneTrack(track: item.track, title: item.meta.title),
-              ),
-              onRemove: () => unawaited(_edit(_detail.remove([item.track]))),
-            );
-          },
-        ),
+          }
+          return _Song(
+            key: ValueKey(key),
+            item: item,
+            onPick: _pick,
+            onCopyTitle: widget.onCopyTitle,
+            onSave: () =>
+                _save(SaveOneTrack(track: item.track, title: item.meta.title)),
+            onRemove: () => unawaited(_edit(_detail.remove([item.track]))),
+          );
+        },
+      ),
       SliverPadding(
         padding: EdgeInsets.only(
           bottom:
@@ -545,11 +539,10 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
   }
 }
 
-// 手机宽度放不下四个 48 dp 的目标，保存和移出收进“⋯”。
+// 一行只留点歌一个主操作，保存和移出收进“⋯”，歌名才不被挤短。
 class _Song extends StatelessWidget {
   const _Song({
     required this.item,
-    required this.index,
     required this.onPick,
     required this.onCopyTitle,
     required this.onSave,
@@ -558,7 +551,6 @@ class _Song extends StatelessWidget {
   });
 
   final TrackSummary item;
-  final int index;
   final PickSong onPick;
   final ValueChanged<String> onCopyTitle;
   final VoidCallback onSave;
@@ -566,7 +558,6 @@ class _Song extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = AlistenColors.of(context);
     final meta = item.meta;
     final subtitle = playlistSongSubtitle(meta);
     void copy() => onCopyTitle(meta.title);
@@ -595,8 +586,8 @@ class _Song extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AlistenSpacing.xs),
-          // 写出点歌结果的按钮要一百多 dp，320 dp 宽、字号超过 1.5 倍时会把“⋯”和
-          // 把手挤出行外。
+          // 写出点歌结果的按钮要一百多 dp，320 dp 宽、字号更大时歌名会被挤得只剩
+          // 一两个字。结果另作为按钮的值读出。
           MediaQuery.withClampedTextScaling(
             maxScaleFactor: 1.5,
             child: PlaylistPickControl(
@@ -614,6 +605,11 @@ class _Song extends StatelessWidget {
                 label: '保存到歌单',
                 onSelected: onSave,
               ),
+              ActionMenuEntry(
+                icon: Icons.content_copy_rounded,
+                label: copyTitleHint,
+                onSelected: copy,
+              ),
               // 单首移出不确认，与 Web 相同。
               ActionMenuEntry(
                 icon: Icons.remove_circle_outline_rounded,
@@ -623,19 +619,6 @@ class _Song extends StatelessWidget {
               ),
             ],
           ),
-          ReorderableDragStartListener(
-            index: index,
-            child: ExcludeSemantics(
-              child: SizedBox.square(
-                dimension: AlistenSizes.minTouchTarget,
-                child: Icon(
-                  Icons.drag_handle_rounded,
-                  size: AlistenSizes.iconSm,
-                  color: colors.onGlassMuted,
-                ),
-              ),
-            ),
-          ),
           const SizedBox(width: AlistenSpacing.xxs),
         ],
       ),
@@ -643,15 +626,18 @@ class _Song extends StatelessWidget {
   }
 }
 
+// 与 [_Song] 一样，歌名和勾选状态并进列表加了移动操作的那个节点。
 class _SelectableSong extends StatelessWidget {
   const _SelectableSong({
     required this.item,
+    required this.index,
     required this.selected,
     required this.onToggle,
     super.key,
   });
 
   final TrackSummary item;
+  final int index;
   final bool selected;
   final VoidCallback onToggle;
 
@@ -660,27 +646,48 @@ class _SelectableSong extends StatelessWidget {
     final colors = AlistenColors.of(context);
     final meta = item.meta;
     final subtitle = playlistSongSubtitle(meta);
-    return MergeSemantics(
-      child: Semantics(
-        checked: selected,
+    return Semantics(
+      label: meta.title,
+      checked: selected,
+      onTap: onToggle,
+      child: ExcludeSemantics(
         child: Pressable(
           onPressed: onToggle,
           button: false,
-          semanticLabel: meta.title,
-          child: ExcludeSemantics(
-            child: TrackRow(
-              title: meta.title,
-              subtitle: subtitle,
-              coverUrl: meta.coverUrl,
-              trailing: SizedBox.square(
-                dimension: AlistenSizes.minTouchTarget,
-                child: Icon(
-                  selected
-                      ? Icons.check_circle_rounded
-                      : Icons.radio_button_unchecked_rounded,
-                  color: selected ? colors.success : colors.onGlassMuted,
+          child: TrackRow(
+            title: meta.title,
+            subtitle: subtitle,
+            coverUrl: meta.coverUrl,
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              AlistenSpacing.page,
+              AlistenSpacing.xs,
+              AlistenSpacing.xxs,
+              AlistenSpacing.xs,
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox.square(
+                  dimension: AlistenSizes.minTouchTarget,
+                  child: Icon(
+                    selected
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: selected ? colors.success : colors.onGlassMuted,
+                  ),
                 ),
-              ),
+                ReorderableDragStartListener(
+                  index: index,
+                  child: SizedBox.square(
+                    dimension: AlistenSizes.minTouchTarget,
+                    child: Icon(
+                      Icons.drag_handle_rounded,
+                      size: AlistenSizes.iconSm,
+                      color: colors.onGlassMuted,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

@@ -13,7 +13,6 @@ import 'package:alisten/shared/ui/avatar_images.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/collapsible.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
-import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/page_glow.dart';
@@ -412,6 +411,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         ),
       ];
     }
+    final colors = AlistenColors.of(context);
     return [
       SliverPadding(
         padding: EdgeInsets.fromLTRB(
@@ -420,19 +420,35 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
           AlistenSpacing.page,
           bottom,
         ),
-        sliver: SliverList.separated(
-          itemCount: rooms.length,
-          separatorBuilder: (_, _) => const SizedBox(height: AlistenSpacing.sm),
-          itemBuilder: (context, index) {
-            final room = rooms[index];
-            return _RoomCard(
-              room: room,
-              joining: _joining == room.id,
-              onPressed: lobby.busy || _joinSheetShown
-                  ? null
-                  : () => unawaited(_join(room)),
-            );
-          },
+        // 房间排在同一块面板里，行间用细线分开，与设置页的分组一致。
+        sliver: DecoratedSliver(
+          decoration: BoxDecoration(
+            color: colors.glassFill,
+            borderRadius: BorderRadius.circular(AlistenRadii.md),
+            border: Border.all(color: colors.glassStroke),
+          ),
+          sliver: SliverList.separated(
+            itemCount: rooms.length,
+            separatorBuilder: (_, _) => Padding(
+              padding: const EdgeInsetsDirectional.only(
+                start: _RoomRow.textInset,
+              ),
+              child: SizedBox(
+                height: AlistenSizes.hairline,
+                child: ColoredBox(color: colors.glassStroke),
+              ),
+            ),
+            itemBuilder: (context, index) {
+              final room = rooms[index];
+              return _RoomRow(
+                room: room,
+                joining: _joining == room.id,
+                onPressed: lobby.busy || _joinSheetShown
+                    ? null
+                    : () => unawaited(_join(room)),
+              );
+            },
+          ),
         ),
       ),
     ];
@@ -597,12 +613,15 @@ final class _LobbyHeader extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(_LobbyHeader oldDelegate) => true;
 }
 
-class _RoomCard extends StatelessWidget {
-  const _RoomCard({
+class _RoomRow extends StatelessWidget {
+  const _RoomRow({
     required this.room,
     required this.joining,
     required this.onPressed,
   });
+
+  static const double textInset =
+      AlistenSpacing.sm + AlistenSizes.rowCover + AlistenSpacing.sm;
 
   final RoomListing room;
   final bool joining;
@@ -616,10 +635,10 @@ class _RoomCard extends StatelessWidget {
     final online = room.onlineCount > 0;
     return Pressable(
       onPressed: onPressed,
-      // 进房期间卡片不可点但不变淡，由正在进入的卡片显示转圈。
+      // 进房期间各行不可点但不变淡，由正在进入的那一行显示转圈。
       dimWhenDisabled: false,
       focusRadius: BorderRadius.circular(AlistenRadii.md),
-      child: GlassPanel(
+      child: Padding(
         padding: const EdgeInsets.all(AlistenSpacing.sm),
         child: Row(
           children: [

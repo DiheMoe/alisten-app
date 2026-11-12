@@ -241,7 +241,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     } else {
       body = _resultSlivers(search);
     }
-    final offers = _offers(typed);
+    // 有搜索结果时链接只占一行，不把结果推到下面去。
+    final offers = _offers(typed, compact: !home && typed == null);
     return AlistenScaffold(
       background: const PageGlow(),
       // 提示显示在输入框和筛选项下方，以免搜下一首歌时挡住它们。
@@ -332,7 +333,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  List<Widget> _offers(String? typed) {
+  List<Widget> _offers(String? typed, {required bool compact}) {
     final pending = ref.watch(pendingShareControllerProvider);
     final clipboard = ref.watch(clipboardLinkControllerProvider);
     final shares = ref.read(pendingShareControllerProvider.notifier);
@@ -345,6 +346,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             heading: sharedLinkHeading,
             share: pending.share,
             resolving: !pending.resolved,
+            compact: compact,
             onResult: widget.onResult,
             onPicked: () => shares.dismiss(pending.id),
             onDismiss: () => shares.dismiss(pending.id),
@@ -361,6 +363,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ? '剪贴板里的歌单链接'
                 : '剪贴板里的房间链接',
             share: clipboard,
+            compact: compact,
             onResult: widget.onResult,
             onPicked: clipboardOffer.dismiss,
             onDismiss: clipboardOffer.dismiss,
@@ -451,7 +454,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 for (final record in recent)
                   ChipPill(
                     label: record.query,
-                    icon: Icons.history_rounded,
                     onPressed: () => _searchAgain(record),
                   ),
               ],
@@ -839,9 +841,11 @@ class _RecommendationCard extends StatelessWidget {
                 PositionedDirectional(
                   end: 0,
                   bottom: 0,
+                  // 叠在封面上，玻璃底在浅色封面上看不清。
                   child: PickControl(
                     track: song.track,
                     title: meta.title,
+                    tone: PickTone.filled,
                     onPick: onPick,
                   ),
                 ),
@@ -951,6 +955,7 @@ class _BestMatch extends StatelessWidget {
                             title: meta.title,
                             onPick: onPick,
                             wide: true,
+                            tone: PickTone.filled,
                           ),
                         ],
                       ),

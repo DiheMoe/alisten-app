@@ -73,20 +73,12 @@ class SegmentedPills<T> extends StatelessWidget {
                   heightFactor: 1,
                   child: Padding(
                     padding: const EdgeInsets.all(AlistenSpacing.xxs),
+                    // 与选中的筛选胶囊一样用文字色实底，不靠描边和阴影也与轨道
+                    // 分得清。
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: colors.selectedFill,
+                        color: colors.onGlass,
                         borderRadius: pill,
-                        // 轮廓标示选中项的边界，与轨道的对比度须达到 3:1。
-                        border: Border.all(color: colors.outline),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Theme.of(context).colorScheme.shadow
-                                .withValues(alpha: 0.12),
-                            blurRadius: AlistenSpacing.sm,
-                            offset: const Offset(0, AlistenSpacing.xxs / 2),
-                          ),
-                        ],
                       ),
                     ),
                   ),
@@ -141,8 +133,11 @@ class _Segment<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     // 未选中项也用实色：分段控件常放在玻璃面板里，两层玻璃会提亮背景，半透明
-    // 文字不够清晰。选中项靠滑块和字重区分。
-    final ink = colors.onGlass;
+    // 文字不够清晰。选中项压在文字色的滑块上，改用底色。
+    final ink = selected
+        ? Theme.of(context).colorScheme.surface
+        : colors.onGlass;
+    final duration = AlistenDurations.of(context, AlistenDurations.medium);
     final icon = segment.icon;
     return Pressable(
       onPressed: onPressed,
@@ -164,16 +159,21 @@ class _Segment<T> extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: AlistenSizes.iconSm, color: ink),
+                // 与滑块同步变色，滑块经过时文字不会先变得看不清。
+                TweenAnimationBuilder<Color?>(
+                  tween: ColorTween(end: ink),
+                  duration: duration,
+                  curve: AlistenCurves.emphasized,
+                  builder: (context, color, _) =>
+                      Icon(icon, size: AlistenSizes.iconSm, color: color),
+                ),
                 if (showLabel) const SizedBox(width: AlistenSpacing.xxs),
               ],
               if (showLabel)
                 Flexible(
                   child: AnimatedDefaultTextStyle(
-                    duration: AlistenDurations.of(
-                      context,
-                      AlistenDurations.short,
-                    ),
+                    duration: duration,
+                    curve: AlistenCurves.emphasized,
                     style: labelStyle(selected: selected).copyWith(color: ink),
                     child: Text(
                       segment.label,

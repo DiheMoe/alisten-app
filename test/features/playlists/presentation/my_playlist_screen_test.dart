@@ -574,8 +574,8 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('a song is dragged by its handle; a long press copies its '
-      'title instead', (tester) async {
+  testWidgets('a long press copies a title; while selecting a song is dragged '
+      'by its handle', (tester) async {
     await open(tester);
     final rowHeight = top(tester, '歌b') - top(tester, '歌a');
 
@@ -584,6 +584,8 @@ void main() {
     expect(titles, ['歌b']);
     expect(server.count('move'), 0);
 
+    await tester.tap(find.text('选择'));
+    await settlePage(tester);
     final gesture = await tester.startGesture(
       tester.getCenter(find.byIcon(Icons.drag_handle_rounded).first),
     );
@@ -600,18 +602,48 @@ void main() {
     expect(top(tester, '歌a'), lessThan(top(tester, '歌d')));
   });
 
-  testWidgets('selecting hides the drag handles, the pick buttons and the '
-      'song menus', (tester) async {
+  testWidgets('selecting swaps the pick buttons and the song menus for the '
+      'drag handles', (tester) async {
     final semantics = tester.ensureSemantics();
     await open(tester);
-    expect(find.byIcon(Icons.drag_handle_rounded), findsWidgets);
+    expect(find.byIcon(Icons.drag_handle_rounded), findsNothing);
+    expect(find.bySemanticsLabel('点歌《歌a》'), findsOneWidget);
+    expect(find.bySemanticsLabel('《歌a》的更多操作'), findsOneWidget);
 
     await tester.tap(find.text('选择'));
     await settlePage(tester);
 
-    expect(find.byIcon(Icons.drag_handle_rounded), findsNothing);
+    expect(find.byIcon(Icons.drag_handle_rounded), findsWidgets);
     expect(find.bySemanticsLabel('点歌《歌a》'), findsNothing);
     expect(find.bySemanticsLabel('《歌a》的更多操作'), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('while selecting a screen reader still moves a song on the row '
+      'that names it and tells whether it is chosen', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await open(tester);
+    await tester.tap(find.text('选择'));
+    await settlePage(tester);
+
+    expect(
+      find.semantics.byPredicate(
+        (node) => hasAction(node, reorderAction('下移')) && node.label.isEmpty,
+      ),
+      findsNothing,
+    );
+    final row = tester.getSemantics(find.bySemanticsLabel('歌a'));
+    expect(
+      row,
+      isSemantics(hasCheckedState: true, isChecked: false, hasTapAction: true),
+    );
+    expect(hasAction(row, reorderAction('下移')), isTrue);
+    reorder(tester, '歌a', '下移');
+    await settlePage(tester);
+
+    expect(server.calls, contains('move pl-1 netease:a before netease:c'));
+    expect(top(tester, '歌b'), lessThan(top(tester, '歌a')));
+    expect(find.text('已选 0 首'), findsOneWidget, reason: 'still selecting');
     semantics.dispose();
   });
 
@@ -976,7 +1008,7 @@ void main() {
 
   for (final scale in [2.0, 3.0]) {
     testWidgets('at 320 dp and ${scale}x text an unknown pick result leaves '
-        'room for the menu and the handle', (tester) async {
+        'room for the menu', (tester) async {
       await open(
         tester,
         size: const Size(320, 760),
@@ -1003,11 +1035,10 @@ void main() {
         tester.getRect(find.byIcon(Icons.question_mark_rounded)).left,
         greaterThan(tester.getRect(find.text('歌a')).left),
       );
-      expect(find.bySemanticsLabel('《歌a》的更多操作').hitTestable(), findsOneWidget);
-      final handle = find.byIcon(Icons.drag_handle_rounded).first;
-      expect(handle.hitTestable(), findsOneWidget);
+      final menu = find.bySemanticsLabel('《歌a》的更多操作');
+      expect(menu.hitTestable(), findsOneWidget);
       expect(
-        tester.getRect(handle).right,
+        tester.getRect(menu).right,
         lessThanOrEqualTo(tester.getSize(find.byType(MaterialApp)).width),
       );
     });

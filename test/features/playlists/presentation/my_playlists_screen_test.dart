@@ -68,7 +68,7 @@ void main() {
   }
 
   Future<void> openLinkSheet(WidgetTester tester) async {
-    await tester.tap(find.text('导入'));
+    await tester.tap(find.bySemanticsLabel('导入'));
     await settlePage(tester);
     await tester.tap(find.text('从链接导入'));
     await settlePage(tester);
@@ -108,7 +108,7 @@ void main() {
 
     reply.complete();
     await settlePage(tester);
-    expect(find.text('3 个歌单'), findsOneWidget);
+    expect(find.textContaining('3 个歌单'), findsOneWidget);
     semantics.dispose();
   });
 
@@ -119,7 +119,7 @@ void main() {
     expect(find.text('读取失败：${networkError.message}'), findsOneWidget);
     await tester.tap(find.text('重试'));
     await settlePage(tester);
-    expect(find.text('3 个歌单'), findsOneWidget);
+    expect(find.textContaining('3 个歌单'), findsOneWidget);
   });
 
   testWidgets('favorites come first and have no menu; a card opens its '
@@ -127,7 +127,7 @@ void main() {
     final semantics = tester.ensureSemantics();
     await open(tester);
 
-    expect(find.text('3 个歌单'), findsOneWidget);
+    expect(find.textContaining('3 个歌单'), findsOneWidget);
     double top(String name) => tester.getTopLeft(find.text(name)).dy;
     double left(String name) => tester.getTopLeft(find.text(name)).dx;
     expect(top('我喜欢'), lessThanOrEqualTo(top('晨跑')));
@@ -146,8 +146,8 @@ void main() {
     await open(tester);
     final label = '夜跑，3 首 · ${formatPlaylistDate(5, testNowMs)}';
 
-    for (final view in ['网格', '列表']) {
-      await tester.tap(find.bySemanticsLabel(view));
+    for (final view in ['', '以列表显示']) {
+      if (view.isNotEmpty) await tester.tap(find.bySemanticsLabel(view));
       await settlePage(tester);
       expect(
         tester.getSemantics(find.bySemanticsLabel(label)),
@@ -159,31 +159,24 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('the view icons are named and their choice announced; the list '
-      'view is kept as the preference', (tester) async {
+  testWidgets('the view button names the view it switches to; the list view '
+      'is kept as the preference', (tester) async {
     final semantics = tester.ensureSemantics();
     final container = await open(tester);
-    Matcher choice({required bool selected}) => isSemantics(
-      isButton: true,
-      isSelected: selected,
-      isInMutuallyExclusiveGroup: true,
-    );
     expect(
-      tester.getSemantics(find.bySemanticsLabel('网格')),
-      choice(selected: true),
+      tester.getSemantics(find.bySemanticsLabel('以列表显示')),
+      isSemantics(isButton: true),
     );
+    expect(find.bySemanticsLabel('以网格显示'), findsNothing);
 
-    await tester.tap(find.bySemanticsLabel('列表'));
+    await tester.tap(find.bySemanticsLabel('以列表显示'));
     await settlePage(tester);
 
     expect(
-      tester.getSemantics(find.bySemanticsLabel('列表')),
-      choice(selected: true),
+      tester.getSemantics(find.bySemanticsLabel('以网格显示')),
+      isSemantics(isButton: true),
     );
-    expect(
-      tester.getSemantics(find.bySemanticsLabel('网格')),
-      choice(selected: false),
-    );
+    expect(find.bySemanticsLabel('以列表显示'), findsNothing);
     expect(container.read(playlistViewProvider).view, PlaylistView.list);
     expect(
       container.read(playlistViewStoreProvider).read().view,
@@ -196,20 +189,21 @@ void main() {
     semantics.dispose();
   });
 
+  const sortLabel = '3 个歌单，排序方式：更新时间，最新在前';
+
   for (final size in const [Size(320, 780), Size(360, 780), Size(408, 900)]) {
-    testWidgets('at ${size.width.round()} dp the view switch sits on the left '
-        'and the sort key with its direction on the right of one row', (
-      tester,
-    ) async {
+    testWidgets('at ${size.width.round()} dp the count with the sort sits on '
+        'the left and the view, import and new playlist buttons on the right '
+        'of one row', (tester) async {
       final semantics = tester.ensureSemantics();
       await open(tester, size: size);
 
-      final grid = find.bySemanticsLabel('网格');
-      final list = find.bySemanticsLabel('列表');
-      final sortKey = find.bySemanticsLabel('排序方式：更新时间');
-      final direction = find.bySemanticsLabel('最新在前');
-      final row = tester.getCenter(grid).dy;
-      for (final control in [list, sortKey, direction]) {
+      final sort = find.bySemanticsLabel(sortLabel);
+      final view = find.bySemanticsLabel('以列表显示');
+      final import = find.bySemanticsLabel('导入');
+      final create = find.bySemanticsLabel('新建歌单');
+      final row = tester.getCenter(sort).dy;
+      for (final control in [view, import, create]) {
         expect(
           tester.getCenter(control).dy,
           moreOrLessEquals(row, epsilon: 2),
@@ -217,19 +211,23 @@ void main() {
         );
       }
       expect(
-        tester.getTopLeft(grid).dx,
+        tester.getTopLeft(sort).dx,
         moreOrLessEquals(AlistenSpacing.page, epsilon: 0.5),
       );
       expect(
-        tester.getTopRight(list).dx,
-        lessThan(tester.getTopLeft(sortKey).dx),
+        tester.getTopRight(sort).dx,
+        lessThanOrEqualTo(tester.getTopLeft(view).dx),
       );
       expect(
-        tester.getTopRight(sortKey).dx,
-        lessThanOrEqualTo(tester.getTopLeft(direction).dx),
+        tester.getTopRight(view).dx,
+        lessThanOrEqualTo(tester.getTopLeft(import).dx),
       );
       expect(
-        tester.getTopRight(direction).dx,
+        tester.getTopRight(import).dx,
+        lessThanOrEqualTo(tester.getTopLeft(create).dx),
+      );
+      expect(
+        tester.getTopRight(create).dx,
         moreOrLessEquals(size.width - AlistenSpacing.page, epsilon: 0.5),
       );
       expect(tester.takeException(), isNull);
@@ -237,17 +235,18 @@ void main() {
     });
   }
 
-  testWidgets('the sort menu and the direction are named for a screen '
-      'reader; a new key starts with its own direction', (tester) async {
+  testWidgets('the sort menu is named for a screen reader and holds the keys '
+      'and the direction; a new key starts with its own direction', (
+    tester,
+  ) async {
     final semantics = tester.ensureSemantics();
     await open(tester);
 
-    final sortButton = find.bySemanticsLabel('排序方式：更新时间');
+    final sortButton = find.bySemanticsLabel(sortLabel);
     expect(
       tester.getSemantics(sortButton),
       isSemantics(isButton: true, hasExpandedState: true, isExpanded: false),
     );
-    expect(find.bySemanticsLabel('最新在前'), findsOneWidget);
 
     await tester.tap(sortButton);
     await settlePage(tester);
@@ -255,17 +254,27 @@ void main() {
       tester.getSemantics(sortButton),
       isSemantics(hasExpandedState: true, isExpanded: true),
     );
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('最新在前')),
+      isSemantics(isSelected: true, isInMutuallyExclusiveGroup: true),
+    );
     await tester.tap(find.text('名称'));
     await settlePage(tester);
 
+    final byName = find.bySemanticsLabel('3 个歌单，排序方式：名称，A–Z');
     expect(
-      tester.getSemantics(find.bySemanticsLabel('排序方式：名称')),
+      tester.getSemantics(byName),
       isSemantics(hasExpandedState: true, isExpanded: false),
     );
-    expect(find.bySemanticsLabel('A–Z'), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel('A–Z'));
+    await tester.tap(byName);
     await settlePage(tester);
-    expect(find.bySemanticsLabel('Z–A'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('A–Z')),
+      isSemantics(isSelected: true),
+    );
+    await tester.tap(find.text('Z–A'));
+    await settlePage(tester);
+    expect(find.bySemanticsLabel('3 个歌单，排序方式：名称，Z–A'), findsOneWidget);
     semantics.dispose();
   });
 
@@ -341,7 +350,7 @@ void main() {
   testWidgets('a new playlist shows up in the list', (tester) async {
     await open(tester);
 
-    await tester.tap(find.widgetWithText(PillButton, '新建歌单'));
+    await tester.tap(find.bySemanticsLabel('新建歌单'));
     await settlePage(tester);
     await tester.enterText(find.byType(EditableText), '散步');
     await tester.pump();
@@ -349,7 +358,7 @@ void main() {
     await settlePage(tester);
 
     expect(find.text('散步'), findsOneWidget);
-    expect(find.text('4 个歌单'), findsOneWidget);
+    expect(find.textContaining('4 个歌单'), findsOneWidget);
     expect(notices, isEmpty);
   });
 
@@ -366,7 +375,7 @@ void main() {
   testWidgets('a create that answers under another sheet closes only its '
       'own sheet', (tester) async {
     await open(tester);
-    await tester.tap(find.widgetWithText(PillButton, '新建歌单'));
+    await tester.tap(find.bySemanticsLabel('新建歌单'));
     await settlePage(tester);
     final answer = server.hold('create');
     await tester.enterText(find.byType(EditableText), '散步');
@@ -399,7 +408,7 @@ void main() {
     );
     await open(tester);
 
-    await tester.tap(find.text('导入'));
+    await tester.tap(find.bySemanticsLabel('导入'));
     await settlePage(tester);
     await tester.tap(find.text('从文件导入'));
     await settlePage(tester);
@@ -430,13 +439,14 @@ void main() {
     final reply = server.hold('importFile');
     await open(tester);
 
-    await tester.tap(find.text('导入'));
+    await tester.tap(find.bySemanticsLabel('导入'));
     await settlePage(tester);
     await tester.tap(find.text('从文件导入'));
     await settlePage(tester);
 
-    expect(find.text('正在导入…'), findsOneWidget);
-    await tester.tap(find.text('正在导入…'));
+    expect(find.bySemanticsLabel('正在导入'), findsOneWidget);
+    expect(find.bySemanticsLabel('导入'), findsNothing);
+    await tester.tap(find.bySemanticsLabel('正在导入'));
     await settlePage(tester);
     expect(find.text('从文件导入'), findsNothing, reason: 'no menu while busy');
 
@@ -444,7 +454,7 @@ void main() {
     await settlePage(tester);
     expect(notices, [(ToastKind.success, '已导入 1 首到“旧歌单”')]);
     expect(noticeDurations, [null], reason: 'a short notice keeps the default');
-    expect(find.text('导入'), findsOneWidget);
+    expect(find.bySemanticsLabel('导入'), findsOneWidget);
     expect(files.picks, 1);
   });
 
@@ -454,7 +464,7 @@ void main() {
     files.next = const PlaylistFileProblem('这个文件不是导出的歌单。');
     await open(tester);
 
-    await tester.tap(find.text('导入'));
+    await tester.tap(find.bySemanticsLabel('导入'));
     await settlePage(tester);
     await tester.tap(find.text('从文件导入'));
     await settlePage(tester);
@@ -466,7 +476,7 @@ void main() {
   testWidgets('a cancelled pick does nothing', (tester) async {
     await open(tester);
 
-    await tester.tap(find.text('导入'));
+    await tester.tap(find.bySemanticsLabel('导入'));
     await settlePage(tester);
     await tester.tap(find.text('从文件导入'));
     await settlePage(tester);
@@ -474,7 +484,7 @@ void main() {
     expect(files.picks, 1);
     expect(notices, isEmpty);
     expect(server.count('importFile'), 0);
-    expect(find.text('导入'), findsOneWidget);
+    expect(find.bySemanticsLabel('导入'), findsOneWidget);
   });
 
   for (final (code, serverText, shown) in [
@@ -496,14 +506,14 @@ void main() {
       server.failNext('importFile', apiError(code, message: serverText));
       await open(tester);
 
-      await tester.tap(find.text('导入'));
+      await tester.tap(find.bySemanticsLabel('导入'));
       await settlePage(tester);
       await tester.tap(find.text('从文件导入'));
       await settlePage(tester);
 
       expect(notices, [(ToastKind.failure, shown)]);
-      expect(find.text('3 个歌单'), findsOneWidget);
-      expect(find.text('导入'), findsOneWidget);
+      expect(find.textContaining('3 个歌单'), findsOneWidget);
+      expect(find.bySemanticsLabel('导入'), findsOneWidget);
     });
   }
 
@@ -514,7 +524,7 @@ void main() {
     await open(tester);
 
     expect(
-      tester.getSemantics(find.text('导入')),
+      tester.getSemantics(find.bySemanticsLabel('导入')),
       isSemantics(
         label: '导入',
         isButton: true,
@@ -522,10 +532,10 @@ void main() {
         isExpanded: false,
       ),
     );
-    await tester.tap(find.text('导入'));
+    await tester.tap(find.bySemanticsLabel('导入'));
     await settlePage(tester);
     expect(
-      tester.getSemantics(find.text('导入')),
+      tester.getSemantics(find.bySemanticsLabel('导入')),
       isSemantics(hasExpandedState: true, isExpanded: true),
     );
     semantics.dispose();
@@ -816,7 +826,7 @@ void main() {
         truncated: false,
       );
       final shown = await openRemovable(tester);
-      await tester.tap(find.text('导入'));
+      await tester.tap(find.bySemanticsLabel('导入'));
       await settlePage(tester);
       await tester.tap(find.text('从文件导入'));
       await settlePage(tester);
@@ -834,7 +844,7 @@ void main() {
 
     testWidgets('still creates a playlist', (tester) async {
       final shown = await openRemovable(tester);
-      await tester.tap(find.widgetWithText(PillButton, '新建歌单'));
+      await tester.tap(find.bySemanticsLabel('新建歌单'));
       await settlePage(tester);
 
       shown.value = false;
@@ -872,7 +882,7 @@ void main() {
         );
         expect(tester.takeException(), isNull);
 
-        final list = find.bySemanticsLabel('列表');
+        final list = find.bySemanticsLabel('以列表显示');
         await tester.scrollUntilVisible(list, -200, scrollable: scrollable);
         await tester.tap(list);
         await settlePage(tester);

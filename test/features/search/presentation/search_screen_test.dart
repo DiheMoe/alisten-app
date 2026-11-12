@@ -1,6 +1,7 @@
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
+import 'package:alisten/shared/ui/chip_pill.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,6 +31,22 @@ void main() {
       },
     );
   }
+
+  testWidgets('recent searches sit under their heading as chips without an '
+      'icon each', (tester) async {
+    final page = await SearchPage.open(tester);
+    await page.search('晴天');
+    await tester.enterText(find.byType(EditableText), '');
+    await page.settle();
+
+    expect(find.text('最近搜索'), findsOneWidget);
+    final chip = find.widgetWithText(ChipPill, '晴天');
+    expect(chip, findsOneWidget);
+    expect(
+      find.descendant(of: chip, matching: find.byType(Icon)),
+      findsNothing,
+    );
+  });
 
   testWidgets('a song found is sent once, says it was picked and is counted', (
     tester,

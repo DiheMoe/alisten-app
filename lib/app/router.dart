@@ -21,7 +21,6 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/index.dart';
-import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -105,12 +104,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                     onResult: reportPick,
                     onNotice: toasts.show,
                     onCopyTitle: (title) => copySongTitle(toasts, title),
-                    saveToPlaylist: (track, title) => SaveToPlaylistButton(
-                      track: track,
-                      title: title,
-                      onOpenAccount: openAccount,
-                      onNotice: toasts.show,
-                      iconSize: AlistenSizes.iconSm,
+                    saveToPlaylist: (from, track, title) => unawaited(
+                      showSaveToPlaylistSheet(
+                        from,
+                        SaveOneTrack(track: track, title: title),
+                        onOpenAccount: openAccount,
+                        onNotice: toasts.show,
+                      ),
                     ),
                   ),
                 ),

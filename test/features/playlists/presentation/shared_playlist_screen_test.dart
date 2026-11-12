@@ -82,14 +82,21 @@ void main() {
     expect(find.text('进入房间后可点歌'), findsOneWidget);
   });
 
-  testWidgets('every song can be saved to a playlist', (tester) async {
+  testWidgets('every song can be picked from its row and saved to a playlist '
+      'from its menu', (tester) async {
     final semantics = tester.ensureSemantics();
     await open(tester);
 
-    expect(find.bySemanticsLabel('把《歌a》保存到歌单'), findsOneWidget);
-    expect(find.bySemanticsLabel('把《歌b》保存到歌单'), findsOneWidget);
     expect(find.bySemanticsLabel('点歌《歌a》'), findsOneWidget);
     expect(find.bySemanticsLabel('点歌《歌b》'), findsOneWidget);
+    expect(find.bySemanticsLabel('《歌b》的更多操作'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('《歌a》的更多操作'));
+    await settlePage(tester);
+    expect(find.text('复制歌名'), findsOneWidget);
+    await tester.tap(find.text('保存到歌单'));
+    await settlePage(tester);
+
+    expect(find.text('新建歌单'), findsOneWidget, reason: 'the save sheet');
     semantics.dispose();
   });
 
@@ -377,7 +384,7 @@ void main() {
 
   for (final scale in [2.0, 3.0]) {
     testWidgets('at 320 dp and ${scale}x text an unknown pick result fits '
-        'beside the save button', (tester) async {
+        'beside the menu', (tester) async {
       await open(
         tester,
         size: const Size(320, 760),
@@ -396,10 +403,7 @@ void main() {
       await tester.ensureVisible(find.text('结果未知'));
       await tester.pump();
       expect(tester.takeException(), isNull);
-      expect(
-        find.byIcon(Icons.playlist_add_rounded).hitTestable(),
-        findsWidgets,
-      );
+      expect(find.byIcon(Icons.more_horiz_rounded).hitTestable(), findsWidgets);
       expect(
         find.byIcon(Icons.question_mark_rounded).hitTestable(),
         findsWidgets,

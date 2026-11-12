@@ -9,7 +9,7 @@ import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/room/index.dart';
-import 'package:alisten/features/search/index.dart' show PickControl;
+import 'package:alisten/features/search/index.dart' show PickControl, PickTone;
 import 'package:alisten/features/server/data/preferences_server_store.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
@@ -213,6 +213,44 @@ void main() {
 
     expect(copied, '一首歌');
     expect(find.text('已复制歌名'), findsOneWidget);
+  });
+
+  testWidgets("a row's menu copies its title and deletes it like a swipe", (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map<Object?, Object?>)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final opened = await _openHistory(tester, [heard('一首歌', at: _now)]);
+
+    await tester.tap(find.bySemanticsLabel('《一首歌》的更多操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('复制歌名'));
+    await tester.pump();
+    expect(copied, '一首歌');
+    expect(find.text('已复制歌名'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('《一首歌》的更多操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('删除'));
+    await tester.pumpAndSettle();
+    expect(opened.api.removedListens.map(trackKey), ['netease:一首歌']);
+    expect(find.text('一首歌'), findsNothing);
+    semantics.dispose();
   });
 
   testWidgets('the page says it is loading until the history is read', (
@@ -570,7 +608,10 @@ void main() {
     final opened = await _openHistory(tester, [heard('晴天', at: _now)]);
     final again = find.bySemanticsLabel('再点一次《晴天》');
     expect(find.text('进入房间后可点歌'), findsOneWidget);
-    expect(tester.widget<PickControl>(find.byType(PickControl)).subtle, isTrue);
+    expect(
+      tester.widget<PickControl>(find.byType(PickControl)).tone,
+      PickTone.quiet,
+    );
     expect(
       tester.getSemantics(again),
       isSemantics(hasEnabledState: true, isEnabled: false, hasTapAction: false),

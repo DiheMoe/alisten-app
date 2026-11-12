@@ -4,8 +4,6 @@ import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/search/application/pick_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
-import 'package:alisten/shared/theme/tokens.dart';
-import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,7 +15,6 @@ const _song = Track(source: TrackSource.qq, id: '001');
 
 void main() {
   late List<(Track, String)> asked;
-  late List<Track> tapped;
 
   Future<void> pump(
     WidgetTester tester, {
@@ -27,7 +24,6 @@ void main() {
     PickStatus? picked,
   }) async {
     asked = [];
-    tapped = [];
     tester.view
       ..physicalSize = size * 3
       ..devicePixelRatio = 3;
@@ -70,15 +66,9 @@ void main() {
             onNotice: (_, _) {},
             onCopyTitle: (_) {},
             saveToPlaylist: withSlot
-                ? (track, title) {
+                ? (context, track, title) {
+                    expect(context.mounted, isTrue);
                     asked.add((track, title));
-                    return IconCircleButton(
-                      icon: Icons.playlist_add_rounded,
-                      semanticLabel: '把《$title》保存到歌单',
-                      style: IconCircleButtonStyle.plain,
-                      iconSize: AlistenSizes.iconSm,
-                      onPressed: () => tapped.add(track),
-                    );
                   }
                 : null,
           ),
@@ -91,35 +81,46 @@ void main() {
     addTearDown(() => tester.pumpWidget(const SizedBox()));
   }
 
-  testWidgets('without a slot a row has no save button', (tester) async {
-    await pump(tester, withSlot: false);
+  Future<void> openMenu(WidgetTester tester) async {
+    await tester.tap(find.bySemanticsLabel('《晴天》的更多操作'));
+    await tester.pumpAndSettle();
+  }
 
-    expect(find.text('晴天'), findsOneWidget);
-    expect(find.byIcon(Icons.playlist_add_rounded), findsNothing);
+  testWidgets('without a slot the menu of a row has no save entry', (
+    tester,
+  ) async {
+    await pump(tester, withSlot: false);
+    await openMenu(tester);
+
+    expect(find.text('复制歌名'), findsOneWidget);
+    expect(find.text('保存到歌单'), findsNothing);
   });
 
-  testWidgets('with a slot the save button comes before the pick button and '
-      'is given the song of the record', (tester) async {
+  testWidgets('with a slot the pick button stays on the row, and saving from '
+      'the menu is given the song of the record', (tester) async {
     final semantics = tester.ensureSemantics();
     await pump(tester, withSlot: true);
 
-    expect(find.bySemanticsLabel('把《晴天》保存到歌单'), findsOneWidget);
+    expect(find.byIcon(Icons.playlist_add_rounded), findsNothing);
     expect(
-      tester.getRect(find.bySemanticsLabel('把《晴天》保存到歌单')).right,
-      lessThanOrEqualTo(tester.getRect(find.bySemanticsLabel('再点一次《晴天》')).left),
+      tester.getRect(find.bySemanticsLabel('再点一次《晴天》')).right,
+      lessThanOrEqualTo(
+        tester.getRect(find.bySemanticsLabel('《晴天》的更多操作')).left,
+      ),
     );
-    expect(trackKey(asked.last.$1), 'qq:001');
-    expect(asked.last.$2, '晴天');
+    await openMenu(tester);
+    await tester.tap(find.text('保存到歌单'));
+    await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.playlist_add_rounded));
-    await tester.pump();
-
-    expect([for (final track in tapped) trackKey(track)], ['qq:001']);
+    expect(asked, hasLength(1));
+    expect(trackKey(asked.single.$1), 'qq:001');
+    expect(asked.single.$2, '晴天');
+    expect(find.text('保存到歌单'), findsNothing, reason: 'the menu closed');
     semantics.dispose();
   });
 
-  testWidgets('the smallest phone at 3x text keeps a row with the save '
-      'button and a spelled-out pick result inside its width', (tester) async {
+  testWidgets('the smallest phone at 3x text keeps a row with the menu and a '
+      'spelled-out pick result inside its width', (tester) async {
     await pump(
       tester,
       withSlot: true,
@@ -130,10 +131,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('结果未知'), findsOneWidget);
-    expect(
-      find.byIcon(Icons.playlist_add_rounded).hitTestable(),
-      findsOneWidget,
-    );
+    expect(find.byIcon(Icons.more_horiz_rounded).hitTestable(), findsOneWidget);
     expect(find.byIcon(Icons.question_mark_rounded).hitTestable(), findsOne);
   });
 }

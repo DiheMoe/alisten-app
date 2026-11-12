@@ -133,7 +133,7 @@ class _JoinRoomSheetState extends ConsumerState<JoinRoomSheet> {
               style: AlistenTypography.title.copyWith(color: colors.onGlass),
             ),
           ),
-          const SizedBox(height: AlistenSpacing.lg),
+          const SizedBox(height: AlistenSpacing.md),
           _RoomSummary(room: widget.room),
           if (widget.needsPassword) ...[
             const SizedBox(height: AlistenSpacing.lg),
@@ -149,13 +149,6 @@ class _JoinRoomSheetState extends ConsumerState<JoinRoomSheet> {
               onSubmitted: (_) => _submit(),
             ),
           ],
-          const SizedBox(height: AlistenSpacing.md),
-          Text(
-            '加入后，与房间内的所有人同步播放、点歌和聊天。',
-            style: AlistenTypography.secondary.copyWith(
-              color: colors.onGlassMuted,
-            ),
-          ),
           if (error != null) ...[
             const SizedBox(height: AlistenSpacing.md),
             InlineMessage(
@@ -163,7 +156,7 @@ class _JoinRoomSheetState extends ConsumerState<JoinRoomSheet> {
               tone: error.unknown ? StatusTone.warning : StatusTone.danger,
             ),
           ],
-          const SizedBox(height: AlistenSpacing.xl),
+          const SizedBox(height: AlistenSpacing.lg),
           PillButton(
             label: '进入房间',
             icon: Icons.login_rounded,

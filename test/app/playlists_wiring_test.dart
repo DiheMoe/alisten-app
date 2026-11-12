@@ -48,7 +48,7 @@ void main() {
     await tester.tap(find.bySemanticsLabel('我的歌单'));
     await settle(tester);
     expect(router.state.uri.path, '/playlists');
-    await tester.tap(find.bySemanticsLabel('列表'));
+    await tester.tap(find.bySemanticsLabel('以列表显示'));
     await settle(tester);
 
     router.go('/');
@@ -104,7 +104,9 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('the history rows can save their songs', (tester) async {
+  testWidgets('the history rows save their songs from their menu', (
+    tester,
+  ) async {
     final semantics = tester.ensureSemantics();
     final api = FakeAlistenApi()
       ..listens.add(
@@ -129,8 +131,10 @@ void main() {
     appContainer(tester).read(routerProvider).go('/history');
     await settle(tester);
 
-    expect(find.bySemanticsLabel('把《晴天》保存到歌单'), findsOneWidget);
-    expect(iconSizes(tester), [AlistenSizes.iconSm]);
+    expect(find.byType(SaveToPlaylistButton), findsNothing);
+    await tester.tap(find.bySemanticsLabel('《晴天》的更多操作'));
+    await settle(tester);
+    expect(find.text('保存到歌单'), findsOneWidget);
     semantics.dispose();
   });
 
@@ -160,7 +164,9 @@ void main() {
     final router = appContainer(tester).read(routerProvider);
     router.go('/history');
     await settle(tester);
-    await tester.tap(find.bySemanticsLabel('把《晴天》保存到歌单'));
+    await tester.tap(find.bySemanticsLabel('《晴天》的更多操作'));
+    await settle(tester);
+    await tester.tap(find.text('保存到歌单'));
     await settle(tester);
     expect(find.text('去账号设置'), findsOneWidget);
 

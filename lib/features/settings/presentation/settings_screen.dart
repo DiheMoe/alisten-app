@@ -24,6 +24,7 @@ import 'package:alisten/shared/ui/page_glow.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
+import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
 import 'package:alisten/shared/ui/tap_rhythm.dart';
 import 'package:alisten/shared/ui/toast.dart';
@@ -102,9 +103,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  late final TextEditingController _nickname;
-  late final TextEditingController _email;
-  bool _saving = false;
   bool _clearingImages = false;
 
   // 设置页自己发起的成员读取。没有成员时据此区分正在读取、没有读到和这个服务器
@@ -121,10 +119,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _nickname = TextEditingController(
-      text: ref.read(identityControllerProvider).member?.name ?? '',
-    );
-    _email = TextEditingController(text: ref.read(profileEmailProvider));
     // 每次打开都重新读取：启动时可能因离线没取到成员，记录开关也可能已在别处
     // 改过。
     unawaited(
@@ -132,13 +126,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (mounted) await _readProfile();
       }),
     );
-  }
-
-  @override
-  void dispose() {
-    _nickname.dispose();
-    _email.dispose();
-    super.dispose();
   }
 
   Future<void> _readProfile() async {
@@ -152,26 +139,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  // 用户改过的输入框不再跟随存储的值，以免覆盖正在编辑的内容。
-  void _follow(TextEditingController field, String? previous, String? next) {
-    if (field.text == (previous ?? '')) field.text = next ?? '';
-  }
-
-  Future<void> _saveProfile() async {
-    setState(() => _saving = true);
-    try {
-      final result = await _settings.saveProfile(
-        nickname: _nickname.text,
-        email: _email.text,
-      );
-      widget.onProfileResult(result);
-      // 服务端可能规整过昵称，以返回值为准。
-      if (result case MutationSucceeded(:final value) when mounted) {
-        _nickname.text = value.name;
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+  // 设置控制器在面板打开前取出：面板在根导航器上，设置页可能先于它离开。
+  void _editProfile() {
+    final settings = _settings;
+    unawaited(
+      showSheetPanel<void>(
+        context,
+        builder: (_) => _ProfileSheet(
+          onSave: settings.saveProfile,
+          onResult: widget.onProfileResult,
+        ),
+      ),
+    );
   }
 
   Future<void> _openNotificationSettings() async {
@@ -212,14 +191,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(
-      identityControllerProvider.select((state) => state.member?.name),
-      (previous, next) => _follow(_nickname, previous, next),
-    );
-    ref.listen(
-      profileEmailProvider,
-      (previous, next) => _follow(_email, previous, next),
-    );
     // 登录页等是设置页的子页面，返回时不会重新打开设置页；身份换了就重新读取，
     // 登录后没读到的记录开关才不会一直显示默认值。
     ref.listen(
@@ -252,7 +223,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _Group(
             title: '账号',
             children: [
-              _profile(member, identity.account),
+              _ProfileHeader(member: member, account: identity.account),
+              _LinkRow(title: '编辑资料', onPressed: _editProfile),
               ?widget.accountActions,
             ],
           ),
@@ -416,7 +388,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
     return _SettingRow(
       title: title,
-      description: identity.account == null ? '保存在服务器上' : '保存在服务器上，登录这个账号的设备共用',
+      description: identity.account == null ? '保存在服务器上' : '存在服务器上，同一账号的设备共用',
       trailing: AlistenToggle(
         value: _recordListens ?? identity.recordListens,
         semanticLabel: title,
@@ -424,50 +396,157 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
+}
 
-  Widget _profile(Member? member, Account? account) {
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.member, required this.account});
+
+  final Member? member;
+  final Account? account;
+
+  @override
+  Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
-    final typed = _nickname.text.trim();
-    final name = typed.isEmpty ? member?.name ?? '' : typed;
-    final changed =
-        _nickname.text != (member?.name ?? '') ||
-        _email.text != ref.read(profileEmailProvider);
+    final member = this.member;
+    final name = member?.name ?? '';
     return Padding(
       padding: const EdgeInsets.all(AlistenSpacing.md),
+      child: Row(
+        children: [
+          MemberAvatar(
+            name: name,
+            imageUrl: member?.avatarUrl(AlistenSizes.profileAvatar),
+            size: AlistenSizes.profileAvatar,
+          ),
+          const SizedBox(width: AlistenSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name.isEmpty ? '还没有昵称' : name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AlistenTypography.weighted(
+                    AlistenTypography.title,
+                    FontWeight.w700,
+                  ).copyWith(color: colors.onGlass),
+                ),
+                Text(
+                  _identityLabel(member, account),
+                  style: AlistenTypography.secondary.copyWith(
+                    color: colors.onGlassMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileSheet extends ConsumerStatefulWidget {
+  const _ProfileSheet({required this.onSave, required this.onResult});
+
+  final Future<MutationResult<Member>> Function({
+    required String nickname,
+    required String email,
+  })
+  onSave;
+  final ValueChanged<MutationResult<Member>> onResult;
+
+  @override
+  ConsumerState<_ProfileSheet> createState() => _ProfileSheetState();
+}
+
+class _ProfileSheetState extends ConsumerState<_ProfileSheet> {
+  late final TextEditingController _nickname;
+  late final TextEditingController _email;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nickname = TextEditingController(
+      text: ref.read(identityControllerProvider).member?.name ?? '',
+    );
+    _email = TextEditingController(text: ref.read(profileEmailProvider));
+  }
+
+  @override
+  void dispose() {
+    _nickname.dispose();
+    _email.dispose();
+    super.dispose();
+  }
+
+  // 用户改过的输入框不再跟随存储的值，以免覆盖正在编辑的内容。
+  void _follow(TextEditingController field, String? previous, String? next) {
+    if (field.text == (previous ?? '')) field.text = next ?? '';
+  }
+
+  Future<void> _save() async {
+    final onResult = widget.onResult;
+    setState(() => _saving = true);
+    try {
+      final result = await widget.onSave(
+        nickname: _nickname.text,
+        email: _email.text,
+      );
+      onResult(result);
+      if (result is MutationSucceeded<Member> && mounted) {
+        dismissSheet(context);
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(
+      identityControllerProvider.select((state) => state.member?.name),
+      (previous, next) => _follow(_nickname, previous, next),
+    );
+    ref.listen(
+      profileEmailProvider,
+      (previous, next) => _follow(_email, previous, next),
+    );
+    // 资料只存到填写时的身份上：登录、退出或换了服务器就关闭。从没有成员到
+    // 读出或建出成员（保存本身也会先建游客）时，输入框跟着更新，不关闭。
+    ref.listen(
+      identityControllerProvider.select(
+        (state) => (state.session, state.member?.id),
+      ),
+      (previous, next) {
+        final (session, member) = previous ?? next;
+        if (_saving) return;
+        if (session != next.$1 || (member != null && member != next.$2)) {
+          dismissSheet(context);
+        }
+      },
+    );
+    final colors = AlistenColors.of(context);
+    final name = ref.watch(
+      identityControllerProvider.select((state) => state.member?.name),
+    );
+    final changed =
+        _nickname.text != (name ?? '') ||
+        _email.text != ref.watch(profileEmailProvider);
+    return PopScope(
+      canPop: !_saving,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              MemberAvatar(
-                name: name,
-                imageUrl: member?.avatarUrl(AlistenSizes.profileAvatar),
-                size: AlistenSizes.profileAvatar,
-              ),
-              const SizedBox(width: AlistenSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name.isEmpty ? '还没有昵称' : name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AlistenTypography.weighted(
-                        AlistenTypography.title,
-                        FontWeight.w700,
-                      ).copyWith(color: colors.onGlass),
-                    ),
-                    Text(
-                      _identityLabel(member, account),
-                      style: AlistenTypography.secondary.copyWith(
-                        color: colors.onGlassMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Semantics(
+            header: true,
+            child: Text(
+              '编辑资料',
+              style: AlistenTypography.title.copyWith(color: colors.onGlass),
+            ),
           ),
           const SizedBox(height: AlistenSpacing.lg),
           AlistenTextField(
@@ -493,9 +572,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             icon: Icons.check_rounded,
             expand: true,
             busy: _saving,
-            onPressed: changed && !_saving
-                ? () => unawaited(_saveProfile())
-                : null,
+            onPressed: changed && !_saving ? () => unawaited(_save()) : null,
           ),
         ],
       ),

@@ -42,7 +42,7 @@ class PlaylistPickControl extends ConsumerWidget {
     return PickControl(
       track: track,
       title: title,
-      subtle: true,
+      tone: PickTone.quiet,
       blockedReason: pickBlockedReason(track, kind),
       onPick: onPick,
     );

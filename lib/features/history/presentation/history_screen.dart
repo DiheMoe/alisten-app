@@ -8,6 +8,7 @@ import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
@@ -46,8 +47,9 @@ class HistoryScreen extends ConsumerStatefulWidget {
   final void Function(ToastKind kind, String text) onNotice;
   final ValueChanged<String> onCopyTitle;
 
-  /// 保存按钮属于歌单功能，由 app 层组装传入。
-  final Widget Function(Track track, String title)? saveToPlaylist;
+  /// 保存到歌单属于歌单功能，由 app 层组装传入；为 null 时菜单里没有这一项。
+  final void Function(BuildContext context, Track track, String title)?
+  saveToPlaylist;
 
   @override
   ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
@@ -101,6 +103,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   void _pick(Track track, String title) {
     unawaited(pickSong(ref, widget.onResult, track, title));
+  }
+
+  void Function(Track track, String title)? get _save {
+    final save = widget.saveToPlaylist;
+    if (save == null) return null;
+    return (track, title) {
+      _releaseFocus();
+      save(context, track, title);
+    };
   }
 
   void _filterBy(String query) {
@@ -404,7 +415,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               onDelete: ({required bool swiped}) =>
                   _delete(listen, swiped: swiped),
               onCopyTitle: widget.onCopyTitle,
-              saveToPlaylist: widget.saveToPlaylist,
+              onSave: _save,
             );
           },
         ),
@@ -534,7 +545,7 @@ class _PlayRow extends StatelessWidget {
     required this.onPick,
     required this.onDelete,
     required this.onCopyTitle,
-    required this.saveToPlaylist,
+    required this.onSave,
     super.key,
   });
 
@@ -548,12 +559,13 @@ class _PlayRow extends StatelessWidget {
   /// 服务端确认删除时返回 true。
   final Future<bool> Function({required bool swiped}) onDelete;
   final ValueChanged<String> onCopyTitle;
-  final Widget Function(Track track, String title)? saveToPlaylist;
+  final void Function(Track track, String title)? onSave;
 
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     final meta = listen.meta;
+    final save = onSave;
     return Dismissible(
       key: ValueKey(trackKey(listen.track)),
       direction: swipeable
@@ -608,18 +620,41 @@ class _PlayRow extends StatelessWidget {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ?saveToPlaylist?.call(listen.track, meta.title),
-            // 点歌结果写成文字，与保存按钮并排时，320 dp 宽的屏幕在 2 倍以上字号
-            // 下会撑破整行；结果另作为按钮的值读出，所以限制缩放。
+            // 点歌结果写成文字，与“⋯”并排时，320 dp 宽的屏幕在 2 倍以上字号下会
+            // 撑破整行；结果另作为按钮的值读出，所以限制缩放。
             MediaQuery.withClampedTextScaling(
               maxScaleFactor: 2,
               child: PickControl(
                 track: listen.track,
                 title: meta.title,
                 label: '再点一次《${meta.title}》',
-                subtle: true,
+                tone: PickTone.quiet,
                 onPick: onPick,
               ),
+            ),
+            ActionMenuButton(
+              semanticLabel: '《${meta.title}》的更多操作',
+              iconSize: AlistenSizes.iconSm,
+              entries: [
+                if (save != null)
+                  ActionMenuEntry(
+                    icon: Icons.playlist_add_rounded,
+                    label: '保存到歌单',
+                    onSelected: () => save(listen.track, meta.title),
+                  ),
+                ActionMenuEntry(
+                  icon: Icons.content_copy_rounded,
+                  label: copyTitleHint,
+                  onSelected: () => onCopyTitle(meta.title),
+                ),
+                ActionMenuEntry(
+                  icon: Icons.delete_outline_rounded,
+                  label: '删除',
+                  danger: true,
+                  enabled: !deleting,
+                  onSelected: () => unawaited(onDelete(swiped: false)),
+                ),
+              ],
             ),
           ],
         ),

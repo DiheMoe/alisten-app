@@ -119,16 +119,22 @@ void main() {
         scheme.surface,
       );
       final trackShown = Color.alphaBlend(track, panel);
-      expect(
-        _contrast(Color.alphaBlend(thumb, trackShown), trackShown),
-        greaterThanOrEqualTo(1.5),
-      );
-      // 滑块轮廓是辨认选中项的边界，与轨道须达到非文字内容的 3:1 对比度。
-      final stroke = (_thumbDecoration(tester).border! as Border).top.color;
-      expect(
-        _contrast(Color.alphaBlend(stroke, trackShown), trackShown),
-        greaterThanOrEqualTo(3),
-      );
+      final thumbShown = Color.alphaBlend(thumb, trackShown);
+      // 没有描边，滑块本身就是辨认选中项的边界，须达到非文字内容的 3:1。
+      expect(_thumbDecoration(tester).border, isNull);
+      expect(_contrast(thumbShown, trackShown), greaterThanOrEqualTo(3));
+      // 选中项的文字压在滑块上。
+      final label = tester
+          .widget<RichText>(
+            find.descendant(
+              of: find.text('聊天'),
+              matching: find.byType(RichText),
+            ),
+          )
+          .text
+          .style!
+          .color!;
+      expect(_contrast(label, thumbShown), greaterThanOrEqualTo(4.5));
       expect(
         tester.getSemantics(find.text('聊天')),
         isSemantics(isSelected: true, isInMutuallyExclusiveGroup: true),

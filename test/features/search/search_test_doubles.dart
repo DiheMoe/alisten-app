@@ -142,6 +142,7 @@ final class SearchPage {
     RoomKind kind = RoomKind.ephemeral,
     FakeClipboardSource? clipboard,
     FakeServerProbe? probe,
+    MediaQueryData system = const MediaQueryData(),
   }) async {
     tester.view
       ..physicalSize = const Size(360, 780) * 3
@@ -155,6 +156,7 @@ final class SearchPage {
       rooms: rooms,
       clipboard: clipboard,
       probe: probe,
+      system: system,
     );
     final router = appContainer(tester).read(routerProvider);
     final page = SearchPage._(tester, rooms, router);
