@@ -94,13 +94,25 @@ void main() {
     expect(await _framesIn(tester, _second), inInclusiveRange(25, 31));
   });
 
-  testWidgets('the flow paints through the shader', (tester) async {
+  testWidgets('the shader renders at half the screen resolution and the '
+      'result is stretched over the page', (tester) async {
     final png = (await tester.runAsync(_png))!;
 
     await tester.pumpWidget(backdrop(png, 'https://cover/a'));
     await _finishLoading(tester);
 
-    expect(_flow(), paints..rect());
+    final size = tester.getSize(_flow());
+    final pixels =
+        size * MediaQuery.devicePixelRatioOf(tester.element(_flow())) / 2;
+    expect(
+      _flow(),
+      paints..drawImageRect(
+        source:
+            Offset.zero &
+            Size(pixels.width.ceilToDouble(), pixels.height.ceilToDouble()),
+        destination: Offset.zero & size,
+      ),
+    );
     expect(tester.takeException(), isNull);
   });
 

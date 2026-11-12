@@ -21,6 +21,10 @@ const _warpDivisor = 3.5;
 
 const _shaderAsset = 'shaders/flowing_cover.frag';
 
+// 着色器按物理像素的这个比例出图，再放大铺满。色块大而柔和，放大看不出差别；
+// 抗色带的噪点在半分辨率下仍然够细。
+const _renderScale = 0.5;
+
 /// 角度取模后才传给着色器：`mediump` 下持续增长的时间值放久了会抖动。
 @visibleForTesting
 ({double a, double b, double c, double warp}) flowPhase(double seconds) {
@@ -51,6 +55,10 @@ class _FlowingCoverBackdropState extends State<FlowingCoverBackdrop>
 
   ui.Image? _from;
   ui.Image? _to;
+
+  // 最近一次着色器出的图。别的动画让房间页每帧重新合成时，只贴这张图，不必
+  // 每帧在全屏上重跑着色器。
+  ui.Image? _rendered;
   double _mix = 1;
   double _alpha = 0;
   bool _showing = false;
@@ -225,6 +233,7 @@ class _FlowingCoverBackdropState extends State<FlowingCoverBackdrop>
     _timer?.cancel();
     _load++;
     _frame.dispose();
+    _rendered?.dispose();
     _shader?.dispose();
     _from?.dispose();
     _to?.dispose();
@@ -252,6 +261,7 @@ class _FlowingCoverBackdropState extends State<FlowingCoverBackdrop>
                 to: image,
                 frame: _frame,
                 state: this,
+                pixelRatio: MediaQuery.devicePixelRatioOf(context),
               ),
             ),
           ),
@@ -274,6 +284,7 @@ class _FlowPainter extends CustomPainter {
     required this.to,
     required this.frame,
     required this.state,
+    required this.pixelRatio,
   }) : super(repaint: frame);
 
   final ui.FragmentShader shader;
@@ -281,15 +292,19 @@ class _FlowPainter extends CustomPainter {
   final ui.Image to;
   final ValueListenable<int> frame;
   final _FlowingCoverBackdropState state;
+  final double pixelRatio;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final width = (size.width * pixelRatio * _renderScale).ceil();
+    final height = (size.height * pixelRatio * _renderScale).ceil();
+    if (width <= 0 || height <= 0) return;
     final seconds =
         state._elapsed.inMicroseconds / Duration.microsecondsPerSecond;
     final phase = flowPhase(seconds);
     shader
-      ..setFloat(0, size.width)
-      ..setFloat(1, size.height)
+      ..setFloat(0, width.toDouble())
+      ..setFloat(1, height.toDouble())
       ..setFloat(2, phase.a)
       ..setFloat(3, phase.b)
       ..setFloat(4, phase.c)
@@ -299,13 +314,29 @@ class _FlowPainter extends CustomPainter {
       // 默认是最近邻采样，放大小图时会出现方块。
       ..setImageSampler(0, from, filterQuality: FilterQuality.low)
       ..setImageSampler(1, to, filterQuality: FilterQuality.low);
-    canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
+    final recorder = ui.PictureRecorder();
+    Canvas(recorder).drawRect(
+      Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+      Paint()..shader = shader,
+    );
+    final picture = recorder.endRecording();
+    final rendered = picture.toImageSync(width, height);
+    picture.dispose();
+    state._rendered?.dispose();
+    state._rendered = rendered;
+    canvas.drawImageRect(
+      rendered,
+      Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+      Offset.zero & size,
+      Paint()..filterQuality = FilterQuality.low,
+    );
   }
 
   @override
   bool shouldRepaint(_FlowPainter oldDelegate) {
     return !identical(oldDelegate.from, from) ||
         !identical(oldDelegate.to, to) ||
-        !identical(oldDelegate.shader, shader);
+        !identical(oldDelegate.shader, shader) ||
+        oldDelegate.pixelRatio != pixelRatio;
   }
 }
