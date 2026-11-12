@@ -4,6 +4,7 @@ import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/credential_store.dart';
 import 'package:alisten/core/logging/app_log.dart';
+import 'package:alisten/core/realtime/room_transport.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/lobby/application/lobby_controller.dart';
@@ -12,6 +13,7 @@ import 'package:alisten/features/room/application/room_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../domain/room/room_fixtures.dart';
 import '../../room/room_test_doubles.dart';
 import '../lobby_test_doubles.dart';
 
@@ -93,6 +95,42 @@ void main() {
 
     expect(controller.state.rooms.map((room) => room.id), ['newer']);
     expect(controller.state.loading, isFalse);
+  });
+
+  test('the room that is entered shows its live count of people in the '
+      'list, also over a refresh, and one fewer once it is left', () async {
+    api.rooms = [
+      roomListing(onlineCount: 1),
+      roomListing(id: 'other', onlineCount: 4),
+    ];
+    await controller.load();
+    int listed(String id) =>
+        controller.state.rooms.firstWhere((room) => room.id == id).onlineCount;
+
+    await controller.join('room-id');
+    factory.last.emitHello(
+      testRoomSnapshot().copyWith(term: 1, seq: 1, onlineCount: 3),
+    );
+    await pumpEventQueue();
+    expect(listed('room-id'), 3);
+    expect(listed('other'), 4);
+
+    factory.last.emit(
+      const RoomEventReceived(
+        MembersUpdatedEvent(term: 1, seq: 2, members: [], onlineCount: 5),
+      ),
+    );
+    await pumpEventQueue();
+    expect(listed('room-id'), 5);
+
+    // 列表接口的人数是它回答那一刻的，房间里收到的更新。
+    await controller.load();
+    expect(listed('room-id'), 5);
+
+    await container.read(roomControllerProvider.notifier).leaveRoom();
+    await pumpEventQueue();
+    expect(listed('room-id'), 4);
+    expect(listed('other'), 4);
   });
 
   test('join enters the room through the room owner', () async {

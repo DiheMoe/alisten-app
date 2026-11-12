@@ -111,7 +111,63 @@ base class LobbyController extends Notifier<LobbyState> {
   ({String name, String description, String? password, String id})? _created;
 
   @override
-  LobbyState build() => const LobbyState();
+  LobbyState build() {
+    ref.listen<({String id, int online})?>(
+      roomControllerProvider.select(_liveCount),
+      _followRoom,
+    );
+    return const LobbyState();
+  }
+
+  static ({String id, int online})? _liveCount(RoomState room) {
+    final id = room.activeRoomId;
+    final online = room.snapshot?.onlineCount;
+    return id == null || online == null ? null : (id: id, online: online);
+  }
+
+  // 所在房间的人数随房间的实时状态变，不必回大厅刷新。退出时自己不再算在内；
+  // 列表接口这时可能还没把自己减掉，所以不靠重新读取。
+  void _followRoom(
+    ({String id, int online})? previous,
+    ({String id, int online})? next,
+  ) {
+    if (next != null) {
+      _setOnline(next.id, next.online);
+    } else if (previous != null) {
+      _setOnline(previous.id, previous.online - 1);
+    }
+  }
+
+  void _setOnline(String id, int online) {
+    final rooms = _withOnline(state.rooms, id, online);
+    if (!identical(rooms, state.rooms)) state = state.copyWith(rooms: rooms);
+  }
+
+  static List<RoomListing> _withOnline(
+    List<RoomListing> rooms,
+    String id,
+    int online,
+  ) {
+    final count = online < 0 ? 0 : online;
+    if (!rooms.any((room) => room.id == id && room.onlineCount != count)) {
+      return rooms;
+    }
+    return [
+      for (final room in rooms)
+        if (room.id == id)
+          RoomListing(
+            id: room.id,
+            slug: room.slug,
+            name: room.name,
+            description: room.description,
+            kind: room.kind,
+            hasPassword: room.hasPassword,
+            onlineCount: count,
+          )
+        else
+          room,
+    ];
+  }
 
   void resetForServerChange() {
     _scope++;
@@ -126,9 +182,14 @@ base class LobbyController extends Notifier<LobbyState> {
     final sequence = ++_loadSequence;
     state = state.copyWith(loading: true, listError: null);
     try {
-      final rooms = await ref.read(alistenApiProvider).listRooms();
+      final listed = await ref.read(alistenApiProvider).listRooms();
       if (!ref.mounted || sequence != _loadSequence) return;
       _createUnconfirmed = false;
+      // 列表的人数是接口回答那一刻的，所在房间以实时人数为准。
+      final live = _liveCount(ref.read(roomControllerProvider));
+      final rooms = live == null
+          ? listed
+          : _withOnline(listed, live.id, live.online);
       state = state.copyWith(rooms: rooms, loading: false);
     } on Object catch (error) {
       if (!ref.mounted || sequence != _loadSequence) return;
