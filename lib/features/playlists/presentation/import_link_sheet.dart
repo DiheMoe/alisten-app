@@ -140,7 +140,6 @@ class _ImportLinkSheetState extends ConsumerState<ImportLinkSheet> {
             icon: Icons.download_rounded,
             large: true,
             expand: true,
-            glow: true,
             busy: _submitting,
             onPressed: _ready ? () => unawaited(_submit()) : null,
           ),

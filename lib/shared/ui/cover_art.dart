@@ -10,7 +10,7 @@ class CoverArt extends StatelessWidget {
     required this.size,
     this.decodeSize,
     this.radius = AlistenRadii.sm,
-    this.glow = false,
+    this.shadow = false,
     this.heroTag,
     this.placeholderIcon = Icons.music_note_rounded,
     super.key,
@@ -22,7 +22,7 @@ class CoverArt extends StatelessWidget {
   /// 默认为 [size]。尺寸带动画的封面应传入动画中的最大尺寸，只解码一次。
   final double? decodeSize;
   final double radius;
-  final bool glow;
+  final bool shadow;
   final Object? heroTag;
   final IconData placeholderIcon;
 
@@ -31,13 +31,14 @@ class CoverArt extends StatelessWidget {
     final colors = AlistenColors.of(context);
     final shape = BorderRadius.circular(radius);
     final url = this.url;
-    final placeholder = DecoratedBox(
-      decoration: BoxDecoration(gradient: colors.brandGradient),
+    // 没有封面时是一块低调的色块，不抢有封面的行。
+    final placeholder = ColoredBox(
+      color: colors.onGlass.withValues(alpha: 0.08),
       child: Center(
         child: Icon(
           placeholderIcon,
           size: size <= 64 ? AlistenSizes.iconSm : AlistenSizes.iconLg,
-          color: colors.onBrand,
+          color: colors.onGlassMuted,
         ),
       ),
     );
@@ -75,7 +76,7 @@ class CoverArt extends StatelessWidget {
     art = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: shape,
-        boxShadow: glow ? colors.glowShadow : null,
+        boxShadow: shadow ? colors.coverShadow : null,
       ),
       child: ClipRRect(
         borderRadius: shape,

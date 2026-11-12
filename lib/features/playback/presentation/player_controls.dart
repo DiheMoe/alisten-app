@@ -570,7 +570,7 @@ class _CompactVote extends StatelessWidget {
                   child: ExcludeSemantics(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        gradient: colors.brandGradient,
+                        color: colors.brand,
                         borderRadius: BorderRadius.circular(AlistenRadii.pill),
                       ),
                       child: Padding(

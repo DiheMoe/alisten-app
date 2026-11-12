@@ -11,7 +11,7 @@ class PlaylistCover extends StatelessWidget {
     required this.favorites,
     required this.size,
     this.radius = AlistenRadii.sm,
-    this.glow = false,
+    this.shadow = false,
     super.key,
   });
 
@@ -19,7 +19,7 @@ class PlaylistCover extends StatelessWidget {
   final bool favorites;
   final double size;
   final double radius;
-  final bool glow;
+  final bool shadow;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +28,7 @@ class PlaylistCover extends StatelessWidget {
       url: url,
       size: size,
       radius: radius,
-      glow: glow,
+      shadow: shadow,
       placeholderIcon: favorites
           ? Icons.star_rounded
           : Icons.music_note_rounded,
@@ -50,7 +50,7 @@ class PlaylistCover extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: colors.brandGradient,
+                color: colors.brand,
               ),
               child: Padding(
                 padding: const EdgeInsets.all(AlistenSpacing.xxs),

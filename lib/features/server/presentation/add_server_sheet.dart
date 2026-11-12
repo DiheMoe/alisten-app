@@ -99,7 +99,6 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
             icon: Icons.swap_horiz_rounded,
             large: true,
             expand: true,
-            glow: true,
             onPressed: () => Navigator.of(context).pop(found),
           ),
         const SizedBox(height: AlistenSpacing.xs),

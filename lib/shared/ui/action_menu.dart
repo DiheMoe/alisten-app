@@ -5,8 +5,8 @@ import 'package:alisten/shared/ui/popover.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/material.dart';
 
-final class PlaylistMenuEntry {
-  const PlaylistMenuEntry({
+final class ActionMenuEntry {
+  const ActionMenuEntry({
     required this.icon,
     required this.label,
     required this.onSelected,
@@ -27,8 +27,8 @@ final class PlaylistMenuEntry {
 
 /// 菜单朝按钮所在位置空间较大的一侧展开：按钮在屏幕下半部分时向上，在左半部分时
 /// 与按钮左边对齐、向右展开，免得超出屏幕。选中一项时先收起菜单。
-class PlaylistMenuButton extends StatefulWidget {
-  const PlaylistMenuButton({
+class ActionMenuButton extends StatefulWidget {
+  const ActionMenuButton({
     required this.semanticLabel,
     required this.entries,
     this.icon = Icons.more_horiz_rounded,
@@ -38,7 +38,7 @@ class PlaylistMenuButton extends StatefulWidget {
   });
 
   final String semanticLabel;
-  final List<PlaylistMenuEntry> entries;
+  final List<ActionMenuEntry> entries;
   final IconData icon;
   final double iconSize;
 
@@ -47,10 +47,10 @@ class PlaylistMenuButton extends StatefulWidget {
   final Widget Function(bool open, VoidCallback toggle)? trigger;
 
   @override
-  State<PlaylistMenuButton> createState() => _PlaylistMenuButtonState();
+  State<ActionMenuButton> createState() => _ActionMenuButtonState();
 }
 
-class _PlaylistMenuButtonState extends State<PlaylistMenuButton> {
+class _ActionMenuButtonState extends State<ActionMenuButton> {
   bool _open = false;
   bool _upward = false;
   bool _rightward = false;
@@ -123,7 +123,7 @@ class _MenuItem extends StatelessWidget {
     required this.onPressed,
   });
 
-  final PlaylistMenuEntry entry;
+  final ActionMenuEntry entry;
   final Color ink;
   final VoidCallback? onPressed;
 

@@ -101,7 +101,6 @@ class _JoinServerSheetState extends State<_JoinServerSheet> {
           icon: Icons.login_rounded,
           large: true,
           expand: true,
-          glow: true,
           onPressed: _join,
         ),
         const SizedBox(height: AlistenSpacing.xs),

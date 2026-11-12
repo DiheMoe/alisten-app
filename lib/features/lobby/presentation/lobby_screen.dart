@@ -307,7 +307,6 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                     label: '创建房间',
                     icon: Icons.add_rounded,
                     large: true,
-                    glow: true,
                     onPressed: busy ? null : () => unawaited(_showCreate()),
                   ),
                 ),
@@ -562,17 +561,12 @@ final class _LobbyHeader extends SliverPersistentHeaderDelegate {
                           children: [
                             Semantics(
                               header: true,
-                              child: ShaderMask(
-                                blendMode: BlendMode.srcIn,
-                                shaderCallback:
-                                    colors.brandGradient.createShader,
-                                child: Text(
-                                  title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AlistenTypography.largeTitle.copyWith(
-                                    color: colors.onGlass,
-                                  ),
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AlistenTypography.largeTitle.copyWith(
+                                  color: colors.onGlass,
                                 ),
                               ),
                             ),
@@ -634,7 +628,7 @@ class _RoomCard extends StatelessWidget {
                 width: AlistenSizes.rowCover,
                 height: AlistenSizes.rowCover,
                 decoration: BoxDecoration(
-                  gradient: identity.fill,
+                  color: identity.fill,
                   borderRadius: BorderRadius.circular(AlistenRadii.sm),
                 ),
                 alignment: Alignment.center,

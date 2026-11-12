@@ -395,9 +395,8 @@ class _PickButtonState extends State<PickButton>
       ),
       decoration: BoxDecoration(
         borderRadius: pill,
-        gradient: branded ? colors.brandGradient : null,
         color: branded
-            ? null
+            ? colors.brand
             : subtle
             ? colors.glassFill
             : ink.withValues(alpha: 0.14),
@@ -408,15 +407,6 @@ class _PickButtonState extends State<PickButton>
               ? colors.glassStroke
               : ink.withValues(alpha: 0.35),
         ),
-        boxShadow: wide && branded
-            ? [
-                BoxShadow(
-                  color: colors.glow.withValues(alpha: 0.4),
-                  blurRadius: AlistenSpacing.xl,
-                  offset: const Offset(0, AlistenSpacing.xs),
-                ),
-              ]
-            : null,
       ),
       child: AnimatedResize(
         duration: short,

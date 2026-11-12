@@ -226,13 +226,6 @@ class ShareLinkCard extends ConsumerWidget {
         color: colors.glassFill,
         borderRadius: BorderRadius.circular(AlistenRadii.lg),
         border: Border.all(color: colors.glassStroke),
-        boxShadow: [
-          BoxShadow(
-            color: colors.glow.withValues(alpha: 0.22),
-            blurRadius: AlistenSpacing.xxxl,
-            offset: const Offset(0, AlistenSpacing.xs),
-          ),
-        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(AlistenSpacing.md),
@@ -253,7 +246,7 @@ class _PlatformBadge extends StatelessWidget {
     final identity = AlistenColors.identity(label);
     return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: identity.fill,
+        color: identity.fill,
         borderRadius: BorderRadius.circular(AlistenRadii.pill),
       ),
       child: Padding(

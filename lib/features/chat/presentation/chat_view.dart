@@ -769,8 +769,7 @@ class _MessageLine extends StatelessWidget {
     final bottom = last ? round : joined;
     final bubble = DecoratedBox(
       decoration: BoxDecoration(
-        color: mine ? null : colors.bubble,
-        gradient: mine ? colors.brandGradient : null,
+        color: mine ? colors.brand : colors.bubble,
         borderRadius: mine
             ? BorderRadius.only(
                 topLeft: round,
@@ -1238,7 +1237,7 @@ class _SendButton extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: colors.brandGradient,
+            color: colors.brand,
           ),
           child: sending
               ? BusyIndicator(size: AlistenSizes.iconSm, color: colors.onBrand)

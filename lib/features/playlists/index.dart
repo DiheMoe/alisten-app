@@ -7,5 +7,6 @@ export 'application/shared_playlist_controller.dart';
 export 'presentation/my_playlist_screen.dart';
 export 'presentation/my_playlists_screen.dart';
 export 'presentation/save_platform_playlist_button.dart';
-export 'presentation/save_to_playlist_sheet.dart' show SaveToPlaylistButton;
+export 'presentation/save_to_playlist_sheet.dart'
+    show SaveOneTrack, SaveToPlaylistButton, showSaveToPlaylistSheet;
 export 'presentation/shared_playlist_screen.dart';

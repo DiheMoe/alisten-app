@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:alisten/app/app_theme.dart';
 import 'package:alisten/app/app_version.dart';
 import 'package:alisten/app/deep_link_controller.dart';
 import 'package:alisten/app/feedback.dart';
@@ -257,21 +258,23 @@ final routerProvider = Provider<GoRouter>((ref) {
                         parentNavigatorKey: rootNavigator,
                         pageBuilder: _page(task: true, (context, state) {
                           final roomRef = state.pathParameters['ref']!;
-                          return RoomRouteGate(
-                            roomRef: roomRef,
-                            child: SearchScreen(
-                              onResult: reportPick,
-                              onNotice: notice,
-                              // 歌单页叠在点歌页之上，返回时点歌页保持原样。
-                              onOpenPlaylist: (playlist) => unawaited(
-                                context.push<void>(
-                                  '/r/$roomRef/playlists/'
-                                  '${playlist.source.name}/${playlist.id}',
+                          return RoomTheme(
+                            child: RoomRouteGate(
+                              roomRef: roomRef,
+                              child: SearchScreen(
+                                onResult: reportPick,
+                                onNotice: notice,
+                                // 歌单页叠在点歌页之上，返回时点歌页保持原样。
+                                onOpenPlaylist: (playlist) => unawaited(
+                                  context.push<void>(
+                                    '/r/$roomRef/playlists/'
+                                    '${playlist.source.name}/${playlist.id}',
+                                  ),
                                 ),
+                                onShowQueue: () =>
+                                    context.go(RoomMode.queue.routeIn(roomRef)),
+                                onOpenRoom: context.go,
                               ),
-                              onShowQueue: () =>
-                                  context.go(RoomMode.queue.routeIn(roomRef)),
-                              onOpenRoom: context.go,
                             ),
                           );
                         }),
@@ -285,19 +288,22 @@ final routerProvider = Provider<GoRouter>((ref) {
                             state.pathParameters['source']!,
                           );
                           final id = state.pathParameters['id']!;
-                          return RoomRouteGate(
-                            roomRef: state.pathParameters['ref']!,
-                            child: PlaylistScreen(
-                              source: source,
-                              id: id,
-                              onResult: reportPick,
-                              onNotice: notice,
-                              saveAsMine: (name) => SavePlatformPlaylistButton(
+                          return RoomTheme(
+                            child: RoomRouteGate(
+                              roomRef: state.pathParameters['ref']!,
+                              child: PlaylistScreen(
                                 source: source,
-                                playlistId: id,
-                                name: name,
-                                onOpenAccount: openAccount,
-                                onNotice: toasts.show,
+                                id: id,
+                                onResult: reportPick,
+                                onNotice: notice,
+                                saveAsMine: (name) =>
+                                    SavePlatformPlaylistButton(
+                                      source: source,
+                                      playlistId: id,
+                                      name: name,
+                                      onOpenAccount: openAccount,
+                                      onNotice: toasts.show,
+                                    ),
                               ),
                             ),
                           );
@@ -360,9 +366,11 @@ const _roomPageKey = ValueKey('room');
 Page<void> _roomPage(String roomRef, RoomMode mode) {
   return MaterialPage(
     key: _roomPageKey,
-    child: RoomRouteGate(
-      roomRef: roomRef,
-      child: RoomScreen(roomRef: roomRef, mode: mode),
+    child: RoomTheme(
+      child: RoomRouteGate(
+        roomRef: roomRef,
+        child: RoomScreen(roomRef: roomRef, mode: mode),
+      ),
     ),
   );
 }

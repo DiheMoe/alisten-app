@@ -131,7 +131,6 @@ class _CreateRoomSheetState extends ConsumerState<CreateRoomSheet> {
             icon: Icons.add_rounded,
             large: true,
             expand: true,
-            glow: true,
             busy: _submitting,
             onPressed: _submit,
           ),

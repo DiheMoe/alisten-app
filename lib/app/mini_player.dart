@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:alisten/app/app_theme.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/playback/index.dart';
@@ -127,13 +128,15 @@ class _MiniPlayerSlot extends ConsumerWidget {
       ),
       child: roomId == null
           ? const SizedBox(width: double.infinity)
-          : MiniPlayer(
-              roomId: roomId,
-              status: status,
-              failure: failure,
-              errorMessage: errorMessage,
-              roomName: roomName,
-              nowPlaying: nowPlaying,
+          : RoomTheme(
+              child: MiniPlayer(
+                roomId: roomId,
+                status: status,
+                failure: failure,
+                errorMessage: errorMessage,
+                roomName: roomName,
+                nowPlaying: nowPlaying,
+              ),
             ),
     );
   }
@@ -226,7 +229,7 @@ class MiniPlayer extends StatelessWidget {
               border: Border.all(color: colors.glassStroke, width: _stroke),
               boxShadow: [
                 BoxShadow(
-                  color: colors.glow.withValues(alpha: 0.3),
+                  color: Colors.black.withValues(alpha: 0.24),
                   blurRadius: AlistenSpacing.xl,
                   offset: const Offset(0, AlistenSpacing.xs),
                 ),

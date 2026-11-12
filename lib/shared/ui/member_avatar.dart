@@ -36,12 +36,12 @@ class MemberAvatar extends StatelessWidget {
     final icon = this.icon;
     final name = this.name?.trim() ?? '';
     final identity = icon == null ? AlistenColors.identity(name) : null;
-    final fill = identity?.fill ?? colors.brandGradient;
+    final fill = identity?.fill ?? colors.brand;
     final ink = identity?.ink ?? colors.onBrand;
     final initial = name.isEmpty ? '?' : name.characters.first.toUpperCase();
     final imageUrl = this.imageUrl;
     Widget avatar = DecoratedBox(
-      decoration: BoxDecoration(shape: BoxShape.circle, gradient: fill),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: fill),
       child: Center(
         child: icon != null
             ? Icon(icon, size: size / 2, color: ink)

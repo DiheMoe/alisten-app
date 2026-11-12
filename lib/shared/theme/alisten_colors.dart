@@ -6,10 +6,11 @@ import 'package:flutter/material.dart';
 @immutable
 final class AlistenColors extends ThemeExtension<AlistenColors> {
   const AlistenColors({
-    required this.brandGradient,
+    required this.brand,
     required this.onBrand,
     required this.glow,
     required this.glowTextShadows,
+    required this.coverShadow,
     required this.aurora,
     required this.scrim,
     required this.glassFill,
@@ -28,23 +29,25 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
     required this.danger,
   });
 
-  factory AlistenColors.fromScheme(ColorScheme scheme) {
+  /// [immersive] 用于房间：深色、颜色取自封面，流动背景压暗，文字和控件靠
+  /// 不透明度分层。房间外的页面保持安静的中性底色。
+  factory AlistenColors.fromScheme(
+    ColorScheme scheme, {
+    bool immersive = false,
+  }) {
     final dark = scheme.brightness == Brightness.dark;
     // 饱和但不到荧光色：荧光色大面积填充时刺眼。
-    HSLColor fill(Color color) => _saturated(
-      color,
+    final fill = _saturated(
+      scheme.primary,
       lightness: dark ? 0.72 : 0.44,
       minSaturation: 0.7,
       maxSaturation: 0.9,
     );
-    final start = fill(scheme.primary);
-    final end = fill(Color.lerp(scheme.primary, scheme.tertiary, 0.8)!);
-    final underWhite = _legibleUnder(Colors.white, start, end);
-    // onPrimaryFixed 是封面色相中最深的色调。
-    final underDeep = _legibleUnder(scheme.onPrimaryFixed, start, end);
+    final underWhite = _legibleUnder(Colors.white, fill, fill);
+    // onPrimaryFixed 是主色色相中最深的色调。
+    final underDeep = _legibleUnder(scheme.onPrimaryFixed, fill, fill);
     // 浅色主题在深色填充上用白字，深色主题在浅色填充上用深色字；若因此要让
-    // 填充明显偏离封面颜色，就改用另一种，浅色主题下的黄、绿封面因而保持明亮并
-    // 配深色字。
+    // 填充明显偏离原来的颜色，就改用另一种，黄、绿封面因而保持明亮并配深色字。
     final (usual, other) = dark
         ? (underDeep, underWhite)
         : (underWhite, underDeep);
@@ -58,12 +61,14 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
     ).toColor();
     final surface = scheme.surface;
     final glow = vivid(scheme.primary);
+    // 房间的流动封面要压得够暗，白字和歌词才有对比。
+    final scrimAlphas = immersive
+        ? const [0.62, 0.58, 0.82]
+        : dark
+        ? const [0.4, 0.22, 0.6]
+        : const [0.55, 0.42, 0.74];
     return AlistenColors(
-      brandGradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [brand.start, brand.end],
-      ),
+      brand: brand.start,
       onBrand: brand.ink,
       glow: glow,
       glowTextShadows: List.unmodifiable([
@@ -74,21 +79,36 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
           blurRadius: 8,
         ),
       ]),
+      coverShadow: List.unmodifiable([
+        BoxShadow(
+          color: Colors.black.withValues(alpha: dark ? 0.42 : 0.16),
+          blurRadius: 40,
+          offset: const Offset(0, 16),
+        ),
+      ]),
+      // 房间没有封面时极光是深色底上的一抹颜色，不能亮到压过白字。
       aurora: List.unmodifiable([
-        vivid(scheme.primary),
-        vivid(scheme.tertiary),
-        vivid(scheme.secondary),
+        for (final color in [scheme.primary, scheme.tertiary, scheme.secondary])
+          immersive
+              ? _saturated(
+                  color,
+                  lightness: 0.42,
+                  minSaturation: 0.62,
+                ).toColor()
+              : vivid(color),
       ]),
       scrim: LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         stops: const [0, 0.45, 1],
         colors: [
-          for (final alpha in dark ? [0.4, 0.22, 0.6] : [0.55, 0.42, 0.74])
-            surface.withValues(alpha: alpha),
+          for (final alpha in scrimAlphas) surface.withValues(alpha: alpha),
         ],
       ),
-      glassFill: Colors.white.withValues(alpha: dark ? 0.075 : 0.62),
+      // 房间里的面板是压在流动封面上的一层暗玻璃，不是提亮背景的白雾。
+      glassFill: immersive
+          ? Colors.black.withValues(alpha: 0.3)
+          : Colors.white.withValues(alpha: dark ? 0.075 : 0.62),
       glassStroke: dark
           ? Colors.white.withValues(alpha: 0.1)
           : scheme.onSurface.withValues(alpha: 0.07),
@@ -96,7 +116,7 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
       bubble: Colors.white.withValues(alpha: dark ? 0.12 : 0.86),
       onGlass: scheme.onSurface,
       // 极光最亮处叠上玻璃面板时，不透明度再低，辅助文字就达不到 4.5:1。
-      onGlassMuted: scheme.onSurface.withValues(alpha: 0.72),
+      onGlassMuted: scheme.onSurface.withValues(alpha: immersive ? 0.8 : 0.72),
       raised: dark
           ? Color.alphaBlend(
               Colors.white.withValues(alpha: 0.06),
@@ -127,28 +147,19 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
 
   static final _derived = Expando<AlistenColors>();
 
-  /// 无图片对象（如没有头像的成员）的填充和文字色。同一 [seed] 在深浅主题下
-  /// 颜色相同，文字与填充的对比度不低于 4.5:1。
-  static ({LinearGradient fill, Color ink}) identity(String seed) {
+  /// 无图片对象（如没有头像的成员、房间）的填充和文字色。同一 [seed] 在深浅主题
+  /// 下颜色相同，文字与填充的对比度不低于 4.5:1。饱和度有意压低，许多头像排在
+  /// 一起时不抢内容。
+  static ({Color fill, Color ink}) identity(String seed) {
     // 用 FNV-1a 计算，使色相在不同运行和平台之间保持不变。
     var hash = 0x811C9DC5;
     for (final unit in seed.codeUnits) {
       hash = ((hash ^ unit) * 0x01000193) & 0xFFFFFFFF;
     }
     final hue = (hash % 360).toDouble();
-    final legible = _legibleUnder(
-      Colors.white,
-      HSLColor.fromAHSL(1, hue, 0.7, 0.56),
-      HSLColor.fromAHSL(1, (hue + 40) % 360, 0.75, 0.46),
-    );
-    return (
-      fill: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [legible.start, legible.end],
-      ),
-      ink: legible.ink,
-    );
+    final tone = HSLColor.fromAHSL(1, hue, 0.38, 0.5);
+    final legible = _legibleUnder(Colors.white, tone, tone);
+    return (fill: legible.start, ink: legible.ink);
   }
 
   static const brandSeed = Color(0xFF6D5BFF);
@@ -161,20 +172,49 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
   static const scanSurface = Color(0xFFFFFFFF);
   static const scanInk = Color(0x8A000000);
 
+  /// 强调色取品牌紫的鲜艳方案，底色、面板和文字取中性方案：房间外的页面只让
+  /// 品牌紫出现在可操作的地方。
   static ColorScheme brandScheme(Brightness brightness) {
-    return ColorScheme.fromSeed(
+    final vivid = ColorScheme.fromSeed(
       seedColor: brandSeed,
       brightness: brightness,
       dynamicSchemeVariant: schemeVariant,
     );
+    final quiet = ColorScheme.fromSeed(
+      seedColor: brandSeed,
+      brightness: brightness,
+      dynamicSchemeVariant: DynamicSchemeVariant.neutral,
+    );
+    return vivid.copyWith(
+      surface: quiet.surface,
+      onSurface: quiet.onSurface,
+      onSurfaceVariant: quiet.onSurfaceVariant,
+      surfaceDim: quiet.surfaceDim,
+      surfaceBright: quiet.surfaceBright,
+      surfaceContainerLowest: quiet.surfaceContainerLowest,
+      surfaceContainerLow: quiet.surfaceContainerLow,
+      surfaceContainer: quiet.surfaceContainer,
+      surfaceContainerHigh: quiet.surfaceContainerHigh,
+      surfaceContainerHighest: quiet.surfaceContainerHighest,
+      outline: quiet.outline,
+      outlineVariant: quiet.outlineVariant,
+      inverseSurface: quiet.inverseSurface,
+      onInverseSurface: quiet.onInverseSurface,
+    );
   }
 
-  final LinearGradient brandGradient;
+  /// 主要按钮、开关、自己的消息等唯一的强调填充。房间里取自封面，房间外是品牌紫。
+  final Color brand;
 
-  /// 与 [brandGradient] 上均匀取的九个点对比度都不低于 4.5:1。
+  /// 与 [brand] 的对比度不低于 4.5:1。
   final Color onBrand;
+
+  /// 只用于随音乐变化的光：歌词长音、进度端点。
   final Color glow;
   final List<Shadow> glowTextShadows;
+
+  /// 封面这类实物图片下的阴影，不带颜色。
+  final List<BoxShadow> coverShadow;
 
   /// 固定三种颜色。
   final List<Color> aurora;
@@ -203,20 +243,13 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
   final Color warning;
   final Color danger;
 
-  List<BoxShadow> get glowShadow => [
-    BoxShadow(
-      color: glow.withValues(alpha: 0.45),
-      blurRadius: 60,
-      offset: const Offset(0, 18),
-    ),
-  ];
-
   @override
   AlistenColors copyWith({
-    LinearGradient? brandGradient,
+    Color? brand,
     Color? onBrand,
     Color? glow,
     List<Shadow>? glowTextShadows,
+    List<BoxShadow>? coverShadow,
     List<Color>? aurora,
     LinearGradient? scrim,
     Color? glassFill,
@@ -235,10 +268,11 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
     Color? danger,
   }) {
     return AlistenColors(
-      brandGradient: brandGradient ?? this.brandGradient,
+      brand: brand ?? this.brand,
       onBrand: onBrand ?? this.onBrand,
       glow: glow ?? this.glow,
       glowTextShadows: glowTextShadows ?? this.glowTextShadows,
+      coverShadow: coverShadow ?? this.coverShadow,
       aurora: aurora ?? this.aurora,
       scrim: scrim ?? this.scrim,
       glassFill: glassFill ?? this.glassFill,
@@ -262,15 +296,14 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
   AlistenColors lerp(AlistenColors? other, double t) {
     if (other == null) return this;
     return AlistenColors(
-      brandGradient: LinearGradient.lerp(
-        brandGradient,
-        other.brandGradient,
-        t,
-      )!,
+      brand: Color.lerp(brand, other.brand, t)!,
       onBrand: Color.lerp(onBrand, other.onBrand, t)!,
       glow: Color.lerp(glow, other.glow, t)!,
       glowTextShadows: List.unmodifiable(
         Shadow.lerpList(glowTextShadows, other.glowTextShadows, t)!,
+      ),
+      coverShadow: List.unmodifiable(
+        BoxShadow.lerpList(coverShadow, other.coverShadow, t)!,
       ),
       aurora: List.unmodifiable([
         for (var index = 0; index < aurora.length; index++)
@@ -298,10 +331,11 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
   @override
   bool operator ==(Object other) {
     return other is AlistenColors &&
-        other.brandGradient == brandGradient &&
+        other.brand == brand &&
         other.onBrand == onBrand &&
         other.glow == glow &&
         listEquals(other.glowTextShadows, glowTextShadows) &&
+        listEquals(other.coverShadow, coverShadow) &&
         listEquals(other.aurora, aurora) &&
         other.scrim == scrim &&
         other.glassFill == glassFill &&
@@ -321,11 +355,12 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
   }
 
   @override
-  int get hashCode => Object.hash(
-    brandGradient,
+  int get hashCode => Object.hashAll([
+    brand,
     onBrand,
     glow,
     Object.hashAll(glowTextShadows),
+    Object.hashAll(coverShadow),
     Object.hashAll(aurora),
     scrim,
     glassFill,
@@ -342,7 +377,7 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
     success,
     warning,
     danger,
-  );
+  ]);
 }
 
 const _minimumContrast = 4.5;

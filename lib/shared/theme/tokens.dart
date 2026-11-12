@@ -139,6 +139,14 @@ abstract final class AlistenTypography {
     letterSpacing: -0.3,
   );
 
+  /// 分区标题：比正文略大，用次要色。只有页面主标题用大号粗体。
+  static final section = _style(
+    16,
+    FontWeight.w600,
+    height: 1.3,
+    letterSpacing: -0.1,
+  );
+
   static final body = _style(15, FontWeight.w500, height: 1.4);
 
   static final bodyStrong = _style(15, FontWeight.w600, height: 1.35);

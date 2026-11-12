@@ -31,8 +31,8 @@ class SectionHeader extends StatelessWidget {
               header: true,
               child: Text(
                 title,
-                style: AlistenTypography.title.copyWith(
-                  color: AlistenColors.of(context).onGlass,
+                style: AlistenTypography.section.copyWith(
+                  color: AlistenColors.of(context).onGlassMuted,
                 ),
               ),
             ),

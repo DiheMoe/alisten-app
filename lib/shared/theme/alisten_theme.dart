@@ -3,8 +3,9 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-/// 框架组件不显示水波纹，按压反馈由各组件自行绘制。
-ThemeData buildAlistenTheme(ColorScheme scheme) {
+/// 框架组件不显示水波纹，按压反馈由各组件自行绘制。[immersive] 见
+/// [AlistenColors.fromScheme]。
+ThemeData buildAlistenTheme(ColorScheme scheme, {bool immersive = false}) {
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
@@ -30,7 +31,7 @@ ThemeData buildAlistenTheme(ColorScheme scheme) {
       selectionColor: scheme.primary.withValues(alpha: 0.3),
       selectionHandleColor: scheme.primary,
     ),
-    extensions: [AlistenColors.fromScheme(scheme)],
+    extensions: [AlistenColors.fromScheme(scheme, immersive: immersive)],
   );
 }
 

@@ -9,7 +9,7 @@ import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/playlists/application/my_playlist_controller.dart';
 import 'package:alisten/features/playlists/application/my_playlists_controller.dart';
 import 'package:alisten/features/playlists/presentation/playlist_header.dart';
-import 'package:alisten/features/playlists/presentation/playlist_menu.dart';
+import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/features/playlists/presentation/playlist_name_form.dart';
 import 'package:alisten/features/playlists/presentation/playlist_song.dart';
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
@@ -242,50 +242,50 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
     });
   }
 
-  List<PlaylistMenuEntry> _actions(MyPlaylist playlist, bool exporting) {
+  List<ActionMenuEntry> _actions(MyPlaylist playlist, bool exporting) {
     final shareId = playlist.shareId;
     return [
       if (!playlist.favorites)
-        PlaylistMenuEntry(
+        ActionMenuEntry(
           icon: Icons.edit_rounded,
           label: '重命名',
           onSelected: () => _rename(playlist),
         ),
       if (shareId == null)
-        PlaylistMenuEntry(
+        ActionMenuEntry(
           icon: Icons.share_rounded,
           label: '分享',
           enabled: !_sharing,
           onSelected: () => unawaited(_share(playlist, again: false)),
         )
       else ...[
-        PlaylistMenuEntry(
+        ActionMenuEntry(
           icon: Icons.link_rounded,
           label: '复制分享链接',
           enabled: !_sharing,
           onSelected: () => _copyLink(shareId),
         ),
-        PlaylistMenuEntry(
+        ActionMenuEntry(
           icon: Icons.autorenew_rounded,
           label: '重新生成分享链接',
           enabled: !_sharing,
           onSelected: () => unawaited(_share(playlist, again: true)),
         ),
-        PlaylistMenuEntry(
+        ActionMenuEntry(
           icon: Icons.link_off_rounded,
           label: '停止分享',
           enabled: !_sharing,
           onSelected: () => unawaited(_unshare(playlist)),
         ),
       ],
-      PlaylistMenuEntry(
+      ActionMenuEntry(
         icon: Icons.ios_share_rounded,
         label: '导出',
         enabled: !exporting,
         onSelected: () => unawaited(_export()),
       ),
       if (!playlist.favorites)
-        PlaylistMenuEntry(
+        ActionMenuEntry(
           icon: Icons.delete_outline_rounded,
           label: '删除',
           danger: true,
@@ -450,7 +450,7 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
               ),
             KeyedSubtree(
               key: _menu,
-              child: PlaylistMenuButton(
+              child: ActionMenuButton(
                 semanticLabel: '“${playlist.name}”的更多操作',
                 entries: _actions(playlist, detail.exporting),
               ),
@@ -605,17 +605,17 @@ class _Song extends StatelessWidget {
               onPick: onPick,
             ),
           ),
-          PlaylistMenuButton(
+          ActionMenuButton(
             semanticLabel: '《${meta.title}》的更多操作',
             iconSize: AlistenSizes.iconSm,
             entries: [
-              PlaylistMenuEntry(
+              ActionMenuEntry(
                 icon: Icons.playlist_add_rounded,
                 label: '保存到歌单',
                 onSelected: onSave,
               ),
               // 单首移出不确认，与 Web 相同。
-              PlaylistMenuEntry(
+              ActionMenuEntry(
                 icon: Icons.remove_circle_outline_rounded,
                 label: '移出这个歌单',
                 danger: true,

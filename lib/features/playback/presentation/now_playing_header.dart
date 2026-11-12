@@ -228,7 +228,6 @@ class _NowPlayingHeaderState extends ConsumerState<NowPlayingHeader>
                               label: '点歌',
                               icon: Icons.add_rounded,
                               large: true,
-                              glow: true,
                               onPressed: widget.onAddSong,
                             ),
                           )
@@ -331,7 +330,7 @@ class _Cover extends ConsumerWidget {
     );
     final nowPlaying = this.nowPlaying;
     final url = nowPlaying?.entry.meta.coverUrl;
-    final full = colors.glowShadow.first;
+    final full = colors.coverShadow.first;
     final faint = full
         .scale(0.3)
         .copyWith(color: full.color.withValues(alpha: full.color.a * 0.35));

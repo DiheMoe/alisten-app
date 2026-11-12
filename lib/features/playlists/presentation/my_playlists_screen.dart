@@ -10,7 +10,7 @@ import 'package:alisten/features/playlists/application/my_playlists_controller.d
 import 'package:alisten/features/playlists/application/playlist_view_controller.dart';
 import 'package:alisten/features/playlists/presentation/import_link_sheet.dart';
 import 'package:alisten/features/playlists/presentation/playlist_cover.dart';
-import 'package:alisten/features/playlists/presentation/playlist_menu.dart';
+import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/features/playlists/presentation/playlist_name_form.dart';
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
@@ -214,15 +214,15 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
                   spacing: AlistenSpacing.xs,
                   runSpacing: AlistenSpacing.xs,
                   children: [
-                    PlaylistMenuButton(
+                    ActionMenuButton(
                       semanticLabel: '导入',
                       entries: [
-                        PlaylistMenuEntry(
+                        ActionMenuEntry(
                           icon: Icons.file_open_rounded,
                           label: '从文件导入',
                           onSelected: () => unawaited(_importFile()),
                         ),
-                        PlaylistMenuEntry(
+                        ActionMenuEntry(
                           icon: Icons.link_rounded,
                           label: '从链接导入',
                           onSelected: () => unawaited(_importLink()),
@@ -240,7 +240,6 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
                     PillButton(
                       label: '新建歌单',
                       icon: Icons.add_rounded,
-                      glow: true,
                       onPressed: () => unawaited(_create()),
                     ),
                   ],
@@ -325,16 +324,16 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
   // “我喜欢”不能改名或删除，没有菜单。
   Widget? _menu(MyPlaylist playlist) {
     if (playlist.favorites) return null;
-    return PlaylistMenuButton(
+    return ActionMenuButton(
       semanticLabel: '“${playlist.name}”的更多操作',
       iconSize: AlistenSizes.iconSm,
       entries: [
-        PlaylistMenuEntry(
+        ActionMenuEntry(
           icon: Icons.edit_rounded,
           label: '重命名',
           onSelected: () => unawaited(_rename(playlist)),
         ),
-        PlaylistMenuEntry(
+        ActionMenuEntry(
           icon: Icons.delete_outline_rounded,
           label: '删除',
           danger: true,
@@ -382,11 +381,11 @@ class _Controls extends ConsumerWidget {
             spacing: AlistenSpacing.xs,
             children: [
               Flexible(
-                child: PlaylistMenuButton(
+                child: ActionMenuButton(
                   semanticLabel: sortLabel,
                   entries: [
                     for (final key in PlaylistSortKey.values)
-                      PlaylistMenuEntry(
+                      ActionMenuEntry(
                         icon: Icons.sort_rounded,
                         label: sortKeyLabel(key),
                         checked: key == sort.key,

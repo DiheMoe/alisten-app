@@ -51,7 +51,6 @@ class RoomModeBar extends StatelessWidget {
             label: '点歌',
             icon: Icons.add_rounded,
             large: true,
-            glow: true,
             onPressed: onAddSong,
           ),
         ],

@@ -124,7 +124,6 @@ class _PlaylistNameFormState<T> extends State<PlaylistNameForm<T>> {
             icon: widget.confirmIcon,
             large: true,
             expand: true,
-            glow: true,
             busy: _submitting,
             onPressed: _ready ? () => unawaited(_submit()) : null,
           ),

@@ -660,7 +660,7 @@ class _PickedCount extends ConsumerWidget {
                     widthFactor: 1,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        gradient: colors.brandGradient,
+                        color: colors.brand,
                         borderRadius: BorderRadius.circular(AlistenRadii.pill),
                       ),
                       child: Padding(

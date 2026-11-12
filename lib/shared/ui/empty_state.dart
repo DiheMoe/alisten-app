@@ -33,12 +33,6 @@ class EmptyState extends StatelessWidget {
               shape: BoxShape.circle,
               color: colors.glassFill,
               border: Border.all(color: colors.glassStroke),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.glow.withValues(alpha: 0.3),
-                  blurRadius: AlistenSpacing.xxxl,
-                ),
-              ],
             ),
             child: Icon(icon, size: AlistenSizes.iconLg, color: colors.onGlass),
           ),

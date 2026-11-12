@@ -85,7 +85,6 @@ class _RoomTopBarState extends State<RoomTopBar> {
                 PillButton(
                   label: '点歌',
                   icon: Icons.add_rounded,
-                  glow: true,
                   onPressed: onAddSong,
                 ),
                 const SizedBox(width: AlistenSpacing.xs),

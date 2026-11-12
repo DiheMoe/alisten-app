@@ -41,26 +41,19 @@ class IconCircleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
-    final (fill, gradient, border, ink) = switch (style) {
+    final (fill, border, ink) = switch (style) {
       IconCircleButtonStyle.glass => (
         colors.glassFill,
-        null,
         Border.all(color: colors.glassStroke),
         colors.onGlass,
       ),
-      IconCircleButtonStyle.plain => (null, null, null, colors.onGlass),
+      IconCircleButtonStyle.plain => (null, null, colors.onGlass),
       IconCircleButtonStyle.solid => (
         colors.onGlass,
         null,
-        null,
         Theme.of(context).colorScheme.surface,
       ),
-      IconCircleButtonStyle.brand => (
-        null,
-        colors.brandGradient,
-        null,
-        colors.onBrand,
-      ),
+      IconCircleButtonStyle.brand => (colors.brand, null, colors.onBrand),
     };
     final target = diameter < AlistenSizes.minTouchTarget
         ? AlistenSizes.minTouchTarget
@@ -81,17 +74,7 @@ class IconCircleButton extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: fill,
-              gradient: gradient,
               border: border,
-              boxShadow: style == IconCircleButtonStyle.solid
-                  ? [
-                      BoxShadow(
-                        color: colors.glow.withValues(alpha: 0.35),
-                        blurRadius: diameter / 2,
-                        offset: Offset(0, diameter / 10),
-                      ),
-                    ]
-                  : null,
             ),
             child: image == null
                 ? glyph

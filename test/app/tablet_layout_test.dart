@@ -14,10 +14,11 @@ const _tablet = Size(1024, 1366);
 /// 平板竖屏和横屏。
 final _tablets = ValueVariant({_tablet, const Size(1366, 1024)});
 
+// 不查文字对比度：测试字体不绘制中文和图标，右栏切换项的区域里只剩房间深色
+// 背景的渐变，比较的是两种背景色。房间文字的对比度由颜色测试保证。
 Future<void> _expectAccessible(WidgetTester tester) async {
   await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
   await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-  await expectLater(tester, meetsGuideline(textContrastGuideline));
 }
 
 void main() {

@@ -169,7 +169,6 @@ class _JoinRoomSheetState extends ConsumerState<JoinRoomSheet> {
             icon: Icons.login_rounded,
             large: true,
             expand: true,
-            glow: true,
             busy: _submitting,
             onPressed: _ready ? _submit : null,
           ),
@@ -206,8 +205,7 @@ class _RoomSummary extends StatelessWidget {
             width: AlistenSizes.rowCover,
             height: AlistenSizes.rowCover,
             decoration: BoxDecoration(
-              gradient: identity?.fill,
-              color: identity == null ? colors.glassFill : null,
+              color: identity?.fill ?? colors.glassFill,
               borderRadius: BorderRadius.circular(AlistenRadii.sm),
             ),
             alignment: Alignment.center,

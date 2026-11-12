@@ -22,7 +22,6 @@ class PillButton extends StatelessWidget {
     this.busy = false,
     this.large = false,
     this.expand = false,
-    this.glow = false,
     this.expanded,
     super.key,
   });
@@ -34,9 +33,6 @@ class PillButton extends StatelessWidget {
   final bool busy;
   final bool large;
   final bool expand;
-
-  /// 只对 [PillButtonStyle.primary] 生效。
-  final bool glow;
 
   final bool? expanded;
 
@@ -83,19 +79,13 @@ class PillButton extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AlistenRadii.pill),
-            gradient: primary ? colors.brandGradient : null,
-            color: style == PillButtonStyle.secondary ? colors.glassFill : null,
+            color: switch (style) {
+              PillButtonStyle.primary => colors.brand,
+              PillButtonStyle.secondary => colors.glassFill,
+              PillButtonStyle.ghost => null,
+            },
             border: style == PillButtonStyle.secondary
                 ? Border.all(color: colors.glassStroke)
-                : null,
-            boxShadow: glow && primary
-                ? [
-                    BoxShadow(
-                      color: colors.glow.withValues(alpha: 0.45),
-                      blurRadius: AlistenSpacing.xl,
-                      offset: const Offset(0, AlistenSpacing.xs),
-                    ),
-                  ]
                 : null,
           ),
           child: Padding(

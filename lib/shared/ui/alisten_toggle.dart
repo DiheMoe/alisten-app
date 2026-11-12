@@ -39,8 +39,7 @@ class AlistenToggle extends StatelessWidget {
             padding: const EdgeInsets.all(AlistenSizes.toggleInset),
             decoration: BoxDecoration(
               borderRadius: pill,
-              gradient: value ? colors.brandGradient : null,
-              color: value ? null : colors.outline,
+              color: value ? colors.brand : colors.outline,
             ),
             child: AnimatedAlign(
               duration: duration,

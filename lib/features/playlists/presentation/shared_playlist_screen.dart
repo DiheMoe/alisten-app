@@ -240,7 +240,6 @@ class SharedPlaylistScreen extends ConsumerWidget {
           child: PillButton(
             label: '复制到我的歌单',
             icon: Icons.library_add_rounded,
-            glow: true,
             onPressed: () => unawaited(_copy(context, shared)),
           ),
         ),

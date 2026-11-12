@@ -7,7 +7,7 @@ import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/playlists/application/my_playlists_controller.dart';
 import 'package:alisten/features/playlists/presentation/playlist_cover.dart';
 import 'package:alisten/features/playlists/presentation/playlist_header.dart';
-import 'package:alisten/features/playlists/presentation/playlist_menu.dart';
+import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/features/playlists/presentation/playlist_name_form.dart';
 import 'package:alisten/features/playlists/presentation/playlist_song.dart';
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
@@ -204,15 +204,15 @@ void main() {
       tester,
       Scaffold(
         body: Center(
-          child: PlaylistMenuButton(
+          child: ActionMenuButton(
             semanticLabel: '“夜跑”的更多操作',
             entries: [
-              PlaylistMenuEntry(
+              ActionMenuEntry(
                 icon: Icons.edit_rounded,
                 label: '重命名',
                 onSelected: () => picked.add('重命名'),
               ),
-              PlaylistMenuEntry(
+              ActionMenuEntry(
                 icon: Icons.delete_outline_rounded,
                 label: '删除',
                 danger: true,
@@ -493,11 +493,11 @@ void main() {
     testWidgets('a menu at either edge of the screen stays on screen', (
       tester,
     ) async {
-      PlaylistMenuButton menu(IconData icon) => PlaylistMenuButton(
+      ActionMenuButton menu(IconData icon) => ActionMenuButton(
         semanticLabel: '导入',
         icon: icon,
         entries: [
-          PlaylistMenuEntry(
+          ActionMenuEntry(
             icon: Icons.file_open_rounded,
             label: '从文件导入',
             onSelected: () {},
@@ -544,10 +544,10 @@ void main() {
         tester,
         Scaffold(
           body: Center(
-            child: PlaylistMenuButton(
+            child: ActionMenuButton(
               semanticLabel: '更多',
               entries: [
-                PlaylistMenuEntry(
+                ActionMenuEntry(
                   icon: Icons.edit_rounded,
                   label: '重命名',
                   enabled: false,
@@ -576,16 +576,16 @@ void main() {
         tester,
         Scaffold(
           body: Center(
-            child: PlaylistMenuButton(
+            child: ActionMenuButton(
               semanticLabel: '排序',
               entries: [
-                PlaylistMenuEntry(
+                ActionMenuEntry(
                   icon: Icons.schedule_rounded,
                   label: '最近',
                   checked: true,
                   onSelected: () {},
                 ),
-                PlaylistMenuEntry(
+                ActionMenuEntry(
                   icon: Icons.sort_by_alpha_rounded,
                   label: '名称',
                   checked: false,
@@ -628,10 +628,10 @@ void main() {
         tester,
         Scaffold(
           body: Center(
-            child: PlaylistMenuButton(
+            child: ActionMenuButton(
               semanticLabel: '“夜跑”的更多操作',
               entries: [
-                PlaylistMenuEntry(
+                ActionMenuEntry(
                   icon: Icons.edit_rounded,
                   label: '重命名',
                   onSelected: () {},

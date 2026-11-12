@@ -550,7 +550,6 @@ class _SaveToPlaylistSheetState extends ConsumerState<SaveToPlaylistSheet> {
             icon: Icons.check_rounded,
             large: true,
             expand: true,
-            glow: true,
             busy: _saving,
             onPressed: !anyChosen || _saving
                 ? null

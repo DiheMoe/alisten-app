@@ -206,7 +206,7 @@ class _Header extends StatelessWidget {
                   url: summary?.coverUrl,
                   size: AlistenSizes.pageCover,
                   radius: AlistenRadii.lg,
-                  glow: true,
+                  shadow: true,
                 ),
               ),
               const SizedBox(height: AlistenSpacing.lg),
