@@ -36,10 +36,31 @@ import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart' hide SearchController;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const _sources = [
-  PillSegment(value: TrackSource.qq, label: 'QQ 音乐'),
-  PillSegment(value: TrackSource.netease, label: '网易云'),
+/// 点歌页上音乐平台之外的一个来源，例如自己的歌单。选中它时输入框不再搜索平台，
+/// 文字交给 [builder] 筛选。
+final class SearchLibrary {
+  const SearchLibrary({
+    required this.label,
+    required this.hint,
+    required this.builder,
+  });
+
+  final String label;
+  final String hint;
+
+  /// 返回一个 sliver。
+  final Widget Function(BuildContext context, String filter, PickSong onPick)
+  builder;
+}
+
+// null 是 [SearchLibrary]。
+const _platforms = [
+  PillSegment<TrackSource?>(value: TrackSource.qq, label: 'QQ 音乐'),
+  PillSegment<TrackSource?>(value: TrackSource.netease, label: '网易云'),
 ];
+
+// 三项时“我的歌单”四个字要放得下。
+const _threeSourcesWidth = AlistenSizes.threeChoiceWidth + AlistenSpacing.xxxl;
 
 const _views = [
   (SearchView.all, '全部'),
@@ -55,6 +76,9 @@ String _sourceName(TrackSource source) => switch (source) {
 };
 
 const _loadMoreDistance = 600.0;
+
+// 慢慢拖动不算，要有甩的速度才换来源，以免竖向滚动时手指偏了就换走。
+const _swipeVelocity = 600.0;
 
 // 手机屏幕上每行正好放下两个歌单。
 const _playlistTileWidth = 200.0;
@@ -74,6 +98,7 @@ class SearchScreen extends ConsumerStatefulWidget {
     required this.onOpenPlaylist,
     required this.onShowQueue,
     required this.onOpenRoom,
+    this.library,
     super.key,
   });
 
@@ -91,12 +116,15 @@ class SearchScreen extends ConsumerStatefulWidget {
   /// 以路由打开当前服务器上的另一个房间，会退出当前房间。
   final ValueChanged<String> onOpenRoom;
 
+  final SearchLibrary? library;
+
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   late final TextEditingController _input;
+  bool _inLibrary = false;
   final _focus = FocusNode();
 
   SearchController get _search => ref.read(searchControllerProvider.notifier);
@@ -147,14 +175,51 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _onChanged(String text) {
     setState(() {});
+    if (_inLibrary) return;
     if (text.trim().isEmpty && !_home(ref.read(searchControllerProvider))) {
       _showHome();
     }
   }
 
   void _submit() {
+    if (_inLibrary) return;
     final keyword = _keyword;
     if (keyword.isNotEmpty) unawaited(_search.submit(keyword));
+  }
+
+  void _swipeSource(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (velocity.abs() < _swipeVelocity) return;
+    final sources = <TrackSource?>[
+      for (final platform in _platforms) platform.value,
+      if (widget.library != null) null,
+    ];
+    final current = _inLibrary
+        ? null
+        : ref.read(searchControllerProvider).source;
+    final forward =
+        (velocity < 0) == (Directionality.of(context) == TextDirection.ltr);
+    final next = sources.indexOf(current) + (forward ? 1 : -1);
+    if (next < 0 || next >= sources.length) return;
+    _chooseSource(sources[next]);
+  }
+
+  // 输入框里的字在平台是搜索词、在歌单里是筛选词，换过去时不沿用。
+  void _chooseSource(TrackSource? source) {
+    final wasInLibrary = _inLibrary;
+    if (source == null) {
+      if (wasInLibrary) return;
+      _input.clear();
+      setState(() => _inLibrary = true);
+      return;
+    }
+    if (wasInLibrary) {
+      _input.clear();
+      setState(() => _inLibrary = false);
+      _showHome(source: source);
+    } else if (source != ref.read(searchControllerProvider).source) {
+      _changeSource(source);
+    }
   }
 
   // 调用时输入框已清空，随后重新获得焦点。
@@ -231,10 +296,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget build(BuildContext context) {
     final search = ref.watch(searchControllerProvider);
     final text = _input.text.trim();
-    final typed = linkOf(text);
+    final library = _inLibrary ? widget.library : null;
+    final typed = library == null ? linkOf(text) : null;
     final home = _home(search);
     final List<Widget> body;
-    if (typed != null) {
+    if (library != null) {
+      body = [library.builder(context, text, _pick)];
+    } else if (typed != null) {
       body = [_typedLink(text)];
     } else if (home) {
       body = _homeSlivers(search);
@@ -242,7 +310,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       body = _resultSlivers(search);
     }
     // 有搜索结果时链接只占一行，不把结果推到下面去。
-    final offers = _offers(typed, compact: !home && typed == null);
+    final offers = library != null
+        ? const <Widget>[]
+        : _offers(typed, compact: !home && typed == null);
     return AlistenScaffold(
       // 提示显示在输入框和筛选项下方，以免搜下一首歌时挡住它们。
       topBar: ToastClearance(
@@ -273,7 +343,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: AlistenTextField(
                 controller: _input,
                 focusNode: _focus,
-                hint: '搜歌名、歌手，或粘贴链接',
+                hint: library?.hint ?? '搜歌名、歌手，或粘贴链接',
                 icon: AlistenIcons.magnifyingGlass,
                 pill: true,
                 textInputAction: TextInputAction.search,
@@ -287,9 +357,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 horizontal: AlistenSpacing.md,
               ),
               child: _Filters(
-                source: search.source,
-                view: home || typed != null ? null : search.view,
-                onSource: _changeSource,
+                source: library == null ? search.source : null,
+                libraryLabel: widget.library?.label,
+                view: library != null || home || typed != null
+                    ? null
+                    : search.view,
+                onSource: _chooseSource,
                 onView: _changeView,
               ),
             ),
@@ -307,22 +380,28 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: NotificationListener<ScrollUpdateNotification>(
                 onNotification: (notification) =>
                     _onScroll(notification.depth, notification.metrics),
-                child: CustomScrollView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  slivers: [
-                    ...offers,
-                    ...body,
-                    // 填满页面的状态视图自己居中，不需要底部留白。
-                    if (body.last is! SliverFillRemaining)
-                      SliverPadding(
-                        padding: EdgeInsets.only(
-                          bottom:
-                              MediaQuery.paddingOf(context).bottom +
-                              AlistenSpacing.xl,
+                // 横向一甩换到相邻的来源。推荐卡片、歌单标签这些横向滚动的行比它
+                // 先收到拖动，在它们上面滑动仍是滚动。
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onHorizontalDragEnd: _swipeSource,
+                  child: CustomScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    slivers: [
+                      ...offers,
+                      ...body,
+                      // 填满页面的状态视图自己居中，不需要底部留白。
+                      if (body.last is! SliverFillRemaining)
+                        SliverPadding(
+                          padding: EdgeInsets.only(
+                            bottom:
+                                MediaQuery.paddingOf(context).bottom +
+                                AlistenSpacing.xl,
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -702,21 +781,26 @@ class _PickedCount extends ConsumerWidget {
 class _Filters extends StatelessWidget {
   const _Filters({
     required this.source,
+    required this.libraryLabel,
     required this.view,
     required this.onSource,
     required this.onView,
   });
 
-  final TrackSource source;
+  /// null 表示选中的是 [libraryLabel] 那一项。
+  final TrackSource? source;
+  final String? libraryLabel;
   final SearchView? view;
-  final ValueChanged<TrackSource> onSource;
+  final ValueChanged<TrackSource?> onSource;
   final ValueChanged<SearchView> onView;
 
   @override
   Widget build(BuildContext context) {
     final view = this.view;
-    final width = MediaQuery.textScalerOf(context)
-        .scale(AlistenSizes.twoChoiceWidth);
+    final libraryLabel = this.libraryLabel;
+    final width = MediaQuery.textScalerOf(context).scale(
+      libraryLabel == null ? AlistenSizes.twoChoiceWidth : _threeSourcesWidth,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -730,12 +814,14 @@ class _Filters extends StatelessWidget {
             child: Semantics(
               container: true,
               label: '音乐来源',
-              child: SegmentedPills<TrackSource>(
-                segments: _sources,
+              child: SegmentedPills<TrackSource?>(
+                segments: [
+                  ..._platforms,
+                  if (libraryLabel != null)
+                    PillSegment(value: null, label: libraryLabel),
+                ],
                 selected: source,
-                onChanged: (chosen) {
-                  if (chosen != source) onSource(chosen);
-                },
+                onChanged: onSource,
               ),
             ),
           ),

@@ -23,7 +23,7 @@ void main() {
 
         final field = tester.getRect(find.byType(AlistenTextField));
         final sources = tester.getRect(
-          find.byType(SegmentedPills<TrackSource>),
+          find.byType(SegmentedPills<TrackSource?>),
         );
         expect(
           sources.top - field.bottom,

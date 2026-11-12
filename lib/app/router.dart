@@ -275,6 +275,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                                 onShowQueue: () =>
                                     context.go(RoomMode.queue.routeIn(roomRef)),
                                 onOpenRoom: context.go,
+                                library: SearchLibrary(
+                                  label: '我的歌单',
+                                  hint: '在选中的歌单里找歌',
+                                  builder: (context, filter, onPick) =>
+                                      MyPlaylistsPicker(
+                                        filter: filter,
+                                        onPick: onPick,
+                                        onOpenAccount: openAccount,
+                                      ),
+                                ),
                               ),
                             ),
                           );
