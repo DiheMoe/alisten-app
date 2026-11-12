@@ -5,6 +5,7 @@ import 'package:alisten/features/playlists/application/my_playlists_controller.d
 import 'package:alisten/features/playlists/application/playlist_api.dart';
 import 'package:alisten/features/playlists/presentation/playlist_name_form.dart';
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
@@ -64,7 +65,7 @@ class SavePlatformPlaylistButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return PillButton(
       label: '保存为我的歌单',
-      icon: Icons.playlist_add_rounded,
+      icon: AlistenIcons.listPlus,
       style: PillButtonStyle.secondary,
       onPressed: () => unawaited(_save(context)),
     );

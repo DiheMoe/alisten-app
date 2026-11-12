@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:alisten/features/admin/presentation/secret_box.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
@@ -58,7 +59,7 @@ class ResetPasswordSheet extends StatelessWidget {
         const SizedBox(height: AlistenSpacing.xs),
         PillButton(
           label: '复制',
-          icon: Icons.copy_rounded,
+          icon: AlistenIcons.copySimple,
           expand: true,
           onPressed: () => unawaited(_copy()),
         ),

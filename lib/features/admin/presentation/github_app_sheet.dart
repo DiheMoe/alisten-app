@@ -6,6 +6,7 @@ import 'package:alisten/features/admin/application/admin_session.dart';
 import 'package:alisten/features/admin/application/github_app_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -167,7 +168,7 @@ class _GithubAppSheetState extends ConsumerState<GithubAppSheet> {
           const SizedBox(height: AlistenSpacing.xl),
           PillButton(
             label: widget.status.enabled ? '保存' : '开启',
-            icon: Icons.check_rounded,
+            icon: AlistenIcons.checkBold,
             large: true,
             expand: true,
             busy: _saving,

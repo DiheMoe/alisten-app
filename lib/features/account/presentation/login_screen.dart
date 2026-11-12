@@ -10,6 +10,7 @@ import 'package:alisten/features/account/presentation/github_notice.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
@@ -85,7 +86,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
-          icon: Icons.arrow_back_rounded,
+          icon: AlistenIcons.arrowLeft,
           semanticLabel: '返回',
           style: IconCircleButtonStyle.plain,
           onPressed: () => unawaited(Navigator.maybePop(context)),

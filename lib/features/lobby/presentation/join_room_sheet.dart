@@ -2,6 +2,7 @@ import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/lobby/application/lobby_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -159,7 +160,7 @@ class _JoinRoomSheetState extends ConsumerState<JoinRoomSheet> {
           const SizedBox(height: AlistenSpacing.lg),
           PillButton(
             label: '进入房间',
-            icon: Icons.login_rounded,
+            icon: AlistenIcons.signIn,
             large: true,
             expand: true,
             busy: _submitting,
@@ -204,7 +205,7 @@ class _RoomSummary extends StatelessWidget {
             alignment: Alignment.center,
             child: identity == null
                 ? Icon(
-                    Icons.lock_rounded,
+                    AlistenIcons.lockSimpleFill,
                     size: AlistenSizes.icon,
                     color: colors.onGlassMuted,
                   )
@@ -248,11 +249,14 @@ class _RoomSummary extends StatelessWidget {
                   runSpacing: AlistenSpacing.xxs,
                   children: [
                     _Fact(
-                      icon: Icons.people_alt_rounded,
+                      icon: AlistenIcons.users,
                       label: '${room.onlineCount} 人在线',
                     ),
                     if (room.hasPassword)
-                      const _Fact(icon: Icons.lock_rounded, label: '需要密码'),
+                      const _Fact(
+                        icon: AlistenIcons.lockSimpleFill,
+                        label: '需要密码',
+                      ),
                   ],
                 ),
               ],

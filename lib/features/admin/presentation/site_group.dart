@@ -4,6 +4,7 @@ import 'package:alisten/domain/mutation/mutation_result.dart';
 import 'package:alisten/features/admin/application/admin_session.dart';
 import 'package:alisten/features/admin/application/admin_site_controller.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -111,7 +112,7 @@ class _SiteGroupState extends ConsumerState<SiteGroup> {
           const SizedBox(height: AlistenSpacing.md),
           PillButton(
             label: '保存',
-            icon: Icons.check_rounded,
+            icon: AlistenIcons.checkBold,
             expand: true,
             busy: _saving,
             onPressed: site.loading ? null : () => unawaited(_save()),

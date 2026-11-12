@@ -7,6 +7,7 @@ import 'package:alisten/features/account/presentation/show_password_row.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -154,8 +155,8 @@ class _GithubPasswordSheetState extends ConsumerState<GithubPasswordSheet> {
             PillButton(
               label: _binding ? '去 GitHub 授权' : '解绑',
               icon: _binding
-                  ? Icons.open_in_new_rounded
-                  : Icons.link_off_rounded,
+                  ? AlistenIcons.arrowSquareOut
+                  : AlistenIcons.linkBreak,
               expand: true,
               busy: _busy,
               onPressed: _busy ? null : () => unawaited(_submit()),

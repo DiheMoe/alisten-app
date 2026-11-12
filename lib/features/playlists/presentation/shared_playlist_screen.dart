@@ -16,6 +16,7 @@ import 'package:alisten/features/search/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/action_menu.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
@@ -97,7 +98,7 @@ class SharedPlaylistScreen extends ConsumerWidget {
       slivers = [
         const PlaylistPageFill(
           child: EmptyState(
-            icon: Icons.link_off_rounded,
+            icon: AlistenIcons.linkBreak,
             title: '分享已失效',
             message: '歌单被删除了，或者分享的人停止了分享。',
           ),
@@ -126,7 +127,7 @@ class SharedPlaylistScreen extends ConsumerWidget {
             child: Padding(
               padding: EdgeInsets.only(bottom: media.bottom),
               child: const EmptyState(
-                icon: Icons.queue_music_rounded,
+                icon: AlistenIcons.queue,
                 title: '这个歌单还是空的',
               ),
             ),
@@ -170,7 +171,7 @@ class SharedPlaylistScreen extends ConsumerWidget {
                       iconSize: AlistenSizes.iconSm,
                       entries: [
                         ActionMenuEntry(
-                          icon: Icons.playlist_add_rounded,
+                          icon: AlistenIcons.listPlus,
                           label: '保存到歌单',
                           onSelected: () => unawaited(
                             showSaveToPlaylistSheet(
@@ -185,7 +186,7 @@ class SharedPlaylistScreen extends ConsumerWidget {
                           ),
                         ),
                         ActionMenuEntry(
-                          icon: Icons.content_copy_rounded,
+                          icon: AlistenIcons.copy,
                           label: copyTitleHint,
                           onSelected: () => onCopyTitle(meta.title),
                         ),
@@ -212,7 +213,7 @@ class SharedPlaylistScreen extends ConsumerWidget {
             right: 0,
             child: AlistenTopBar(
               leading: IconCircleButton(
-                icon: Icons.arrow_back_rounded,
+                icon: AlistenIcons.arrowLeft,
                 semanticLabel: '返回',
                 onPressed: () => unawaited(Navigator.maybePop(context)),
               ),
@@ -259,7 +260,7 @@ class SharedPlaylistScreen extends ConsumerWidget {
         Center(
           child: PillButton(
             label: '复制到我的歌单',
-            icon: Icons.library_add_rounded,
+            icon: AlistenIcons.folderPlus,
             onPressed: () => unawaited(_copy(context, shared)),
           ),
         ),

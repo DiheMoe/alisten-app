@@ -18,6 +18,7 @@ import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
@@ -156,7 +157,7 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
       title: '退出这个房间？',
       message: '这台设备会停止播放，房间里的其他人照常收听。',
       confirmLabel: '退出房间',
-      confirmIcon: Icons.logout_rounded,
+      confirmIcon: AlistenIcons.signOut,
       // 面板收起后页面才能以动画滑出。
       untilClosed: true,
     );
@@ -373,12 +374,12 @@ class _TwoPanes extends StatelessWidget {
 }
 
 const _sideModes = [
+  PillSegment(value: RoomMode.queue, label: '队列', icon: AlistenIcons.queue),
   PillSegment(
-    value: RoomMode.queue,
-    label: '队列',
-    icon: Icons.queue_music_rounded,
+    value: RoomMode.chat,
+    label: '聊天',
+    icon: AlistenIcons.chatsCircle,
   ),
-  PillSegment(value: RoomMode.chat, label: '聊天', icon: Icons.forum_rounded),
 ];
 
 class _SidePanel extends StatelessWidget {

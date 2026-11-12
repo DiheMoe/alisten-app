@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -246,7 +247,7 @@ class _AlistenTextFieldState extends State<AlistenTextField> {
                   builder: (context, _) => widget.controller.text.isEmpty
                       ? const SizedBox(width: AlistenSpacing.md)
                       : IconCircleButton(
-                          icon: Icons.cancel_rounded,
+                          icon: AlistenIcons.xCircleFill,
                           semanticLabel: '清空',
                           style: IconCircleButtonStyle.plain,
                           iconSize: AlistenSizes.iconSm,

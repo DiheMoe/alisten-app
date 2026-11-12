@@ -12,6 +12,7 @@ import 'package:alisten/features/playlists/presentation/playlist_name_form.dart'
 import 'package:alisten/features/playlists/presentation/playlist_song.dart';
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_images.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
@@ -71,8 +72,8 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.star_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.music_note_rounded), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.starFill), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.musicNote), findsOneWidget);
   });
 
   group('the name form', () {
@@ -208,12 +209,12 @@ void main() {
             semanticLabel: '“夜跑”的更多操作',
             entries: [
               ActionMenuEntry(
-                icon: Icons.edit_rounded,
+                icon: AlistenIcons.pencilSimple,
                 label: '重命名',
                 onSelected: () => picked.add('重命名'),
               ),
               ActionMenuEntry(
-                icon: Icons.delete_outline_rounded,
+                icon: AlistenIcons.trash,
                 label: '删除',
                 danger: true,
                 onSelected: () => picked.add('删除'),
@@ -224,7 +225,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+    await tester.tap(find.byIcon(AlistenIcons.dotsThreeBold));
     await settlePage(tester);
     expect(find.text('重命名'), findsOneWidget);
 
@@ -498,7 +499,7 @@ void main() {
         icon: icon,
         entries: [
           ActionMenuEntry(
-            icon: Icons.file_open_rounded,
+            icon: AlistenIcons.fileArrowUp,
             label: '从文件导入',
             onSelected: () {},
           ),
@@ -511,8 +512,8 @@ void main() {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              menu(Icons.more_horiz_rounded),
-              menu(Icons.more_vert_rounded),
+              menu(AlistenIcons.dotsThreeBold),
+              menu(AlistenIcons.dotsThreeVerticalBold),
             ],
           ),
         ),
@@ -523,7 +524,10 @@ void main() {
         matching: find.byType(IntrinsicWidth),
       );
 
-      for (final icon in [Icons.more_horiz_rounded, Icons.more_vert_rounded]) {
+      for (final icon in [
+        AlistenIcons.dotsThreeBold,
+        AlistenIcons.dotsThreeVerticalBold,
+      ]) {
         await tester.tap(find.byIcon(icon));
         await settlePage(tester);
         final rect = tester.getRect(panel);
@@ -548,7 +552,7 @@ void main() {
               semanticLabel: '更多',
               entries: [
                 ActionMenuEntry(
-                  icon: Icons.edit_rounded,
+                  icon: AlistenIcons.pencilSimple,
                   label: '重命名',
                   enabled: false,
                   onSelected: () => picked.add('重命名'),
@@ -559,7 +563,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+      await tester.tap(find.byIcon(AlistenIcons.dotsThreeBold));
       await settlePage(tester);
       await tester.tap(find.text('重命名'));
       await settlePage(tester);
@@ -580,13 +584,13 @@ void main() {
               semanticLabel: '排序',
               entries: [
                 ActionMenuEntry(
-                  icon: Icons.schedule_rounded,
+                  icon: AlistenIcons.clock,
                   label: '最近',
                   checked: true,
                   onSelected: () {},
                 ),
                 ActionMenuEntry(
-                  icon: Icons.sort_by_alpha_rounded,
+                  icon: AlistenIcons.textAa,
                   label: '名称',
                   checked: false,
                   onSelected: () {},
@@ -597,10 +601,10 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+      await tester.tap(find.byIcon(AlistenIcons.dotsThreeBold));
       await settlePage(tester);
 
-      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+      expect(find.byIcon(AlistenIcons.checkBold), findsOneWidget);
       expect(
         tester.getSemantics(find.bySemanticsLabel(RegExp('最近'))),
         isSemantics(
@@ -632,7 +636,7 @@ void main() {
               semanticLabel: '“夜跑”的更多操作',
               entries: [
                 ActionMenuEntry(
-                  icon: Icons.edit_rounded,
+                  icon: AlistenIcons.pencilSimple,
                   label: '重命名',
                   onSelected: () {},
                 ),
@@ -647,7 +651,7 @@ void main() {
         tester.getSemantics(trigger),
         isSemantics(isExpanded: false, hasExpandedState: true, isButton: true),
       );
-      await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+      await tester.tap(find.byIcon(AlistenIcons.dotsThreeBold));
       await settlePage(tester);
       expect(
         tester.getSemantics(trigger),
@@ -682,11 +686,11 @@ void main() {
         tester,
         cover(url: 'https://c/a', favorites: true, size: 120),
       );
-      expect(find.byIcon(Icons.star_rounded), findsOneWidget);
+      expect(find.byIcon(AlistenIcons.starFill), findsOneWidget);
       // 星标只作装饰，读屏不读。
       expect(
         find.ancestor(
-          of: find.byIcon(Icons.star_rounded),
+          of: find.byIcon(AlistenIcons.starFill),
           matching: find.byWidgetPredicate(
             (widget) => widget is ExcludeSemantics && widget.excluding,
           ),
@@ -705,7 +709,7 @@ void main() {
         tester,
         cover(url: 'https://c/a', favorites: false, size: 120),
       );
-      expect(find.byIcon(Icons.star_rounded), findsNothing);
+      expect(find.byIcon(AlistenIcons.starFill), findsNothing);
     });
 
     testWidgets('a row-sized cover has no badge', (tester) async {
@@ -713,7 +717,7 @@ void main() {
         tester,
         cover(url: 'https://c/a', favorites: true, size: AlistenSizes.rowCover),
       );
-      expect(find.byIcon(Icons.star_rounded), findsNothing);
+      expect(find.byIcon(AlistenIcons.starFill), findsNothing);
     });
   });
 

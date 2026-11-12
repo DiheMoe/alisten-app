@@ -18,6 +18,7 @@ import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
@@ -127,7 +128,7 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
             title: '移出歌曲',
             message: '把 ${tracks.length} 首歌移出这个歌单？',
             confirmLabel: '移出',
-            confirmIcon: Icons.remove_circle_outline_rounded,
+            confirmIcon: AlistenIcons.minusCircle,
           );
           if (!confirmed) return;
         }
@@ -174,7 +175,7 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
           title: '重新生成分享链接',
           message: '生成新链接之后，之前分享出去的链接就打不开了。',
           confirmLabel: '重新生成',
-          confirmIcon: Icons.autorenew_rounded,
+          confirmIcon: AlistenIcons.repeat,
         );
         if (!confirmed) return;
       }
@@ -208,7 +209,7 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
         title: '停止分享',
         message: '停止之后，分享出去的链接就打不开了。',
         confirmLabel: '停止分享',
-        confirmIcon: Icons.link_off_rounded,
+        confirmIcon: AlistenIcons.linkBreak,
       );
       if (!confirmed) return;
       reportPlaylistResult(
@@ -247,46 +248,46 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
     return [
       if (!playlist.favorites)
         ActionMenuEntry(
-          icon: Icons.edit_rounded,
+          icon: AlistenIcons.pencilSimple,
           label: '重命名',
           onSelected: () => _rename(playlist),
         ),
       if (shareId == null)
         ActionMenuEntry(
-          icon: Icons.share_rounded,
+          icon: AlistenIcons.shareNetwork,
           label: '分享',
           enabled: !_sharing,
           onSelected: () => unawaited(_share(playlist, again: false)),
         )
       else ...[
         ActionMenuEntry(
-          icon: Icons.link_rounded,
+          icon: AlistenIcons.link,
           label: '复制分享链接',
           enabled: !_sharing,
           onSelected: () => _copyLink(shareId),
         ),
         ActionMenuEntry(
-          icon: Icons.autorenew_rounded,
+          icon: AlistenIcons.repeat,
           label: '重新生成分享链接',
           enabled: !_sharing,
           onSelected: () => unawaited(_share(playlist, again: true)),
         ),
         ActionMenuEntry(
-          icon: Icons.link_off_rounded,
+          icon: AlistenIcons.linkBreak,
           label: '停止分享',
           enabled: !_sharing,
           onSelected: () => unawaited(_unshare(playlist)),
         ),
       ],
       ActionMenuEntry(
-        icon: Icons.ios_share_rounded,
+        icon: AlistenIcons.export,
         label: '导出',
         enabled: !exporting,
         onSelected: () => unawaited(_export()),
       ),
       if (!playlist.favorites)
         ActionMenuEntry(
-          icon: Icons.delete_outline_rounded,
+          icon: AlistenIcons.trash,
           label: '删除',
           danger: true,
           onSelected: () => unawaited(_delete(playlist)),
@@ -321,11 +322,11 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
       slivers = [
         PlaylistPageFill(
           child: EmptyState(
-            icon: Icons.playlist_remove_rounded,
+            icon: AlistenIcons.listDashes,
             title: '这个歌单不存在了',
             action: PillButton(
               label: '返回我的歌单',
-              icon: Icons.arrow_back_rounded,
+              icon: AlistenIcons.arrowLeft,
               style: PillButtonStyle.secondary,
               onPressed: widget.onDeleted,
             ),
@@ -380,7 +381,7 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
                     )
                   : AlistenTopBar(
                       leading: IconCircleButton(
-                        icon: Icons.arrow_back_rounded,
+                        icon: AlistenIcons.arrowLeft,
                         semanticLabel: '返回',
                         onPressed: () => unawaited(Navigator.maybePop(context)),
                       ),
@@ -434,7 +435,7 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
             if (items != null && items.isNotEmpty && !selecting)
               PillButton(
                 label: '选择',
-                icon: Icons.checklist_rounded,
+                icon: AlistenIcons.listChecks,
                 style: PillButtonStyle.secondary,
                 onPressed: _detail.startSelecting,
               ),
@@ -473,7 +474,7 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
             child: items != null
                 // 文字改用 App 里这两处的叫法，Web 写的是“播放栏、播放列表”。
                 ? const EmptyState(
-                    icon: Icons.queue_music_rounded,
+                    icon: AlistenIcons.queue,
                     title: '这个歌单还是空的',
                     message: '在播放器、队列和播放历史里，可以把歌保存到歌单。',
                   )
@@ -601,18 +602,18 @@ class _Song extends StatelessWidget {
             iconSize: AlistenSizes.iconSm,
             entries: [
               ActionMenuEntry(
-                icon: Icons.playlist_add_rounded,
+                icon: AlistenIcons.listPlus,
                 label: '保存到歌单',
                 onSelected: onSave,
               ),
               ActionMenuEntry(
-                icon: Icons.content_copy_rounded,
+                icon: AlistenIcons.copy,
                 label: copyTitleHint,
                 onSelected: copy,
               ),
               // 单首移出不确认，与 Web 相同。
               ActionMenuEntry(
-                icon: Icons.remove_circle_outline_rounded,
+                icon: AlistenIcons.minusCircle,
                 label: '移出这个歌单',
                 danger: true,
                 onSelected: onRemove,
@@ -671,8 +672,8 @@ class _SelectableSong extends StatelessWidget {
                   dimension: AlistenSizes.minTouchTarget,
                   child: Icon(
                     selected
-                        ? Icons.check_circle_rounded
-                        : Icons.radio_button_unchecked_rounded,
+                        ? AlistenIcons.checkCircleFill
+                        : AlistenIcons.circle,
                     color: selected ? colors.success : colors.onGlassMuted,
                   ),
                 ),
@@ -681,7 +682,7 @@ class _SelectableSong extends StatelessWidget {
                   child: SizedBox.square(
                     dimension: AlistenSizes.minTouchTarget,
                     child: Icon(
-                      Icons.drag_handle_rounded,
+                      AlistenIcons.equalsBold,
                       size: AlistenSizes.iconSm,
                       color: colors.onGlassMuted,
                     ),
@@ -726,7 +727,7 @@ class _SelectingBar extends StatelessWidget {
             child: Row(
               children: [
                 IconCircleButton(
-                  icon: Icons.close_rounded,
+                  icon: AlistenIcons.x,
                   semanticLabel: '退出选择',
                   style: IconCircleButtonStyle.plain,
                   onPressed: onClose,
@@ -828,7 +829,7 @@ class _SelectionBar extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _BarButton(
-                          icon: Icons.playlist_add_rounded,
+                          icon: AlistenIcons.listPlus,
                           label: '保存到歌单',
                           semanticLabel: '把选中的歌保存到歌单',
                           onPressed: enabled ? onSave : null,
@@ -836,7 +837,7 @@ class _SelectionBar extends StatelessWidget {
                       ),
                       Expanded(
                         child: _BarButton(
-                          icon: Icons.vertical_align_top_rounded,
+                          icon: AlistenIcons.arrowLineUp,
                           label: '移到最前',
                           semanticLabel: '把选中的歌移到最前',
                           onPressed: enabled ? onTop : null,
@@ -844,7 +845,7 @@ class _SelectionBar extends StatelessWidget {
                       ),
                       Expanded(
                         child: _BarButton(
-                          icon: Icons.vertical_align_bottom_rounded,
+                          icon: AlistenIcons.arrowLineDown,
                           label: '移到最后',
                           semanticLabel: '把选中的歌移到最后',
                           onPressed: enabled ? onBottom : null,
@@ -852,7 +853,7 @@ class _SelectionBar extends StatelessWidget {
                       ),
                       Expanded(
                         child: _BarButton(
-                          icon: Icons.remove_circle_outline_rounded,
+                          icon: AlistenIcons.minusCircle,
                           label: '移出',
                           semanticLabel: '把选中的歌移出这个歌单',
                           danger: true,

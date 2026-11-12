@@ -1,6 +1,7 @@
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:flutter/material.dart';
@@ -67,13 +68,13 @@ class RoomActionsSheet extends StatelessWidget {
         action(
           RoomAction.enter,
           '进入',
-          Icons.login_rounded,
+          AlistenIcons.signIn,
           style: PillButtonStyle.primary,
         ),
-        action(RoomAction.copyInvite, '复制邀请链接', Icons.link_rounded),
-        action(RoomAction.apiKey, 'API Key', Icons.key_rounded),
-        action(RoomAction.edit, '编辑', Icons.edit_rounded),
-        action(RoomAction.delete, '删除', Icons.delete_outline_rounded),
+        action(RoomAction.copyInvite, '复制邀请链接', AlistenIcons.link),
+        action(RoomAction.apiKey, 'API Key', AlistenIcons.key),
+        action(RoomAction.edit, '编辑', AlistenIcons.pencilSimple),
+        action(RoomAction.delete, '删除', AlistenIcons.trash),
       ],
     );
   }

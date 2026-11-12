@@ -1,5 +1,6 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/material.dart';
 
@@ -22,7 +23,7 @@ class ChipPill extends StatelessWidget {
     final colors = AlistenColors.of(context);
     final surface = Theme.of(context).colorScheme.surface;
     final ink = selected ? surface : colors.onGlass;
-    final icon = this.icon ?? (selected ? Icons.check_rounded : null);
+    final icon = this.icon ?? (selected ? AlistenIcons.checkBold : null);
     final pill = BorderRadius.circular(AlistenRadii.pill);
     return Pressable(
       onPressed: onPressed,

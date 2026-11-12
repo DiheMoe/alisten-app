@@ -9,6 +9,7 @@ import 'package:alisten/features/admin/presentation/admin_time.dart';
 import 'package:alisten/features/admin/presentation/secret_box.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -87,7 +88,7 @@ class _ApiKeySheetState extends ConsumerState<ApiKeySheet> {
           ? '重置后旧 Key 立即失效，正在使用它的 bot 需要换成新 Key。'
           : '新 Key 只显示一次，生成后请立即复制。',
       confirmLabel: generated ? '重置' : '生成',
-      confirmIcon: Icons.key_rounded,
+      confirmIcon: AlistenIcons.key,
     );
     if (!confirmed || !mounted || _resetting) return;
     setState(() {
@@ -211,7 +212,7 @@ class _ApiKeySheetState extends ConsumerState<ApiKeySheet> {
               alignment: AlignmentDirectional.centerStart,
               child: StatusPill(
                 label: '正在读取',
-                icon: Icons.sync_rounded,
+                icon: AlistenIcons.arrowsClockwise,
                 busy: true,
               ),
             ),
@@ -234,7 +235,7 @@ class _ApiKeySheetState extends ConsumerState<ApiKeySheet> {
             const SizedBox(height: AlistenSpacing.xs),
             PillButton(
               label: '复制',
-              icon: Icons.copy_rounded,
+              icon: AlistenIcons.copySimple,
               expand: true,
               onPressed: () => unawaited(_copy(key)),
             ),
@@ -251,7 +252,7 @@ class _ApiKeySheetState extends ConsumerState<ApiKeySheet> {
           const SizedBox(height: AlistenSpacing.xl),
           PillButton(
             label: status?.generated ?? false ? '重置 API Key' : '生成 API Key',
-            icon: Icons.key_rounded,
+            icon: AlistenIcons.key,
             style: key == null
                 ? PillButtonStyle.primary
                 : PillButtonStyle.secondary,

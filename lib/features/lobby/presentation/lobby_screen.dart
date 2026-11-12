@@ -7,6 +7,7 @@ import 'package:alisten/features/lobby/presentation/create_room_sheet.dart';
 import 'package:alisten/features/lobby/presentation/join_room_sheet.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/avatar_images.dart';
@@ -209,19 +210,19 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                       barExtent: PillButton.heightOf(context),
                       actions: [
                         IconCircleButton(
-                          icon: Icons.history_rounded,
+                          icon: AlistenIcons.clockCounterClockwise,
                           semanticLabel: '播放历史',
                           style: IconCircleButtonStyle.plain,
                           onPressed: widget.onOpenHistory,
                         ),
                         IconCircleButton(
-                          icon: Icons.library_music_rounded,
+                          icon: AlistenIcons.playlist,
                           semanticLabel: '我的歌单',
                           style: IconCircleButtonStyle.plain,
                           onPressed: widget.onOpenPlaylists,
                         ),
                         IconCircleButton(
-                          icon: Icons.settings_rounded,
+                          icon: AlistenIcons.gearSix,
                           semanticLabel: '设置',
                           style: IconCircleButtonStyle.plain,
                           image: avatarUrl == null
@@ -247,7 +248,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                         children: [
                           if (!_filtering && lobby.rooms.isNotEmpty)
                             IconCircleButton(
-                              icon: Icons.search_rounded,
+                              icon: AlistenIcons.magnifyingGlass,
                               semanticLabel: '筛选房间',
                               style: IconCircleButtonStyle.plain,
                               onPressed: _startFiltering,
@@ -264,7 +265,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                             )
                           else
                             IconCircleButton(
-                              icon: Icons.refresh_rounded,
+                              icon: AlistenIcons.arrowClockwise,
                               semanticLabel: '刷新房间列表',
                               style: IconCircleButtonStyle.plain,
                               onPressed: () => unawaited(_lobby.load()),
@@ -304,7 +305,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                   bottom: bottom + AlistenSpacing.md,
                   child: PillButton(
                     label: '创建房间',
-                    icon: Icons.add_rounded,
+                    icon: AlistenIcons.plusBold,
                     large: true,
                     onPressed: busy ? null : () => unawaited(_showCreate()),
                   ),
@@ -330,7 +331,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
           controller: _filter,
           focusNode: _filterFocus,
           hint: '筛选房间',
-          icon: Icons.search_rounded,
+          icon: AlistenIcons.magnifyingGlass,
           pill: true,
           textInputAction: TextInputAction.search,
           onChanged: _lobby.filter,
@@ -371,23 +372,23 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
               ? Semantics(
                   liveRegion: true,
                   child: EmptyState(
-                    icon: Icons.cloud_off_rounded,
+                    icon: AlistenIcons.cloudSlash,
                     title: error,
                     action: PillButton(
                       label: '重试',
-                      icon: Icons.refresh_rounded,
+                      icon: AlistenIcons.arrowClockwise,
                       style: PillButtonStyle.secondary,
                       onPressed: () => unawaited(_lobby.load()),
                     ),
                   ),
                 )
               : EmptyState(
-                  icon: Icons.meeting_room_rounded,
+                  icon: AlistenIcons.door,
                   title: '还没有可加入的房间',
                   message: '创建一个房间，邀请朋友一起听。',
                   action: PillButton(
                     label: '刷新',
-                    icon: Icons.refresh_rounded,
+                    icon: AlistenIcons.arrowClockwise,
                     style: PillButtonStyle.secondary,
                     onPressed: () => unawaited(_lobby.load()),
                   ),
@@ -400,7 +401,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       return [
         fill(
           EmptyState(
-            icon: Icons.search_off_rounded,
+            icon: AlistenIcons.magnifyingGlassMinus,
             title: '没有匹配“${lobby.query.trim()}”的房间',
             action: PillButton(
               label: '清除筛选',
@@ -711,7 +712,7 @@ class _RoomRow extends StatelessWidget {
                           ink: colors.onGlassMuted,
                           label: '需要密码',
                           leading: Icon(
-                            Icons.lock_rounded,
+                            AlistenIcons.lockSimpleFill,
                             size: AlistenSizes.inlineIcon,
                             color: colors.onGlassMuted,
                           ),
@@ -731,7 +732,7 @@ class _RoomRow extends StatelessWidget {
                         semanticLabel: '正在进入',
                       )
                     : Icon(
-                        Icons.chevron_right_rounded,
+                        AlistenIcons.caretRight,
                         size: AlistenSizes.icon,
                         color: colors.onGlassMuted,
                       ),

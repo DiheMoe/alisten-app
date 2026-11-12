@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -206,10 +207,10 @@ class _ToastCapsule extends StatelessWidget {
     final colors = AlistenColors.of(context);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final (icon, ink) = switch (message.kind) {
-      ToastKind.info => (Icons.info_rounded, colors.onGlass),
-      ToastKind.success => (Icons.check_circle_rounded, colors.success),
-      ToastKind.warning => (Icons.warning_rounded, colors.warning),
-      ToastKind.failure => (Icons.error_rounded, colors.danger),
+      ToastKind.info => (AlistenIcons.infoFill, colors.onGlass),
+      ToastKind.success => (AlistenIcons.checkCircleFill, colors.success),
+      ToastKind.warning => (AlistenIcons.warningFill, colors.warning),
+      ToastKind.failure => (AlistenIcons.warningCircleFill, colors.danger),
     };
     return Semantics(
       container: true,

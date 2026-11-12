@@ -8,6 +8,7 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
@@ -199,7 +200,7 @@ final class _RoomRouteGateState extends ConsumerState<RoomRouteGate> {
       background: const FlowingCoverBackdrop(url: null),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
-          icon: Icons.arrow_back_rounded,
+          icon: AlistenIcons.arrowLeft,
           semanticLabel: '返回',
           style: IconCircleButtonStyle.plain,
           onPressed: () => _back(context),
@@ -258,7 +259,7 @@ final class _WaitingToReconnect extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return EmptyState(
-      icon: Icons.cloud_off_rounded,
+      icon: AlistenIcons.cloudSlash,
       title: '暂时连不上房间',
       message: '没有连上房间，会自动重试。',
       action: ConnectionPill(
@@ -300,15 +301,15 @@ final class _Refusal extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final (icon, title) = switch (failure) {
-      RoomFailure.authorization => (Icons.lock_rounded, '需要验证才能进入'),
-      RoomFailure.notFound => (Icons.search_off_rounded, '找不到这个房间'),
-      RoomFailure.outdated => (Icons.system_update_rounded, '需要更新 Alisten'),
-      RoomFailure.unavailable => (Icons.cloud_off_rounded, '暂时进不了房间'),
+      RoomFailure.authorization => (AlistenIcons.lockSimpleFill, '需要验证才能进入'),
+      RoomFailure.notFound => (AlistenIcons.magnifyingGlassMinus, '找不到这个房间'),
+      RoomFailure.outdated => (AlistenIcons.arrowCircleDown, '需要更新 Alisten'),
+      RoomFailure.unavailable => (AlistenIcons.cloudSlash, '暂时进不了房间'),
     };
     final retrying = ref.watch(roomEntryProvider(roomRef)).isLoading;
     final enterAgain = PillButton(
       label: '重新进入',
-      icon: Icons.refresh_rounded,
+      icon: AlistenIcons.arrowClockwise,
       busy: retrying,
       onPressed: () => ref.invalidate(roomEntryProvider(roomRef)),
     );
@@ -319,7 +320,7 @@ final class _Refusal extends ConsumerWidget {
         enterAgain,
       RoomFailure.authorization => PillButton(
         label: '输入密码',
-        icon: Icons.key_rounded,
+        icon: AlistenIcons.key,
         onPressed: () => unawaited(
           showJoinRoomSheet(context, ref, roomRef: roomRef, room: listing),
         ),
@@ -327,7 +328,7 @@ final class _Refusal extends ConsumerWidget {
       RoomFailure.unavailable => enterAgain,
       RoomFailure.outdated => PillButton(
         label: '检查更新',
-        icon: Icons.system_update_rounded,
+        icon: AlistenIcons.arrowCircleDown,
         onPressed: () => unawaited(
           checkForUpdate(
             context,

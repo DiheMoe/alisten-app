@@ -1,5 +1,6 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:flutter/material.dart';
 
@@ -30,8 +31,8 @@ class PlaylistCover extends StatelessWidget {
       radius: radius,
       shadow: shadow,
       placeholderIcon: favorites
-          ? Icons.star_rounded
-          : Icons.music_note_rounded,
+          ? AlistenIcons.starFill
+          : AlistenIcons.musicNote,
     );
     if (!favorites ||
         url == null ||
@@ -55,7 +56,7 @@ class PlaylistCover extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(AlistenSpacing.xxs),
                 child: Icon(
-                  Icons.star_rounded,
+                  AlistenIcons.starFill,
                   size: AlistenSizes.inlineIcon,
                   color: colors.onBrand,
                 ),
@@ -103,7 +104,7 @@ class PlaylistName extends StatelessWidget {
       children: [
         ExcludeSemantics(
           child: Icon(
-            Icons.star_rounded,
+            AlistenIcons.starFill,
             size: MediaQuery.textScalerOf(context)
                 .scale(style.fontSize ?? AlistenTypography.body.fontSize!),
             color: AlistenColors.of(context).warning,

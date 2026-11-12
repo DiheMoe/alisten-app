@@ -2,9 +2,9 @@ import 'dart:math' as math;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 
 /// 须放在使用 [pullRefreshPhysics] 的 `CustomScrollView` 中，作为第一个 sliver
 /// 或紧跟吸顶头部：下拉指示依赖列表顶部可越界。读屏用户无法下拉，页面需另设
@@ -60,7 +60,7 @@ class SliverPullRefresh extends StatelessWidget {
                 : Transform.rotate(
                     angle: pulled * math.pi,
                     child: Icon(
-                      Icons.arrow_downward_rounded,
+                      AlistenIcons.arrowDown,
                       size: AlistenSizes.iconSm,
                       color: colors.onGlass,
                     ),

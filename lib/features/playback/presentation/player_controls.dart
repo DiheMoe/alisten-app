@@ -7,6 +7,7 @@ import 'package:alisten/features/playback/application/playback_controller.dart';
 import 'package:alisten/features/playback/presentation/local_playback_status.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_slider.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
@@ -97,7 +98,7 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
               child: _SideControl(
-                icon: Icons.skip_next_rounded,
+                icon: AlistenIcons.skipForwardFill,
                 semanticLabel: '投票切歌',
                 semanticValue: voteValue,
                 active: vote != null,
@@ -166,8 +167,8 @@ class _PlayButton extends StatelessWidget {
                     status == LocalPlaybackStatus.unavailable
                         ? localPlaybackNote(status)!.icon
                         : offerPlay
-                        ? Icons.play_arrow_rounded
-                        : Icons.pause_rounded,
+                        ? AlistenIcons.playFill
+                        : AlistenIcons.pauseFill,
                     size: iconSize,
                     color: ink,
                   ),
@@ -229,7 +230,7 @@ class _Volume extends ConsumerWidget {
       ),
       content: const _VolumePanel(),
       child: _SideControl(
-        icon: silent ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+        icon: silent ? AlistenIcons.speakerSlash : AlistenIcons.speakerHigh,
         semanticLabel: '调节本机音量',
         expanded: open,
         active: open,
@@ -259,7 +260,7 @@ class _VolumePanel extends ConsumerWidget {
       child: Row(
         children: [
           IconCircleButton(
-            icon: muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+            icon: muted ? AlistenIcons.speakerSlash : AlistenIcons.speakerHigh,
             semanticLabel: muted ? '取消静音' : '静音',
             style: IconCircleButtonStyle.plain,
             onPressed: () => unawaited(playback.toggleMute()),
@@ -425,7 +426,7 @@ class _CompactVote extends StatelessWidget {
                       : Nudge(
                           trigger: vote,
                           child: Icon(
-                            Icons.skip_next_rounded,
+                            AlistenIcons.skipForwardFill,
                             size: AlistenSizes.icon,
                             color: colors.onGlass,
                           ),

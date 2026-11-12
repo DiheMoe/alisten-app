@@ -5,6 +5,7 @@ import 'package:alisten/features/account/application/pairing_code_controller.dar
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
@@ -80,7 +81,7 @@ class _PairingCodeSheetState extends ConsumerState<PairingCodeSheet> {
               alignment: AlignmentDirectional.centerStart,
               child: StatusPill(
                 label: '正在生成配对码…',
-                icon: Icons.sync_rounded,
+                icon: AlistenIcons.arrowsClockwise,
                 busy: true,
               ),
             ),
@@ -127,7 +128,7 @@ class _PairingCodeSheetState extends ConsumerState<PairingCodeSheet> {
                       errorBuilder: (context, error, stackTrace) =>
                           const Center(
                             child: Icon(
-                              Icons.broken_image_rounded,
+                              AlistenIcons.imageBroken,
                               size: AlistenSizes.iconLg,
                               color: AlistenColors.scanInk,
                             ),
@@ -169,7 +170,7 @@ class _PairingCodeSheetState extends ConsumerState<PairingCodeSheet> {
     const SizedBox(height: AlistenSpacing.md),
     PillButton(
       label: '重新生成',
-      icon: Icons.refresh_rounded,
+      icon: AlistenIcons.arrowClockwise,
       expand: true,
       onPressed: () => unawaited(_generate()),
     ),

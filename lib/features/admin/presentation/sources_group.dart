@@ -6,6 +6,7 @@ import 'package:alisten/features/admin/application/source_accounts_controller.da
 import 'package:alisten/features/admin/presentation/qr_login_sheet.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
@@ -141,7 +142,7 @@ class _SourceRow extends StatelessWidget {
                     ] else if (error == null)
                       const StatusPill(
                         label: '正在读取',
-                        icon: Icons.sync_rounded,
+                        icon: AlistenIcons.arrowsClockwise,
                         busy: true,
                       ),
                   ],
@@ -150,7 +151,7 @@ class _SourceRow extends StatelessWidget {
               const SizedBox(width: AlistenSpacing.sm),
               PillButton(
                 label: status?.saved ?? false ? '重新登录' : '扫码登录',
-                icon: Icons.qr_code_2_rounded,
+                icon: AlistenIcons.qrCode,
                 style: PillButtonStyle.secondary,
                 onPressed: status == null && error == null ? null : onSignIn,
               ),

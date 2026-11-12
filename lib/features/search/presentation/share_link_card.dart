@@ -7,6 +7,7 @@ import 'package:alisten/features/search/application/shared_link.dart';
 import 'package:alisten/features/search/presentation/song_row.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -106,9 +107,7 @@ class ShareLinkCard extends ConsumerWidget {
             : inRoom
             ? '离开当前房间并进入'
             : '进入这个房间',
-        icon: playlistLink
-            ? Icons.queue_music_rounded
-            : Icons.meeting_room_rounded,
+        icon: playlistLink ? AlistenIcons.queue : AlistenIcons.door,
         large: true,
         expand: true,
         onPressed: () => enterRoom(linkRoute),
@@ -128,7 +127,7 @@ class ShareLinkCard extends ConsumerWidget {
           liveRegion: true,
           child: StatusPill(
             label: reason ?? unrecognizedText,
-            icon: Icons.link_off_rounded,
+            icon: AlistenIcons.linkBreak,
             tone: StatusTone.warning,
           ),
         ),
@@ -181,7 +180,7 @@ class ShareLinkCard extends ConsumerWidget {
             ),
             if (onDismiss case final dismiss?)
               IconCircleButton(
-                icon: Icons.close_rounded,
+                icon: AlistenIcons.x,
                 semanticLabel: linkRoute == null
                     ? '不点这条链接'
                     : playlistLink
@@ -222,7 +221,7 @@ class ShareLinkCard extends ConsumerWidget {
             children: [
               ExcludeSemantics(
                 child: Icon(
-                  Icons.meeting_room_rounded,
+                  AlistenIcons.door,
                   size: AlistenSizes.iconSm,
                   color: colors.onGlassMuted,
                 ),
@@ -305,7 +304,7 @@ class _CompactOffer extends StatelessWidget {
               action,
               if (onDismiss case final dismiss?)
                 IconCircleButton(
-                  icon: Icons.close_rounded,
+                  icon: AlistenIcons.x,
                   semanticLabel: '不点这条链接',
                   style: IconCircleButtonStyle.plain,
                   iconSize: AlistenSizes.iconSm,

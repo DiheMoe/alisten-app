@@ -8,6 +8,7 @@ import 'package:alisten/features/playlists/application/my_playlists_controller.d
 import 'package:alisten/features/playlists/presentation/my_playlist_screen.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/application/pick_controller.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:alisten/shared/ui/toast.dart';
@@ -587,7 +588,7 @@ void main() {
     await tester.tap(find.text('选择'));
     await settlePage(tester);
     final gesture = await tester.startGesture(
-      tester.getCenter(find.byIcon(Icons.drag_handle_rounded).first),
+      tester.getCenter(find.byIcon(AlistenIcons.equalsBold).first),
     );
     await tester.pump();
     for (var step = 0; step < 10; step++) {
@@ -606,14 +607,14 @@ void main() {
       'drag handles', (tester) async {
     final semantics = tester.ensureSemantics();
     await open(tester);
-    expect(find.byIcon(Icons.drag_handle_rounded), findsNothing);
+    expect(find.byIcon(AlistenIcons.equalsBold), findsNothing);
     expect(find.bySemanticsLabel('点歌《歌a》'), findsOneWidget);
     expect(find.bySemanticsLabel('《歌a》的更多操作'), findsOneWidget);
 
     await tester.tap(find.text('选择'));
     await settlePage(tester);
 
-    expect(find.byIcon(Icons.drag_handle_rounded), findsWidgets);
+    expect(find.byIcon(AlistenIcons.equalsBold), findsWidgets);
     expect(find.bySemanticsLabel('点歌《歌a》'), findsNothing);
     expect(find.bySemanticsLabel('《歌a》的更多操作'), findsNothing);
     semantics.dispose();
@@ -1032,7 +1033,7 @@ void main() {
       expect(find.text('结果未知').hitTestable(), findsOneWidget);
       // 点歌按钮不盖住封面和歌名。
       expect(
-        tester.getRect(find.byIcon(Icons.question_mark_rounded)).left,
+        tester.getRect(find.byIcon(AlistenIcons.questionBold)).left,
         greaterThan(tester.getRect(find.text('歌a')).left),
       );
       final menu = find.bySemanticsLabel('《歌a》的更多操作');

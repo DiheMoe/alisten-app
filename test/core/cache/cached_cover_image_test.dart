@@ -6,6 +6,7 @@ import 'package:alisten/core/cache/cached_cover_image.dart';
 import 'package:alisten/core/cache/disk_cover_cache.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/cover_images.dart';
 import 'package:dio/dio.dart';
@@ -38,7 +39,7 @@ void main() {
     );
   }
 
-  Finder placeholder() => find.byIcon(Icons.music_note_rounded);
+  Finder placeholder() => find.byIcon(AlistenIcons.musicNote);
 
   testWidgets('a cover shown twice is read from the cache once', (
     tester,

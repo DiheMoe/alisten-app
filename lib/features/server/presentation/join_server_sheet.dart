@@ -1,5 +1,6 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
@@ -98,7 +99,7 @@ class _JoinServerSheetState extends State<_JoinServerSheet> {
         const SizedBox(height: AlistenSpacing.xl),
         PillButton(
           label: '加入',
-          icon: Icons.login_rounded,
+          icon: AlistenIcons.signIn,
           large: true,
           expand: true,
           onPressed: _join,

@@ -3,6 +3,7 @@ import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
@@ -13,10 +14,10 @@ import '../features/lobby/lobby_test_doubles.dart';
 import 'app_test_harness.dart';
 
 const _outcomes = <({String name, IconData icon, String text})>[
-  (name: 'confirmed', icon: Icons.check_circle_rounded, text: '已点赞，共 3 个赞'),
-  (name: 'refused', icon: Icons.error_rounded, text: '太快了'),
-  (name: 'unknown', icon: Icons.warning_rounded, text: mutationUnknownText),
-  (name: 'not sent', icon: Icons.warning_rounded, text: '未连接，未发送'),
+  (name: 'confirmed', icon: AlistenIcons.checkCircleFill, text: '已点赞，共 3 个赞'),
+  (name: 'refused', icon: AlistenIcons.warningCircleFill, text: '太快了'),
+  (name: 'unknown', icon: AlistenIcons.warningFill, text: mutationUnknownText),
+  (name: 'not sent', icon: AlistenIcons.warningFill, text: '未连接，未发送'),
 ];
 
 MutationResult<int> _result(String name) {

@@ -12,6 +12,7 @@ import 'package:alisten/features/playlists/presentation/playlist_name_form.dart'
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/animated_resize.dart';
 import 'package:alisten/shared/ui/fade_leaving_inert.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
@@ -77,7 +78,7 @@ class SaveToPlaylistButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconCircleButton(
-      icon: Icons.playlist_add_rounded,
+      icon: AlistenIcons.listPlus,
       semanticLabel: title.isEmpty ? '保存到歌单' : '把《$title》保存到歌单',
       style: IconCircleButtonStyle.plain,
       iconSize: iconSize,
@@ -432,7 +433,7 @@ class _SaveToPlaylistSheetState extends ConsumerState<SaveToPlaylistSheet> {
         title: '新建歌单',
         confirmLabel: '创建',
         busyLabel: '创建',
-        confirmIcon: Icons.add_rounded,
+        confirmIcon: AlistenIcons.plusBold,
         onSubmit: (name) => _playlists.create(name),
         onSucceeded: _created,
         onCancel: _cancelCreating,
@@ -547,7 +548,7 @@ class _SaveToPlaylistSheetState extends ConsumerState<SaveToPlaylistSheet> {
           const SizedBox(height: AlistenSpacing.lg),
           PillButton(
             label: '保存',
-            icon: Icons.check_rounded,
+            icon: AlistenIcons.checkBold,
             large: true,
             expand: true,
             busy: _saving,
@@ -629,8 +630,8 @@ class _Choice extends StatelessWidget {
                     const SizedBox(width: AlistenSpacing.sm),
                     Icon(
                       checked
-                          ? Icons.check_circle_rounded
-                          : Icons.radio_button_unchecked_rounded,
+                          ? AlistenIcons.checkCircleFill
+                          : AlistenIcons.circle,
                       size: AlistenSizes.icon,
                       color: checked ? colors.success : colors.onGlassMuted,
                     ),
@@ -676,7 +677,7 @@ class _NewPlaylistRow extends StatelessWidget {
                     border: Border.all(color: colors.glassStroke),
                   ),
                   child: Icon(
-                    Icons.add_rounded,
+                    AlistenIcons.plusBold,
                     size: AlistenSizes.iconSm,
                     color: colors.onGlass,
                   ),

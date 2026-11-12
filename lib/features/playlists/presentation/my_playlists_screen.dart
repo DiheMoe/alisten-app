@@ -15,6 +15,7 @@ import 'package:alisten/features/playlists/presentation/playlist_states.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/action_menu.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
@@ -63,7 +64,7 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
       title: '新建歌单',
       confirmLabel: '创建',
       busyLabel: '创建',
-      confirmIcon: Icons.add_rounded,
+      confirmIcon: AlistenIcons.plusBold,
       onSubmit: playlists.create,
     );
   }
@@ -166,7 +167,7 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
       background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
-          icon: Icons.arrow_back_rounded,
+          icon: AlistenIcons.arrowLeft,
           semanticLabel: '返回',
           style: IconCircleButtonStyle.plain,
           onPressed: () => unawaited(Navigator.maybePop(context)),
@@ -217,23 +218,23 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
                 else
                   ActionMenuButton(
                     semanticLabel: '导入',
-                    icon: Icons.download_rounded,
+                    icon: AlistenIcons.downloadSimple,
                     iconSize: AlistenSizes.iconSm,
                     entries: [
                       ActionMenuEntry(
-                        icon: Icons.file_open_rounded,
+                        icon: AlistenIcons.fileArrowUp,
                         label: '从文件导入',
                         onSelected: () => unawaited(_importFile()),
                       ),
                       ActionMenuEntry(
-                        icon: Icons.link_rounded,
+                        icon: AlistenIcons.link,
                         label: '从链接导入',
                         onSelected: () => unawaited(_importLink()),
                       ),
                     ],
                   ),
                 IconCircleButton(
-                  icon: Icons.add_rounded,
+                  icon: AlistenIcons.plusBold,
                   semanticLabel: '新建歌单',
                   style: IconCircleButtonStyle.brand,
                   diameter: AlistenSizes.rowAction,
@@ -325,12 +326,12 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
       iconSize: AlistenSizes.iconSm,
       entries: [
         ActionMenuEntry(
-          icon: Icons.edit_rounded,
+          icon: AlistenIcons.pencilSimple,
           label: '重命名',
           onSelected: () => unawaited(_rename(playlist)),
         ),
         ActionMenuEntry(
-          icon: Icons.delete_outline_rounded,
+          icon: AlistenIcons.trash,
           label: '删除',
           danger: true,
           onSelected: () => unawaited(_delete(playlist)),
@@ -361,14 +362,14 @@ class _SortMenu extends ConsumerWidget {
       entries: [
         for (final key in PlaylistSortKey.values)
           ActionMenuEntry(
-            icon: Icons.sort_rounded,
+            icon: AlistenIcons.sortAscending,
             label: sortKeyLabel(key),
             checked: key == sort.key,
             onSelected: () => controller.setSortKey(key),
           ),
         for (final (direction, icon) in const [
-          (SortOrder.descending, Icons.arrow_downward_rounded),
-          (SortOrder.ascending, Icons.arrow_upward_rounded),
+          (SortOrder.descending, AlistenIcons.arrowDown),
+          (SortOrder.ascending, AlistenIcons.arrowUpBold),
         ])
           ActionMenuEntry(
             icon: icon,
@@ -441,8 +442,8 @@ class _SortTrigger extends StatelessWidget {
                       ),
                       child: Icon(
                         sort.order == SortOrder.ascending
-                            ? Icons.arrow_upward_rounded
-                            : Icons.arrow_downward_rounded,
+                            ? AlistenIcons.arrowUpBold
+                            : AlistenIcons.arrowDown,
                         size: MediaQuery.textScalerOf(context)
                             .scale(AlistenSizes.inlineIcon),
                         color: colors.onGlass,
@@ -469,7 +470,7 @@ class _ViewToggle extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final grid = view == PlaylistView.grid;
     return IconCircleButton(
-      icon: grid ? Icons.view_list_rounded : Icons.grid_view_rounded,
+      icon: grid ? AlistenIcons.rows : AlistenIcons.squaresFour,
       semanticLabel: grid ? '以列表显示' : '以网格显示',
       style: IconCircleButtonStyle.plain,
       iconSize: AlistenSizes.iconSm,

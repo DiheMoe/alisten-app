@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,7 +30,7 @@ void main() {
     await tester.pumpWidget(
       app(
         IconCircleButton(
-          icon: Icons.skip_next_rounded,
+          icon: AlistenIcons.skipForwardFill,
           semanticLabel: '投票切歌',
           diameter: 36,
           onPressed: () => presses++,
@@ -63,7 +64,7 @@ void main() {
     await tester.pumpWidget(
       app(
         IconCircleButton(
-          icon: Icons.settings_rounded,
+          icon: AlistenIcons.gearSix,
           semanticLabel: '设置',
           style: IconCircleButtonStyle.plain,
           image: MemoryImage(png),
@@ -72,15 +73,15 @@ void main() {
       ),
     );
     final button = tester.getRect(find.byType(IconCircleButton));
-    expect(find.byIcon(Icons.settings_rounded), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.gearSix), findsOneWidget);
 
     await _finishLoading(tester);
-    expect(find.byIcon(Icons.settings_rounded), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.gearSix), findsOneWidget);
     expect(find.byType(RawImage), findsOneWidget);
     expect(tester.getRect(find.byType(IconCircleButton)), button);
 
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.settings_rounded), findsNothing);
+    expect(find.byIcon(AlistenIcons.gearSix), findsNothing);
     expect(tester.widget<RawImage>(find.byType(RawImage)).image, isNotNull);
     expect(
       tester.getSize(find.byType(RawImage)),
@@ -103,7 +104,7 @@ void main() {
         data: const MediaQueryData(disableAnimations: true),
         child: app(
           IconCircleButton(
-            icon: Icons.settings_rounded,
+            icon: AlistenIcons.gearSix,
             semanticLabel: '设置',
             image: MemoryImage(png),
             onPressed: () {},
@@ -115,7 +116,7 @@ void main() {
     await _finishLoading(tester);
     await tester.pump();
 
-    expect(find.byIcon(Icons.settings_rounded), findsNothing);
+    expect(find.byIcon(AlistenIcons.gearSix), findsNothing);
     expect(tester.widget<RawImage>(find.byType(RawImage)).image, isNotNull);
   });
 
@@ -123,7 +124,7 @@ void main() {
     await tester.pumpWidget(
       app(
         IconCircleButton(
-          icon: Icons.settings_rounded,
+          icon: AlistenIcons.gearSix,
           semanticLabel: '设置',
           image: MemoryImage(Uint8List(0)),
           onPressed: () {},
@@ -134,7 +135,7 @@ void main() {
     await _finishLoading(tester);
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.settings_rounded), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.gearSix), findsOneWidget);
     expect(find.byType(RawImage), findsNothing);
   });
 
@@ -144,7 +145,7 @@ void main() {
     await tester.pumpWidget(
       app(
         const IconCircleButton(
-          icon: Icons.skip_next_rounded,
+          icon: AlistenIcons.skipForwardFill,
           semanticLabel: '投票切歌',
           onPressed: null,
         ),

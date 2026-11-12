@@ -3,6 +3,7 @@ import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -41,7 +42,7 @@ const _longSong = NowPlaying(
 );
 
 Widget _saveButton(Track track, String title) => IconCircleButton(
-  icon: Icons.playlist_add_rounded,
+  icon: AlistenIcons.listPlus,
   semanticLabel: '把《$title》保存到歌单',
   style: IconCircleButtonStyle.plain,
   onPressed: () {},
@@ -199,7 +200,7 @@ void main() {
     final compact = ValueNotifier(false);
     addTearDown(compact.dispose);
     await _stage(tester, size: const Size(360, 700), compact: compact);
-    final save = find.byIcon(Icons.playlist_add_rounded);
+    final save = find.byIcon(AlistenIcons.listPlus);
 
     expect(save.hitTestable(), findsOneWidget);
     expect(find.semantics.byLabel('把《歌曲》保存到歌单'), findsOne);

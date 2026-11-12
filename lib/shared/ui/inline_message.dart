@@ -1,5 +1,6 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
 import 'package:flutter/material.dart';
 
@@ -19,10 +20,10 @@ class InlineMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     final (ink, icon) = switch (tone) {
-      StatusTone.neutral => (colors.onGlass, Icons.info_rounded),
-      StatusTone.success => (colors.success, Icons.check_circle_rounded),
-      StatusTone.warning => (colors.warning, Icons.warning_rounded),
-      StatusTone.danger => (colors.danger, Icons.error_rounded),
+      StatusTone.neutral => (colors.onGlass, AlistenIcons.infoFill),
+      StatusTone.success => (colors.success, AlistenIcons.checkCircleFill),
+      StatusTone.warning => (colors.warning, AlistenIcons.warningFill),
+      StatusTone.danger => (colors.danger, AlistenIcons.warningCircleFill),
     };
     final action = this.action;
     return DecoratedBox(

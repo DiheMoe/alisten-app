@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -52,7 +53,7 @@ void main() {
                       PillSegment(
                         value: 'queue',
                         label: '队列',
-                        icon: Icons.queue_music_rounded,
+                        icon: AlistenIcons.queue,
                       ),
                       PillSegment(value: 'chat', label: '聊天'),
                     ],
@@ -165,13 +166,9 @@ void main() {
               PillSegment(
                 value: 'grid',
                 label: '网格',
-                icon: Icons.grid_view_rounded,
+                icon: AlistenIcons.squaresFour,
               ),
-              PillSegment(
-                value: 'list',
-                label: '列表',
-                icon: Icons.view_list_rounded,
-              ),
+              PillSegment(value: 'list', label: '列表', icon: AlistenIcons.rows),
             ],
             selected: 'grid',
             onChanged: chosen.add,

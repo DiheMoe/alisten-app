@@ -1,5 +1,6 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -196,7 +197,7 @@ void main() {
                 child: AlistenTextField(
                   controller: controller,
                   hint: '搜歌名、歌手',
-                  icon: Icons.search_rounded,
+                  icon: AlistenIcons.magnifyingGlass,
                   pill: pill,
                 ),
               ),

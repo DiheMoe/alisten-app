@@ -6,6 +6,7 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/ui/action_menu.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/track_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -166,8 +167,8 @@ void main() {
     final semantics = tester.ensureSemantics();
     await _pump(tester, save: (_, _, _) {});
 
-    expect(find.byIcon(Icons.playlist_add_rounded), findsNothing);
-    expect(find.byIcon(Icons.close_rounded), findsNothing);
+    expect(find.byIcon(AlistenIcons.listPlus), findsNothing);
+    expect(find.byIcon(AlistenIcons.x), findsNothing);
     final row = find.ancestor(
       of: find.text('一首名字很长很长很长很长的歌c'),
       matching: find.byType(TrackRow),

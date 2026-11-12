@@ -1,4 +1,5 @@
 import 'package:alisten/features/playback/application/local_playback_state.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:flutter/material.dart';
 
 typedef LocalPlaybackNote = ({
@@ -17,44 +18,44 @@ LocalPlaybackNote? localPlaybackNote(LocalPlaybackStatus status) {
     LocalPlaybackStatus.idle || LocalPlaybackStatus.playing => null,
     LocalPlaybackStatus.waiting => (
       text: '等待开播',
-      icon: Icons.schedule_rounded,
+      icon: AlistenIcons.clock,
       busy: false,
       failed: false,
     ),
     LocalPlaybackStatus.loading => (
       text: '加载中',
-      icon: Icons.downloading_rounded,
+      icon: AlistenIcons.cloudArrowDown,
       busy: true,
       failed: false,
     ),
     LocalPlaybackStatus.buffering => (
       text: '缓冲中',
-      icon: Icons.downloading_rounded,
+      icon: AlistenIcons.cloudArrowDown,
       busy: true,
       failed: false,
     ),
     LocalPlaybackStatus.paused => (
       text: '本机已暂停',
-      icon: Icons.pause_circle_rounded,
+      icon: AlistenIcons.pauseCircleFill,
       busy: false,
       failed: false,
     ),
     LocalPlaybackStatus.ended => (
       text: '等待下一首',
-      icon: Icons.hourglass_bottom_rounded,
+      icon: AlistenIcons.hourglassLow,
       busy: false,
       failed: false,
     ),
     LocalPlaybackStatus.error => (
       text: '播放失败，点按重试',
-      icon: Icons.error_rounded,
+      icon: AlistenIcons.warningCircleFill,
       busy: false,
       failed: true,
     ),
     // 重试无效，所以不像播放失败那样提供重试。
     LocalPlaybackStatus.unavailable => (
       text: '本机无法播放，请重启应用',
-      icon: Icons.volume_off_rounded,
+      icon: AlistenIcons.speakerSlash,
       busy: false,
       failed: false,
     ),

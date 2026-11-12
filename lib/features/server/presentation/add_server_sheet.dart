@@ -4,6 +4,7 @@ import 'package:alisten/domain/server/server_profile.dart';
 import 'package:alisten/features/server/application/add_server_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -87,7 +88,7 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
         if (found == null)
           PillButton(
             label: '检测',
-            icon: Icons.travel_explore_rounded,
+            icon: AlistenIcons.globe,
             large: true,
             expand: true,
             busy: state.checking,
@@ -96,7 +97,7 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
         else
           PillButton(
             label: '添加并切换',
-            icon: Icons.swap_horiz_rounded,
+            icon: AlistenIcons.arrowsLeftRight,
             large: true,
             expand: true,
             onPressed: () => Navigator.of(context).pop(found),
@@ -137,7 +138,7 @@ class _FoundServer extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                Icons.check_circle_rounded,
+                AlistenIcons.checkCircleFill,
                 size: AlistenSizes.iconSm,
                 color: colors.success,
               ),

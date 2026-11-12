@@ -5,6 +5,7 @@ import 'package:alisten/features/admin/application/admin_registration_controller
 import 'package:alisten/features/admin/application/admin_session.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
@@ -98,7 +99,7 @@ class _RegistrationGroupState extends ConsumerState<RegistrationGroup> {
               child: StatusPill(
                 label: '正在获取注册状态…',
                 busy: true,
-                icon: Icons.sync_rounded,
+                icon: AlistenIcons.arrowsClockwise,
               ),
             ),
           if (loadError != null)

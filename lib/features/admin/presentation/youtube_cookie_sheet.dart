@@ -5,6 +5,7 @@ import 'package:alisten/features/admin/application/admin_session.dart';
 import 'package:alisten/features/admin/application/youtube_cookie_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -153,7 +154,7 @@ class _YoutubeCookieSheetState extends ConsumerState<YoutubeCookieSheet> {
           const SizedBox(height: AlistenSpacing.xl),
           PillButton(
             label: '保存',
-            icon: Icons.check_rounded,
+            icon: AlistenIcons.checkBold,
             large: true,
             expand: true,
             busy: _saving,

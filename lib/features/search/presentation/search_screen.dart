@@ -16,6 +16,7 @@ import 'package:alisten/features/search/presentation/share_link_card.dart';
 import 'package:alisten/features/search/presentation/song_row.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
@@ -202,7 +203,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       title: '清空最近搜索？',
       message: '这台设备上记下的搜索词会全部删除。',
       confirmLabel: '清空',
-      confirmIcon: Icons.delete_outline_rounded,
+      confirmIcon: AlistenIcons.trash,
     );
     if (!confirmed || !mounted) return;
     unawaited(_search.clearHistory());
@@ -255,8 +256,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               leading: IconCircleButton(
                 // 页面从底部升起时，收起的方向是向下。
                 icon: ModalRoute.of(context)?.fullscreenDialog ?? false
-                    ? Icons.keyboard_arrow_down_rounded
-                    : Icons.arrow_back_rounded,
+                    ? AlistenIcons.caretDown
+                    : AlistenIcons.arrowLeft,
                 semanticLabel: '返回房间',
                 style: IconCircleButtonStyle.plain,
                 onPressed: () => unawaited(Navigator.maybePop(context)),
@@ -275,7 +276,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 controller: _input,
                 focusNode: _focus,
                 hint: '搜歌名、歌手，或粘贴链接',
-                icon: Icons.search_rounded,
+                icon: AlistenIcons.magnifyingGlass,
                 pill: true,
                 textInputAction: TextInputAction.search,
                 onChanged: _onChanged,
@@ -404,7 +405,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
     return SliverFillRemaining(
       child: EmptyState(
-        icon: Icons.link_off_rounded,
+        icon: AlistenIcons.linkBreak,
         title: reason,
         message: switch (share?.problem) {
           LinkProblem.notSong => '歌单、专辑和歌手的链接不能直接点，可以搜索歌名。',
@@ -471,7 +472,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   child: Center(child: BusyIndicator(semanticLabel: '正在推荐')),
                 )
               : IconCircleButton(
-                  icon: Icons.refresh_rounded,
+                  icon: AlistenIcons.arrowClockwise,
                   semanticLabel: '换一批推荐',
                   style: IconCircleButtonStyle.plain,
                   onPressed: () => unawaited(_search.refreshRecommendations()),
@@ -505,11 +506,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             SearchPartial(:final message) => Semantics(
               liveRegion: true,
               child: EmptyState(
-                icon: Icons.cloud_off_rounded,
+                icon: AlistenIcons.cloudSlash,
                 title: message,
                 action: PillButton(
                   label: '重试',
-                  icon: Icons.refresh_rounded,
+                  icon: AlistenIcons.arrowClockwise,
                   style: PillButtonStyle.secondary,
                   onPressed: () => unawaited(_search.retry()),
                 ),
@@ -609,7 +610,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         : TrackSource.qq;
     final playlists = search.view == SearchView.playlists;
     return EmptyState(
-      icon: Icons.search_off_rounded,
+      icon: AlistenIcons.magnifyingGlassMinus,
       title: '没有找到“${search.keyword}”',
       message: playlists
           ? '没有相关的歌单，换个关键词试试。'
@@ -618,7 +619,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ? null
           : PillButton(
               label: '在${_sourceName(other)}搜索',
-              icon: Icons.swap_horiz_rounded,
+              icon: AlistenIcons.arrowsLeftRight,
               style: PillButtonStyle.secondary,
               onPressed: () => _changeSource(other),
             ),
@@ -676,7 +677,7 @@ class _PickedCount extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.queue_music_rounded,
+                              AlistenIcons.queue,
                               size: AlistenSizes.iconSm,
                               color: colors.onBrand,
                             ),
@@ -782,7 +783,7 @@ class _Recommendations extends StatelessWidget {
         SearchFailed(:final message) || SearchPartial(:final message) =>
           _InlineRetry(message: message, onRetry: onRetry),
         SearchLoaded() => const _Note(
-          icon: Icons.auto_awesome_rounded,
+          icon: AlistenIcons.sparkle,
           text: '还没有推荐。房间里多播几首网易云的歌，这里就会有了。',
         ),
         SearchIdle() || SearchLoading() => const SizedBox(
@@ -1124,7 +1125,7 @@ class _InlineRetry extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                Icons.error_outline_rounded,
+                AlistenIcons.warningCircle,
                 size: AlistenSizes.iconSm,
                 color: colors.danger,
               ),

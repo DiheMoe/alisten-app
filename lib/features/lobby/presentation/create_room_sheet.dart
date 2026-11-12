@@ -2,6 +2,7 @@ import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/lobby/application/lobby_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -128,7 +129,7 @@ class _CreateRoomSheetState extends ConsumerState<CreateRoomSheet> {
           const SizedBox(height: AlistenSpacing.xl),
           PillButton(
             label: '创建并进入',
-            icon: Icons.add_rounded,
+            icon: AlistenIcons.plusBold,
             large: true,
             expand: true,
             busy: _submitting,

@@ -8,6 +8,7 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/action_menu.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
@@ -45,9 +46,9 @@ const _dividerInset =
     AlistenSpacing.sm + AlistenSizes.rowCover + AlistenSpacing.sm;
 
 const _modes = [
-  (RoomPlayMode.sequential, '顺序', Icons.east_rounded, '已切换为顺序播放'),
-  (RoomPlayMode.rotation, '轮流', Icons.people_alt_rounded, '已切换为轮流播放'),
-  (RoomPlayMode.random, '随机', Icons.shuffle_rounded, '已切换为随机播放'),
+  (RoomPlayMode.sequential, '顺序', AlistenIcons.arrowRight, '已切换为顺序播放'),
+  (RoomPlayMode.rotation, '轮流', AlistenIcons.users, '已切换为轮流播放'),
+  (RoomPlayMode.random, '随机', AlistenIcons.shuffle, '已切换为随机播放'),
 ];
 
 const _bounceScale = 1.4;
@@ -117,7 +118,7 @@ class QueueView extends ConsumerWidget {
       title: '移除这首歌？',
       message: '《${entry.meta.title}》会从等待的歌里移除。',
       confirmLabel: '移除',
-      confirmIcon: Icons.delete_outline_rounded,
+      confirmIcon: AlistenIcons.trash,
     );
     if (!confirmed) return;
     onResult(await queue.remove(entry.id), '已移除');
@@ -245,11 +246,11 @@ class QueueView extends ConsumerWidget {
                     child: Center(
                       child: EdgeFadeItem(
                         child: EmptyState(
-                          icon: Icons.queue_music_rounded,
+                          icon: AlistenIcons.queue,
                           title: _noSongs,
                           action: PillButton(
                             label: '点歌',
-                            icon: Icons.add_rounded,
+                            icon: AlistenIcons.plusBold,
                             onPressed: onAddSong,
                           ),
                         ),
@@ -504,7 +505,7 @@ class _EntryRow extends StatelessWidget {
             )
           : entry.auto
           ? const MemberAvatar.icon(
-              Icons.auto_awesome_rounded,
+              AlistenIcons.sparkle,
               size: AlistenSizes.memberTag,
             )
           : null,
@@ -545,18 +546,18 @@ class _EntryMenu extends StatelessWidget {
       entries: [
         if (save != null)
           ActionMenuEntry(
-            icon: Icons.playlist_add_rounded,
+            icon: AlistenIcons.listPlus,
             label: '保存到歌单',
             onSelected: () => save(context, entry.track, title),
           ),
         ActionMenuEntry(
-          icon: Icons.content_copy_rounded,
+          icon: AlistenIcons.copy,
           label: copyTitleHint,
           onSelected: () => onCopyTitle(title),
         ),
         if (removable)
           ActionMenuEntry(
-            icon: Icons.remove_circle_outline_rounded,
+            icon: AlistenIcons.minusCircle,
             label: '移除',
             danger: true,
             enabled: remove != null,
@@ -590,7 +591,7 @@ class _NoneWaiting extends StatelessWidget {
             const SizedBox(width: AlistenSpacing.xs),
             PillButton(
               label: '点歌',
-              icon: Icons.add_rounded,
+              icon: AlistenIcons.plusBold,
               style: PillButtonStyle.secondary,
               onPressed: onAddSong,
             ),
@@ -632,7 +633,7 @@ class _Playing extends StatelessWidget {
         const SizedBox(width: AlistenSpacing.xs),
         ExcludeSemantics(
           child: Icon(
-            Icons.graphic_eq_rounded,
+            AlistenIcons.waveform,
             size: AlistenSizes.icon,
             color: Theme.of(context).colorScheme.primary,
           ),
@@ -660,7 +661,7 @@ class _LikeCount extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.favorite_border_rounded,
+                AlistenIcons.heart,
                 size: AlistenSizes.inlineIcon,
                 color: muted,
               ),
@@ -811,8 +812,8 @@ class _LikeButtonState extends State<_LikeButton>
                                 scale: _scale.value,
                                 child: Icon(
                                   _bounce.isAnimating
-                                      ? Icons.favorite_rounded
-                                      : Icons.favorite_border_rounded,
+                                      ? AlistenIcons.heartFill
+                                      : AlistenIcons.heart,
                                   size: AlistenSizes.iconSm,
                                   color: Color.lerp(
                                     colors.onGlassMuted,

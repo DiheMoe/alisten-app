@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:alisten/features/update/application/update_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:alisten/shared/ui/toast.dart';
@@ -117,7 +118,9 @@ class _UpdateSheetState extends ConsumerState<UpdateSheet> {
         const SizedBox(height: AlistenSpacing.xl),
         PillButton(
           label: android ? '下载更新' : '前往发布页',
-          icon: android ? Icons.download_rounded : Icons.open_in_new_rounded,
+          icon: android
+              ? AlistenIcons.downloadSimple
+              : AlistenIcons.arrowSquareOut,
           busy: _opening,
           large: true,
           expand: true,

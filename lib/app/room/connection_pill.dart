@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:alisten/features/room/index.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
 import 'package:flutter/material.dart';
@@ -82,28 +83,28 @@ class _ConnectionPillState extends ConsumerState<ConnectionPill> {
       RoomConnectionStatus.connecting => (
         '正在连接',
         '正在连接房间',
-        Icons.sync_rounded,
+        AlistenIcons.arrowsClockwise,
         StatusTone.warning,
         true,
       ),
       RoomConnectionStatus.reconnecting when _waiting && seconds > 0 => (
         '正在重连 · $seconds 秒后重试',
         '连接中断，稍后自动重连',
-        Icons.cloud_off_rounded,
+        AlistenIcons.cloudSlash,
         StatusTone.warning,
         false,
       ),
       RoomConnectionStatus.reconnecting => (
         '正在重连',
         '连接中断，正在重连',
-        Icons.sync_rounded,
+        AlistenIcons.arrowsClockwise,
         StatusTone.warning,
         true,
       ),
       RoomConnectionStatus.stopped => (
         '连接已停止',
         '与房间的连接已经停止',
-        Icons.error_rounded,
+        AlistenIcons.warningCircleFill,
         StatusTone.danger,
         false,
       ),

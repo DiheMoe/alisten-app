@@ -16,6 +16,7 @@ import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/visible_frames.dart';
@@ -406,7 +407,10 @@ class _LyricsViewState extends ConsumerState<LyricsView>
     ref.listen(playbackControllerProvider, _onPlayback);
     _smoothShown = _smooth;
     if (lines.every((line) => line.isBlank)) {
-      return const EmptyState(icon: Icons.lyrics_rounded, title: '暂无歌词');
+      return const EmptyState(
+        icon: AlistenIcons.microphoneStage,
+        title: '暂无歌词',
+      );
     }
     return RepaintBoundary(
       child: EdgeFade(

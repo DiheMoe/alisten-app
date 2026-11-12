@@ -1,5 +1,6 @@
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/chip_pill.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
@@ -94,7 +95,7 @@ void main() {
     page.loseAdd();
     await page.settle();
 
-    expect(find.byIcon(Icons.question_mark_rounded), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.questionBold), findsOneWidget);
     expect(find.text('结果未知'), findsOneWidget);
     expect(tester.getSemantics(pick).value, '结果未知');
     expect(find.text('结果未知，已重新同步'), findsOneWidget);

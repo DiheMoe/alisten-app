@@ -1,4 +1,5 @@
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -12,7 +13,7 @@ class AsyncStateView extends StatelessWidget {
     required this.onRetry,
     required this.child,
     this.emptyLabel = '暂无可显示内容',
-    this.emptyIcon = Icons.inbox_rounded,
+    this.emptyIcon = AlistenIcons.tray,
     this.emptyAction,
     super.key,
   });
@@ -38,11 +39,11 @@ class AsyncStateView extends StatelessWidget {
       return Semantics(
         liveRegion: true,
         child: EmptyState(
-          icon: Icons.cloud_off_rounded,
+          icon: AlistenIcons.cloudSlash,
           title: error,
           action: PillButton(
             label: '重试',
-            icon: Icons.refresh_rounded,
+            icon: AlistenIcons.arrowClockwise,
             style: PillButtonStyle.secondary,
             onPressed: onRetry,
           ),

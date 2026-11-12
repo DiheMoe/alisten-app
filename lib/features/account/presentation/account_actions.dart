@@ -15,6 +15,7 @@ import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/pressable.dart';
@@ -49,7 +50,7 @@ class _AccountActionsState extends ConsumerState<AccountActions> {
       title: '退出登录？',
       message: inRoom ? '退出后会重新进入当前房间，正在播放的歌会中断。' : '退出后这台设备会变成新的游客。',
       confirmLabel: '退出登录',
-      confirmIcon: Icons.logout_rounded,
+      confirmIcon: AlistenIcons.signOut,
     );
     if (!confirmed || !mounted) return;
     setState(() => _loggingOut = true);
@@ -247,7 +248,7 @@ class _ActionRow extends StatelessWidget {
                 )
               else
                 Icon(
-                  Icons.chevron_right_rounded,
+                  AlistenIcons.caretRight,
                   size: AlistenSizes.icon,
                   color: colors.onGlassMuted,
                 ),

@@ -2,6 +2,7 @@ import 'package:alisten/app/room/connection_pill.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/animated_resize.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
@@ -64,7 +65,7 @@ class _RoomTopBarState extends State<RoomTopBar> {
         children: [
           AlistenTopBar(
             leading: IconCircleButton(
-              icon: Icons.keyboard_arrow_down_rounded,
+              icon: AlistenIcons.caretDown,
               semanticLabel: '收起房间',
               style: IconCircleButtonStyle.plain,
               iconSize: AlistenSizes.iconLg,
@@ -84,7 +85,7 @@ class _RoomTopBarState extends State<RoomTopBar> {
               if (widget.onAddSong case final onAddSong?) ...[
                 PillButton(
                   label: '点歌',
-                  icon: Icons.add_rounded,
+                  icon: AlistenIcons.plusBold,
                   onPressed: onAddSong,
                 ),
                 const SizedBox(width: AlistenSpacing.xs),
@@ -102,7 +103,7 @@ class _RoomTopBarState extends State<RoomTopBar> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _MenuItem(
-                        icon: Icons.person_add_alt_1_rounded,
+                        icon: AlistenIcons.userPlus,
                         label: '复制邀请链接',
                         ink: colors.onGlass,
                         onPressed: () {
@@ -111,7 +112,7 @@ class _RoomTopBarState extends State<RoomTopBar> {
                         },
                       ),
                       _MenuItem(
-                        icon: Icons.logout_rounded,
+                        icon: AlistenIcons.signOut,
                         label: '退出房间',
                         ink: colors.danger,
                         onPressed: () {
@@ -123,7 +124,7 @@ class _RoomTopBarState extends State<RoomTopBar> {
                   ),
                 ),
                 child: IconCircleButton(
-                  icon: Icons.more_horiz_rounded,
+                  icon: AlistenIcons.dotsThreeBold,
                   semanticLabel: '更多',
                   style: IconCircleButtonStyle.plain,
                   expanded: _menuOpen,

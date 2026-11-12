@@ -7,6 +7,7 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
@@ -118,7 +119,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
       background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
-          icon: Icons.arrow_back_rounded,
+          icon: AlistenIcons.arrowLeft,
           semanticLabel: '返回',
           style: IconCircleButtonStyle.plain,
           onPressed: () => unawaited(Navigator.maybePop(context)),
@@ -221,7 +222,7 @@ class _PairFormState extends State<_PairForm> {
         const SizedBox(height: AlistenSpacing.lg),
         PillButton(
           label: '登录',
-          icon: Icons.check_rounded,
+          icon: AlistenIcons.checkBold,
           expand: true,
           busy: widget.busy,
           onPressed: widget.busy ? null : _submit,

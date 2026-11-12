@@ -6,6 +6,7 @@ import 'package:alisten/features/server/presentation/add_server_sheet.dart';
 import 'package:alisten/features/server/presentation/switch_server_flow.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
@@ -86,7 +87,7 @@ class _ServerScreenState extends ConsumerState<ServerScreen> {
       title: '删除 $name？',
       message: '会删除这台设备在这个服务器上的身份和房间票据。',
       confirmLabel: '删除',
-      confirmIcon: Icons.delete_outline_rounded,
+      confirmIcon: AlistenIcons.trash,
     );
     if (!confirmed || !mounted || _busy) return;
     setState(() {
@@ -111,7 +112,7 @@ class _ServerScreenState extends ConsumerState<ServerScreen> {
       background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
-          icon: Icons.arrow_back_rounded,
+          icon: AlistenIcons.arrowLeft,
           semanticLabel: '返回',
           style: IconCircleButtonStyle.plain,
           onPressed: () => unawaited(Navigator.maybePop(context)),
@@ -163,7 +164,7 @@ class _ServerScreenState extends ConsumerState<ServerScreen> {
           const SizedBox(height: AlistenSpacing.lg),
           PillButton(
             label: '添加服务器',
-            icon: Icons.add_rounded,
+            icon: AlistenIcons.plusBold,
             expand: true,
             onPressed: working == null ? () => unawaited(_add()) : null,
           ),
@@ -234,19 +235,23 @@ class _ServerRow extends StatelessWidget {
             ),
             if (builtIn) ...[
               const SizedBox(width: AlistenSpacing.xs),
-              const StatusPill(label: '内置', icon: Icons.verified_rounded),
+              const StatusPill(label: '内置', icon: AlistenIcons.sealCheckFill),
             ],
             if (current) ...[
               const SizedBox(width: AlistenSpacing.xs),
               const StatusPill(
                 label: '当前',
-                icon: Icons.check_circle_rounded,
+                icon: AlistenIcons.checkCircleFill,
                 tone: StatusTone.success,
               ),
             ],
             if (workingLabel case final label?) ...[
               const SizedBox(width: AlistenSpacing.xs),
-              StatusPill(label: label, icon: Icons.sync_rounded, busy: true),
+              StatusPill(
+                label: label,
+                icon: AlistenIcons.arrowsClockwise,
+                busy: true,
+              ),
             ],
           ],
         ),
@@ -267,7 +272,7 @@ class _ServerRow extends StatelessWidget {
           Padding(
             padding: const EdgeInsetsDirectional.only(end: AlistenSpacing.xs),
             child: IconCircleButton(
-              icon: Icons.delete_outline_rounded,
+              icon: AlistenIcons.trash,
               semanticLabel: '删除 $name',
               style: IconCircleButtonStyle.plain,
               diameter: AlistenSizes.rowAction,

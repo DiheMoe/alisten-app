@@ -5,6 +5,7 @@ import 'package:alisten/domain/mutation/mutation_result.dart';
 import 'package:alisten/features/account/presentation/show_password_row.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -161,7 +162,7 @@ class _CredentialsFormState extends State<CredentialsForm> {
           const SizedBox(height: AlistenSpacing.lg),
           PillButton(
             label: widget.submitLabel,
-            icon: Icons.check_rounded,
+            icon: AlistenIcons.checkBold,
             expand: true,
             busy: _busy,
             onPressed: _busy || !widget.enabled

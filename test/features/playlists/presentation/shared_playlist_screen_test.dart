@@ -6,6 +6,7 @@ import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/playlists/application/shared_playlist_controller.dart';
 import 'package:alisten/features/playlists/presentation/shared_playlist_screen.dart';
 import 'package:alisten/features/search/application/pick_controller.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -124,7 +125,7 @@ void main() {
 
     expect(find.text('分享已失效'), findsOneWidget);
     expect(find.text('歌单被删除了，或者分享的人停止了分享。'), findsOneWidget);
-    expect(find.byIcon(Icons.link_off_rounded), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.linkBreak), findsOneWidget);
   });
 
   testWidgets('an empty share says so', (tester) async {
@@ -403,9 +404,12 @@ void main() {
       await tester.ensureVisible(find.text('结果未知'));
       await tester.pump();
       expect(tester.takeException(), isNull);
-      expect(find.byIcon(Icons.more_horiz_rounded).hitTestable(), findsWidgets);
       expect(
-        find.byIcon(Icons.question_mark_rounded).hitTestable(),
+        find.byIcon(AlistenIcons.dotsThreeBold).hitTestable(),
+        findsWidgets,
+      );
+      expect(
+        find.byIcon(AlistenIcons.questionBold).hitTestable(),
         findsWidgets,
       );
     });

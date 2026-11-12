@@ -5,6 +5,7 @@ import 'package:alisten/features/playlists/application/my_playlists_controller.d
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -26,7 +27,7 @@ class PlaylistNameForm<T> extends StatefulWidget {
     required this.onSubmit,
     required this.onSucceeded,
     this.initialName = '',
-    this.confirmIcon = Icons.check_rounded,
+    this.confirmIcon = AlistenIcons.checkBold,
     this.onCancel,
     super.key,
   });
@@ -151,7 +152,7 @@ Future<T?> showPlaylistNameSheet<T>(
   required String busyLabel,
   required Future<MutationResult<T>> Function(String name) onSubmit,
   String initialName = '',
-  IconData confirmIcon = Icons.check_rounded,
+  IconData confirmIcon = AlistenIcons.checkBold,
   bool cancellable = true,
   String? guestMessage,
   VoidCallback? onOpenAccount,
@@ -179,7 +180,7 @@ class PlaylistNameSheet<T> extends ConsumerWidget {
     required this.busyLabel,
     required this.onSubmit,
     this.initialName = '',
-    this.confirmIcon = Icons.check_rounded,
+    this.confirmIcon = AlistenIcons.checkBold,
     this.cancellable = true,
     this.guestMessage,
     this.onOpenAccount,

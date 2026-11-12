@@ -7,6 +7,7 @@ import 'package:alisten/features/admin/presentation/admin_time.dart';
 import 'package:alisten/features/admin/presentation/youtube_cookie_sheet.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -54,7 +55,7 @@ class _YoutubeGroupState extends ConsumerState<YoutubeGroup>
       title: '清除 YouTube Cookie？',
       message: '清除后，下载 YouTube 链接时不再携带 cookies',
       confirmLabel: '清除',
-      confirmIcon: Icons.delete_outline_rounded,
+      confirmIcon: AlistenIcons.trash,
     );
     if (!confirmed || !mounted || _clearing) return;
     setState(() => _clearing = true);
@@ -112,7 +113,7 @@ class _YoutubeGroupState extends ConsumerState<YoutubeGroup>
               alignment: AlignmentDirectional.centerStart,
               child: StatusPill(
                 label: '正在读取',
-                icon: Icons.sync_rounded,
+                icon: AlistenIcons.arrowsClockwise,
                 busy: true,
               ),
             ),
@@ -138,14 +139,14 @@ class _YoutubeGroupState extends ConsumerState<YoutubeGroup>
               if (saved)
                 PillButton(
                   label: '清除',
-                  icon: Icons.delete_outline_rounded,
+                  icon: AlistenIcons.trash,
                   style: PillButtonStyle.ghost,
                   busy: _clearing,
                   onPressed: () => unawaited(_clear()),
                 ),
               PillButton(
                 label: saved ? '覆盖' : '填写',
-                icon: Icons.content_paste_rounded,
+                icon: AlistenIcons.clipboardText,
                 style: PillButtonStyle.secondary,
                 onPressed: (status == null && error == null) || _clearing
                     ? null

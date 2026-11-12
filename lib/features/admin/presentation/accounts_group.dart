@@ -5,6 +5,7 @@ import 'package:alisten/features/admin/application/admin_accounts_controller.dar
 import 'package:alisten/features/admin/presentation/reset_password_sheet.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
@@ -108,7 +109,7 @@ class _AccountsGroupState extends ConsumerState<AccountsGroup> {
           const SizedBox(height: AlistenSpacing.sm),
           PillButton(
             label: '查找',
-            icon: Icons.search_rounded,
+            icon: AlistenIcons.magnifyingGlass,
             expand: true,
             busy: accounts.searching,
             onPressed: accounts.searching

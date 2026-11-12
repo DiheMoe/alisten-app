@@ -4,6 +4,7 @@ import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/search/application/pick_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -101,7 +102,7 @@ void main() {
     final semantics = tester.ensureSemantics();
     await pump(tester, withSlot: true);
 
-    expect(find.byIcon(Icons.playlist_add_rounded), findsNothing);
+    expect(find.byIcon(AlistenIcons.listPlus), findsNothing);
     expect(
       tester.getRect(find.bySemanticsLabel('再点一次《晴天》')).right,
       lessThanOrEqualTo(
@@ -131,7 +132,10 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('结果未知'), findsOneWidget);
-    expect(find.byIcon(Icons.more_horiz_rounded).hitTestable(), findsOneWidget);
-    expect(find.byIcon(Icons.question_mark_rounded).hitTestable(), findsOne);
+    expect(
+      find.byIcon(AlistenIcons.dotsThreeBold).hitTestable(),
+      findsOneWidget,
+    );
+    expect(find.byIcon(AlistenIcons.questionBold).hitTestable(), findsOne);
   });
 }

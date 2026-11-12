@@ -16,6 +16,7 @@ import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/alisten_toggle.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
@@ -740,7 +741,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(ToastHost),
-        matching: find.byIcon(Icons.error_rounded),
+        matching: find.byIcon(AlistenIcons.warningCircleFill),
       ),
       findsOneWidget,
     );
@@ -926,7 +927,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('检查更新失败，请稍后再试。'), findsOneWidget);
-      expect(toastIcon(Icons.error_rounded), findsOneWidget);
+      expect(toastIcon(AlistenIcons.warningCircleFill), findsOneWidget);
     });
 
     testWidgets('shows the check in progress and cannot be started again '
@@ -1027,7 +1028,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(ToastHost),
-        matching: find.byIcon(Icons.check_circle_rounded),
+        matching: find.byIcon(AlistenIcons.checkCircleFill),
       ),
       findsOneWidget,
     );
@@ -1050,7 +1051,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(ToastHost),
-        matching: find.byIcon(Icons.error_rounded),
+        matching: find.byIcon(AlistenIcons.warningCircleFill),
       ),
       findsOneWidget,
     );
@@ -1237,7 +1238,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(ToastHost),
-        matching: find.byIcon(Icons.warning_rounded),
+        matching: find.byIcon(AlistenIcons.warningFill),
       ),
       findsOneWidget,
     );

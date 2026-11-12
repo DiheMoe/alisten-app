@@ -9,6 +9,7 @@ import 'package:alisten/features/chat/presentation/member_list.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/animated_resize.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
@@ -306,7 +307,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     final Widget timeline;
     if (messages.isEmpty) {
       timeline = const EmptyState(
-        icon: Icons.forum_rounded,
+        icon: AlistenIcons.chatsCircle,
         title: '还没有消息',
         message: '说点什么，聊聊正在放的这首歌',
       );
@@ -440,7 +441,7 @@ class _RowList extends StatelessWidget {
               _EarlierRow() => Center(
                 child: PillButton(
                   label: '查看更早的消息',
-                  icon: Icons.history_rounded,
+                  icon: AlistenIcons.clockCounterClockwise,
                   style: PillButtonStyle.ghost,
                   onPressed: onShowEarlier,
                 ),
@@ -606,7 +607,7 @@ class _MemberStrip extends ConsumerWidget {
                   children: [
                     Text('成员', style: muted),
                     Icon(
-                      Icons.chevron_right_rounded,
+                      AlistenIcons.caretRight,
                       size: AlistenSizes.iconSm,
                       color: colors.onGlassMuted,
                     ),
@@ -873,12 +874,12 @@ class _ActivityPill extends StatelessWidget {
     final colors = AlistenColors.of(context);
     final failed = item.kind == RoomActivityKind.failed;
     final icon = switch (item.kind) {
-      RoomActivityKind.added => Icons.playlist_add_rounded,
-      RoomActivityKind.removed => Icons.playlist_remove_rounded,
-      RoomActivityKind.liked => Icons.favorite_rounded,
-      RoomActivityKind.voted => Icons.how_to_vote_rounded,
-      RoomActivityKind.skipped => Icons.skip_next_rounded,
-      RoomActivityKind.failed => Icons.error_outline_rounded,
+      RoomActivityKind.added => AlistenIcons.listPlus,
+      RoomActivityKind.removed => AlistenIcons.listDashes,
+      RoomActivityKind.liked => AlistenIcons.heartFill,
+      RoomActivityKind.voted => AlistenIcons.checkSquare,
+      RoomActivityKind.skipped => AlistenIcons.skipForwardFill,
+      RoomActivityKind.failed => AlistenIcons.warningCircle,
     };
     final actor = item.member;
     return Padding(
@@ -967,7 +968,7 @@ class _ToLatestButton extends ConsumerWidget {
           : PillButton(
               key: ValueKey(unread > 0),
               label: unread > 0 ? '新消息 $unread 条' : '回到最新',
-              icon: Icons.arrow_downward_rounded,
+              icon: AlistenIcons.arrowDown,
               onPressed: onPressed,
             ),
     );
@@ -1122,13 +1123,13 @@ class _ComposerState extends ConsumerState<_Composer> {
                   // 不朗读：房间顶栏会播报连接状态。
                   if (!connected)
                     _ComposerNotice(
-                      icon: Icons.cloud_off_rounded,
+                      icon: AlistenIcons.cloudSlash,
                       text: '连接后可发送',
                       color: colors.warning,
                     ),
                   if (sendError != null)
                     _ComposerNotice(
-                      icon: Icons.error_outline_rounded,
+                      icon: AlistenIcons.warningCircle,
                       text: sendError,
                       color: colors.danger,
                       announce: true,
@@ -1247,7 +1248,7 @@ class _SendButton extends StatelessWidget {
           child: sending
               ? BusyIndicator(size: AlistenSizes.iconSm, color: colors.onBrand)
               : Icon(
-                  Icons.arrow_upward_rounded,
+                  AlistenIcons.arrowUpBold,
                   size: AlistenSizes.icon,
                   color: idle ? colors.onGlassMuted : colors.onBrand,
                 ),

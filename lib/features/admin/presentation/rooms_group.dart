@@ -10,6 +10,7 @@ import 'package:alisten/features/admin/presentation/room_actions_sheet.dart';
 import 'package:alisten/features/admin/presentation/room_form_sheet.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -78,7 +79,7 @@ class _RoomsGroupState extends ConsumerState<RoomsGroup> {
       title: '删除常驻房间？',
       message: '删除「${room.name}」后，房间里的所有人都会断开连接。',
       confirmLabel: '删除',
-      confirmIcon: Icons.delete_outline_rounded,
+      confirmIcon: AlistenIcons.trash,
     );
     if (!confirmed || !mounted || _deleting != null) return;
     setState(() => _deleting = room.id);
@@ -152,7 +153,7 @@ class _RoomsGroupState extends ConsumerState<RoomsGroup> {
                     alignment: AlignmentDirectional.centerStart,
                     child: StatusPill(
                       label: '正在读取',
-                      icon: Icons.sync_rounded,
+                      icon: AlistenIcons.arrowsClockwise,
                       busy: true,
                     ),
                   )
@@ -162,7 +163,7 @@ class _RoomsGroupState extends ConsumerState<RoomsGroup> {
               ],
               PillButton(
                 label: '新建常驻房间',
-                icon: Icons.add_rounded,
+                icon: AlistenIcons.plusBold,
                 style: PillButtonStyle.secondary,
                 expand: true,
                 onPressed: deleting == null
@@ -244,12 +245,15 @@ class _RoomRow extends StatelessWidget {
                 const SizedBox(width: AlistenSpacing.xs),
                 const StatusPill(
                   label: '删除中',
-                  icon: Icons.sync_rounded,
+                  icon: AlistenIcons.arrowsClockwise,
                   busy: true,
                 ),
               ] else if (room.hasPassword) ...[
                 const SizedBox(width: AlistenSpacing.xs),
-                const StatusPill(label: '有密码', icon: Icons.lock_rounded),
+                const StatusPill(
+                  label: '有密码',
+                  icon: AlistenIcons.lockSimpleFill,
+                ),
               ],
             ],
           ),

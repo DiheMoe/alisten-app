@@ -1,5 +1,6 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_images.dart';
 import 'package:flutter/material.dart';
 
@@ -12,7 +13,7 @@ class CoverArt extends StatelessWidget {
     this.radius = AlistenRadii.sm,
     this.shadow = false,
     this.heroTag,
-    this.placeholderIcon = Icons.music_note_rounded,
+    this.placeholderIcon = AlistenIcons.musicNote,
     super.key,
   });
 

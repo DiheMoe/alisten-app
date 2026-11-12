@@ -8,6 +8,7 @@ import 'package:alisten/features/admin/presentation/youtube_group.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
@@ -40,7 +41,7 @@ class AdminHome extends ConsumerWidget {
         actions: [
           PillButton(
             label: '退出后台',
-            icon: Icons.logout_rounded,
+            icon: AlistenIcons.signOut,
             style: PillButtonStyle.secondary,
             onPressed: onExit,
           ),

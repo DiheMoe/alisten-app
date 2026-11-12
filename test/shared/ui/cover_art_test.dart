@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/cover_images.dart';
 import 'package:flutter/material.dart';
@@ -45,7 +46,7 @@ void main() {
     await _finishLoading(tester);
 
     expect(asked.toSet(), {_cover});
-    expect(find.byIcon(Icons.music_note_rounded), findsNothing);
+    expect(find.byIcon(AlistenIcons.musicNote), findsNothing);
     final shown = tester.widget<RawImage>(find.byType(RawImage)).image!;
     expect(shown.width, 96);
   });
@@ -63,7 +64,7 @@ void main() {
     );
     await _finishLoading(tester);
 
-    expect(find.byIcon(Icons.music_note_rounded), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.musicNote), findsOneWidget);
   });
 
   testWidgets('without an image the placeholder shows the given icon', (
@@ -74,15 +75,19 @@ void main() {
         theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
         home: const Row(
           children: [
-            CoverArt(url: null, size: 52, placeholderIcon: Icons.star_rounded),
+            CoverArt(
+              url: null,
+              size: 52,
+              placeholderIcon: AlistenIcons.starFill,
+            ),
             CoverArt(url: '', size: 52),
           ],
         ),
       ),
     );
 
-    expect(find.byIcon(Icons.star_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.music_note_rounded), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.starFill), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.musicNote), findsOneWidget);
   });
 }
 

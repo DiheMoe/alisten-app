@@ -7,6 +7,7 @@ import 'package:alisten/features/account/presentation/show_password_row.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -146,7 +147,7 @@ class _ChangePasswordSheetState extends ConsumerState<ChangePasswordSheet> {
           const SizedBox(height: AlistenSpacing.lg),
           PillButton(
             label: '修改密码',
-            icon: Icons.check_rounded,
+            icon: AlistenIcons.checkBold,
             expand: true,
             busy: _busy,
             onPressed: _busy ? null : () => unawaited(_submit()),

@@ -1,5 +1,6 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -88,7 +89,7 @@ void main() {
                   expected = PillButton.heightOf(context, large: large);
                   return PillButton(
                     label: '加入房间',
-                    icon: Icons.login_rounded,
+                    icon: AlistenIcons.signIn,
                     large: large,
                     onPressed: () {},
                   );

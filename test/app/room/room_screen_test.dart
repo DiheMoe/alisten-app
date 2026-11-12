@@ -17,6 +17,7 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
@@ -346,8 +347,8 @@ void main() {
 
     final route = ModalRoute.of(tester.element(find.byType(SearchScreen)))!;
     expect((route as PageRoute<void>).fullscreenDialog, isTrue);
-    expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
+    expect(find.byIcon(AlistenIcons.caretDown), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.arrowLeft), findsNothing);
   });
 
   testWidgets('on Apple platforms song search keeps the back swipe', (
@@ -362,7 +363,7 @@ void main() {
 
     final route = ModalRoute.of(tester.element(find.byType(SearchScreen)))!;
     expect((route as PageRoute<void>).fullscreenDialog, isFalse);
-    expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.arrowLeft), findsOneWidget);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
   testWidgets('a track that fails here says so, and a tap tries again', (

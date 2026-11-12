@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:alisten/features/settings/application/open_source_licenses.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/async_state_view.dart';
@@ -40,7 +41,7 @@ class _LicensesScreenState extends ConsumerState<LicensesScreen> {
       background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
-          icon: Icons.arrow_back_rounded,
+          icon: AlistenIcons.arrowLeft,
           semanticLabel: '返回',
           style: IconCircleButtonStyle.plain,
           onPressed: () => unawaited(Navigator.maybePop(context)),
@@ -52,7 +53,7 @@ class _LicensesScreenState extends ConsumerState<LicensesScreen> {
         errorMessage: licenses.hasError ? '没能读取开源许可' : null,
         empty: packages.isEmpty,
         emptyLabel: '没有可显示的许可',
-        emptyIcon: Icons.description_outlined,
+        emptyIcon: AlistenIcons.fileText,
         onRetry: () => ref.invalidate(openSourceLicensesProvider),
         child: _list(packages),
       ),
@@ -176,8 +177,8 @@ class _PackageHeader extends StatelessWidget {
                   const SizedBox(width: AlistenSpacing.sm),
                   Icon(
                     expanded
-                        ? Icons.expand_less_rounded
-                        : Icons.expand_more_rounded,
+                        ? AlistenIcons.caretUpBold
+                        : AlistenIcons.caretDownBold,
                     size: AlistenSizes.icon,
                     color: colors.onGlassMuted,
                   ),

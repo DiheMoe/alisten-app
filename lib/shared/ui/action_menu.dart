@@ -1,5 +1,6 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/popover.dart';
 import 'package:alisten/shared/ui/pressable.dart';
@@ -31,7 +32,7 @@ class ActionMenuButton extends StatefulWidget {
   const ActionMenuButton({
     required this.semanticLabel,
     required this.entries,
-    this.icon = Icons.more_horiz_rounded,
+    this.icon = AlistenIcons.dotsThreeBold,
     this.iconSize = AlistenSizes.icon,
     this.trigger,
     super.key,
@@ -156,7 +157,7 @@ class _MenuItem extends StatelessWidget {
               if (entry.checked ?? false) ...[
                 const SizedBox(width: AlistenSpacing.sm),
                 Icon(
-                  Icons.check_rounded,
+                  AlistenIcons.checkBold,
                   size: AlistenSizes.iconSm,
                   color: ink,
                 ),

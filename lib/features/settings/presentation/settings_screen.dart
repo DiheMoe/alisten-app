@@ -12,6 +12,7 @@ import 'package:alisten/features/settings/application/settings_state.dart';
 import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/alisten_toggle.dart';
@@ -35,14 +36,10 @@ const _themes = [
   PillSegment(
     value: AppTheme.system,
     label: '跟随系统',
-    icon: Icons.brightness_auto_rounded,
+    icon: AlistenIcons.circleHalf,
   ),
-  PillSegment(value: AppTheme.dark, label: '深色', icon: Icons.dark_mode_rounded),
-  PillSegment(
-    value: AppTheme.light,
-    label: '浅色',
-    icon: Icons.light_mode_rounded,
-  ),
+  PillSegment(value: AppTheme.dark, label: '深色', icon: AlistenIcons.moon),
+  PillSegment(value: AppTheme.light, label: '浅色', icon: AlistenIcons.sun),
 ];
 
 const _weWillRockYou = [
@@ -205,7 +202,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
-          icon: Icons.arrow_back_rounded,
+          icon: AlistenIcons.arrowLeft,
           semanticLabel: '返回',
           style: IconCircleButtonStyle.plain,
           onPressed: () => unawaited(Navigator.maybePop(context)),
@@ -380,7 +377,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ? SizedBox(width: AlistenSizes.toggleTrack.width)
             : PillButton(
                 label: '重试',
-                icon: Icons.refresh_rounded,
+                icon: AlistenIcons.arrowClockwise,
                 style: PillButtonStyle.secondary,
                 onPressed: () => unawaited(_readProfile()),
               ),
@@ -569,7 +566,7 @@ class _ProfileSheetState extends ConsumerState<_ProfileSheet> {
           const SizedBox(height: AlistenSpacing.lg),
           PillButton(
             label: '保存资料',
-            icon: Icons.check_rounded,
+            icon: AlistenIcons.checkBold,
             expand: true,
             busy: _saving,
             onPressed: changed && !_saving ? () => unawaited(_save()) : null,
@@ -799,7 +796,7 @@ class _LinkRow extends StatelessWidget {
                 )
               else
                 Icon(
-                  Icons.chevron_right_rounded,
+                  AlistenIcons.caretRight,
                   size: AlistenSizes.icon,
                   color: muted,
                 ),
@@ -858,7 +855,7 @@ class _ImageCache extends StatelessWidget {
           const SizedBox(width: AlistenSpacing.sm),
           PillButton(
             label: '清除缓存',
-            icon: Icons.delete_outline_rounded,
+            icon: AlistenIcons.trash,
             style: PillButtonStyle.secondary,
             busy: clearing,
             onPressed: clearing ? null : onClear,
@@ -889,17 +886,17 @@ class _Permission extends StatelessWidget {
     final (label, icon, tone) = switch (permission) {
       NotificationPermission.granted => (
         '已允许',
-        Icons.check_circle_rounded,
+        AlistenIcons.checkCircleFill,
         StatusTone.success,
       ),
       NotificationPermission.denied => (
         '已被系统拒绝',
-        Icons.block_rounded,
+        AlistenIcons.prohibit,
         StatusTone.danger,
       ),
       NotificationPermission.unknown => (
         '尚未确认',
-        Icons.help_rounded,
+        AlistenIcons.questionFill,
         StatusTone.neutral,
       ),
     };
@@ -938,7 +935,7 @@ class _Permission extends StatelessWidget {
             const SizedBox(height: AlistenSpacing.sm),
             PillButton(
               label: '去系统设置',
-              icon: Icons.open_in_new_rounded,
+              icon: AlistenIcons.arrowSquareOut,
               style: PillButtonStyle.secondary,
               onPressed: onOpenSettings,
             ),

@@ -1,5 +1,6 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/toast.dart';
@@ -33,7 +34,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(ToastHost),
-          matching: find.byIcon(Icons.error_rounded),
+          matching: find.byIcon(AlistenIcons.warningCircleFill),
         ),
         findsOneWidget,
       );

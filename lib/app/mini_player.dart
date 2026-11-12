@@ -8,6 +8,7 @@ import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
@@ -346,7 +347,7 @@ class _Close extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return IconCircleButton(
-      icon: Icons.close_rounded,
+      icon: AlistenIcons.x,
       semanticLabel: '关闭',
       style: IconCircleButtonStyle.plain,
       iconSize: AlistenSizes.iconLg,
@@ -385,7 +386,7 @@ class _LocalPause extends ConsumerWidget {
         status == LocalPlaybackStatus.paused ||
         status == LocalPlaybackStatus.error;
     return IconCircleButton(
-      icon: offerPlay ? Icons.play_arrow_rounded : Icons.pause_rounded,
+      icon: offerPlay ? AlistenIcons.playFill : AlistenIcons.pauseFill,
       semanticLabel: offerPlay ? '恢复本机播放' : '暂停本机播放',
       style: IconCircleButtonStyle.plain,
       iconSize: AlistenSizes.iconLg,

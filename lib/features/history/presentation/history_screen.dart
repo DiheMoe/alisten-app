@@ -9,6 +9,7 @@ import 'package:alisten/features/search/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/action_menu.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
@@ -184,7 +185,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       title: '清空播放历史',
       message: '将清空你的全部播放记录，登录同一个账号的其他设备上也会一起清空。',
       confirmLabel: '清空',
-      confirmIcon: Icons.delete_sweep_rounded,
+      confirmIcon: AlistenIcons.broom,
       onConfirm: () async {
         final result = await history.clear();
         _report(notice, result);
@@ -215,7 +216,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           children: [
             AlistenTopBar(
               leading: IconCircleButton(
-                icon: Icons.arrow_back_rounded,
+                icon: AlistenIcons.arrowLeft,
                 semanticLabel: '返回',
                 style: IconCircleButtonStyle.plain,
                 onPressed: () => unawaited(Navigator.maybePop(context)),
@@ -234,13 +235,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   )
                 else
                   IconCircleButton(
-                    icon: Icons.ios_share_rounded,
+                    icon: AlistenIcons.export,
                     semanticLabel: '导出播放历史',
                     style: IconCircleButtonStyle.plain,
                     onPressed: empty ? null : () => unawaited(_export()),
                   ),
                 IconCircleButton(
-                  icon: Icons.delete_sweep_rounded,
+                  icon: AlistenIcons.broom,
                   semanticLabel: '清空播放历史',
                   style: IconCircleButtonStyle.plain,
                   onPressed: empty ? null : () => unawaited(_clear()),
@@ -259,7 +260,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   controller: _filter,
                   focusNode: _filterFocus,
                   hint: '筛选歌名、歌手或专辑',
-                  icon: Icons.search_rounded,
+                  icon: AlistenIcons.magnifyingGlass,
                   pill: true,
                   textInputAction: TextInputAction.search,
                   onChanged: _filterBy,
@@ -303,12 +304,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       child: Semantics(
         liveRegion: true,
         child: EmptyState(
-          icon: Icons.cloud_off_rounded,
+          icon: AlistenIcons.cloudSlash,
           title: '播放历史没有读出来',
           message: error,
           action: PillButton(
             label: '重试',
-            icon: Icons.refresh_rounded,
+            icon: AlistenIcons.arrowClockwise,
             style: PillButtonStyle.secondary,
             onPressed: () => unawaited(_history.load()),
           ),
@@ -333,7 +334,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             child: Padding(
               padding: EdgeInsets.only(bottom: bottom),
               child: const EmptyState(
-                icon: Icons.history_rounded,
+                icon: AlistenIcons.clockCounterClockwise,
                 title: '你的音乐足迹，从这里开始',
                 message: '你在房间里听过的歌会记在这里。',
               ),
@@ -344,7 +345,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             child: Padding(
               padding: EdgeInsets.only(bottom: bottom),
               child: EmptyState(
-                icon: Icons.search_off_rounded,
+                icon: AlistenIcons.magnifyingGlassMinus,
                 title: '没有找到相关记录',
                 message: '换个关键词，再找找看。',
                 action: PillButton(
@@ -583,7 +584,7 @@ class _PlayRow extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Icon(
-                Icons.delete_rounded,
+                AlistenIcons.trashFill,
                 size: AlistenSizes.iconSm,
                 color: colors.danger,
               ),
@@ -638,17 +639,17 @@ class _PlayRow extends StatelessWidget {
               entries: [
                 if (save != null)
                   ActionMenuEntry(
-                    icon: Icons.playlist_add_rounded,
+                    icon: AlistenIcons.listPlus,
                     label: '保存到歌单',
                     onSelected: () => save(listen.track, meta.title),
                   ),
                 ActionMenuEntry(
-                  icon: Icons.content_copy_rounded,
+                  icon: AlistenIcons.copy,
                   label: copyTitleHint,
                   onSelected: () => onCopyTitle(meta.title),
                 ),
                 ActionMenuEntry(
-                  icon: Icons.delete_outline_rounded,
+                  icon: AlistenIcons.trash,
                   label: '删除',
                   danger: true,
                   enabled: !deleting,

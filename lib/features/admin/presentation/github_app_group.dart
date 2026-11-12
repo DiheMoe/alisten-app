@@ -6,6 +6,7 @@ import 'package:alisten/features/admin/application/github_app_controller.dart';
 import 'package:alisten/features/admin/presentation/github_app_sheet.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -75,7 +76,7 @@ class _GithubAppGroupState extends ConsumerState<GithubAppGroup>
       title: '关闭 GitHub 登录',
       message: _closeMessage,
       confirmLabel: '关闭',
-      confirmIcon: Icons.link_off_rounded,
+      confirmIcon: AlistenIcons.linkBreak,
     );
     if (!confirmed || !mounted || _closing) return;
     setState(() => _closing = true);
@@ -143,7 +144,7 @@ class _GithubAppGroupState extends ConsumerState<GithubAppGroup>
                 const SizedBox(width: AlistenSpacing.xs),
                 PillButton(
                   label: '复制',
-                  icon: Icons.copy_rounded,
+                  icon: AlistenIcons.copySimple,
                   style: PillButtonStyle.ghost,
                   onPressed: () => unawaited(_copy(status.callbackUrl)),
                 ),
@@ -156,7 +157,7 @@ class _GithubAppGroupState extends ConsumerState<GithubAppGroup>
               alignment: AlignmentDirectional.centerStart,
               child: StatusPill(
                 label: '正在读取',
-                icon: Icons.sync_rounded,
+                icon: AlistenIcons.arrowsClockwise,
                 busy: true,
               ),
             ),
@@ -183,14 +184,14 @@ class _GithubAppGroupState extends ConsumerState<GithubAppGroup>
                 if (status.enabled)
                   PillButton(
                     label: '关闭 GitHub 登录',
-                    icon: Icons.link_off_rounded,
+                    icon: AlistenIcons.linkBreak,
                     style: PillButtonStyle.ghost,
                     busy: _closing,
                     onPressed: () => unawaited(_close()),
                   ),
                 PillButton(
                   label: status.enabled ? '修改' : '开启',
-                  icon: Icons.key_rounded,
+                  icon: AlistenIcons.key,
                   style: PillButtonStyle.secondary,
                   onPressed: _closing
                       ? null

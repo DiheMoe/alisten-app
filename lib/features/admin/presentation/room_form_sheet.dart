@@ -8,6 +8,7 @@ import 'package:alisten/features/admin/application/room_form.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -212,7 +213,7 @@ class _RoomFormSheetState extends ConsumerState<RoomFormSheet> {
           const SizedBox(height: AlistenSpacing.xl),
           PillButton(
             label: '保存',
-            icon: Icons.check_rounded,
+            icon: AlistenIcons.checkBold,
             large: true,
             expand: true,
             busy: _submitting,

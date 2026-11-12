@@ -2,6 +2,7 @@ import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -99,7 +100,7 @@ void main() {
         .widget<Icon>(
           find.descendant(
             of: find.byKey(ValueKey(key)),
-            matching: find.byIcon(Icons.add_rounded),
+            matching: find.byIcon(AlistenIcons.plusBold),
           ),
         )
         .color;

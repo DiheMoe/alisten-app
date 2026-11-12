@@ -1,6 +1,7 @@
 import 'package:alisten/app/room/room_mode.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/foundation.dart';
@@ -49,7 +50,7 @@ class RoomModeBar extends StatelessWidget {
           const SizedBox(width: AlistenSpacing.sm),
           PillButton(
             label: '点歌',
-            icon: Icons.add_rounded,
+            icon: AlistenIcons.plusBold,
             large: true,
             onPressed: onAddSong,
           ),
@@ -60,9 +61,9 @@ class RoomModeBar extends StatelessWidget {
 }
 
 const _tabs = [
-  (RoomMode.lyrics, Icons.lyrics_rounded, '歌词'),
-  (RoomMode.queue, Icons.queue_music_rounded, '队列'),
-  (RoomMode.chat, Icons.forum_rounded, '聊天'),
+  (RoomMode.lyrics, AlistenIcons.microphoneStage, '歌词'),
+  (RoomMode.queue, AlistenIcons.queue, '队列'),
+  (RoomMode.chat, AlistenIcons.chatsCircle, '聊天'),
 ];
 
 enum _TabContent { iconAndLabel, label, icon }

@@ -14,6 +14,7 @@ import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -227,7 +228,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.byIcon(Icons.broken_image_rounded), findsOneWidget);
+    expect(find.byIcon(AlistenIcons.imageBroken), findsOneWidget);
     expect(find.text('ABCD-2345'), findsOneWidget);
   });
 }

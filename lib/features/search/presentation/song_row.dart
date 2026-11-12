@@ -7,6 +7,7 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/application/pick_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/animated_resize.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart'
@@ -180,14 +181,13 @@ class PickUnavailableNotice extends ConsumerWidget {
         child: entered
             ? StatusPill(
                 label: '连接后可点歌',
-                icon: stopped ? Icons.cloud_off_rounded : Icons.sync_rounded,
+                icon: stopped
+                    ? AlistenIcons.cloudSlash
+                    : AlistenIcons.arrowsClockwise,
                 tone: stopped ? StatusTone.danger : StatusTone.warning,
                 busy: !stopped,
               )
-            : const StatusPill(
-                label: '进入房间后可点歌',
-                icon: Icons.meeting_room_rounded,
-              ),
+            : const StatusPill(label: '进入房间后可点歌', icon: AlistenIcons.door),
       ),
     );
   }
@@ -341,15 +341,15 @@ class _PickButtonState extends State<PickButton>
       PickTone.quiet => colors.onGlass,
     };
     final (IconData? icon, String? words, Color ink) = switch (status) {
-      null => (Icons.add_rounded, wide ? '点歌' : null, plain),
+      null => (AlistenIcons.plusBold, wide ? '点歌' : null, plain),
       PickStatus.sending => (null, '点歌中', plain),
-      PickStatus.added => (Icons.check_rounded, '已点', colors.success),
-      PickStatus.failed => (Icons.priority_high_rounded, '失败', colors.danger),
-      PickStatus.unknown => (
-        Icons.question_mark_rounded,
-        '结果未知',
-        colors.warning,
+      PickStatus.added => (AlistenIcons.checkBold, '已点', colors.success),
+      PickStatus.failed => (
+        AlistenIcons.exclamationMarkBold,
+        '失败',
+        colors.danger,
       ),
+      PickStatus.unknown => (AlistenIcons.questionBold, '结果未知', colors.warning),
     };
     final value = switch (status) {
       null => null,

@@ -13,6 +13,7 @@ import 'package:alisten/features/playback/presentation/player_controls.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/fade_leaving_inert.dart';
@@ -220,7 +221,7 @@ class _NowPlayingHeaderState extends ConsumerState<NowPlayingHeader>
                         ? Center(
                             child: PillButton(
                               label: '点歌',
-                              icon: Icons.add_rounded,
+                              icon: AlistenIcons.plusBold,
                               large: true,
                               onPressed: widget.onAddSong,
                             ),

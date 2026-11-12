@@ -4,6 +4,7 @@ import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/playlists/application/my_playlists_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
@@ -75,7 +76,7 @@ Future<bool> confirmPlaylistDelete(BuildContext context, MyPlaylist playlist) {
     title: '删除歌单',
     message: '删除“${playlist.name}”之后，里面的歌也一起删除。',
     confirmLabel: '删除',
-    confirmIcon: Icons.delete_outline_rounded,
+    confirmIcon: AlistenIcons.trash,
   );
 }
 
@@ -110,12 +111,12 @@ class PlaylistGuestState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return EmptyState(
-      icon: Icons.star_rounded,
+      icon: AlistenIcons.starFill,
       title: '收藏你喜欢的歌',
       message: '注册账号之后，就能收藏歌曲、建自己的歌单。',
       action: PillButton(
         label: '去账号设置',
-        icon: Icons.person_rounded,
+        icon: AlistenIcons.user,
         style: PillButtonStyle.secondary,
         onPressed: onOpenAccount,
       ),
@@ -149,7 +150,7 @@ class PlaylistGuestPrompt extends StatelessWidget {
         const SizedBox(height: AlistenSpacing.lg),
         PillButton(
           label: '去账号设置',
-          icon: Icons.person_rounded,
+          icon: AlistenIcons.user,
           large: true,
           expand: true,
           onPressed: onOpenAccount,
@@ -185,11 +186,11 @@ class PlaylistReadFailure extends StatelessWidget {
     return Semantics(
       liveRegion: true,
       child: EmptyState(
-        icon: Icons.cloud_off_rounded,
+        icon: AlistenIcons.cloudSlash,
         title: '读取失败：$message',
         action: PillButton(
           label: '重试',
-          icon: Icons.refresh_rounded,
+          icon: AlistenIcons.arrowClockwise,
           style: PillButtonStyle.secondary,
           onPressed: onRetry,
         ),

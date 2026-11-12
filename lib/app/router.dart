@@ -21,6 +21,7 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/index.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -408,7 +409,7 @@ class _LostPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlistenScaffold(
       body: EmptyState(
-        icon: Icons.link_off_rounded,
+        icon: AlistenIcons.linkBreak,
         title: '找不到这个页面',
         message: '链接可能有误或已过期。',
         action: PillButton(label: '返回大厅', onPressed: () => context.go('/')),

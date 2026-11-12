@@ -7,6 +7,7 @@ import 'package:alisten/features/search/application/search_controller.dart';
 import 'package:alisten/features/search/presentation/song_row.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
@@ -66,11 +67,11 @@ class PlaylistScreen extends ConsumerWidget {
         child: Semantics(
           liveRegion: true,
           child: EmptyState(
-            icon: Icons.cloud_off_rounded,
+            icon: AlistenIcons.cloudSlash,
             title: playlistErrorMessage(error),
             action: PillButton(
               label: '重试',
-              icon: Icons.refresh_rounded,
+              icon: AlistenIcons.arrowClockwise,
               style: PillButtonStyle.secondary,
               onPressed: ref
                   .read(playlistControllerProvider(key).notifier)
@@ -90,7 +91,7 @@ class PlaylistScreen extends ConsumerWidget {
       );
     } else if (detail.tracks.isEmpty) {
       content = const SliverFillRemaining(
-        child: EmptyState(icon: Icons.queue_music_rounded, title: '这个歌单里还没有歌'),
+        child: EmptyState(icon: AlistenIcons.queue, title: '这个歌单里还没有歌'),
       );
     } else {
       content = SliverList.builder(
@@ -133,7 +134,7 @@ class PlaylistScreen extends ConsumerWidget {
             right: 0,
             child: AlistenTopBar(
               leading: IconCircleButton(
-                icon: Icons.arrow_back_rounded,
+                icon: AlistenIcons.arrowLeft,
                 semanticLabel: '返回',
                 onPressed: () => unawaited(Navigator.maybePop(context)),
               ),

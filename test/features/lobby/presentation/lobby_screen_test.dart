@@ -16,6 +16,7 @@ import 'package:alisten/features/settings/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
@@ -1025,7 +1026,7 @@ void main() {
     Finder inSettings(Finder finder) =>
         find.descendant(of: _settingsButton, matching: finder);
 
-    Finder gear() => inSettings(find.byIcon(Icons.settings_rounded));
+    Finder gear() => inSettings(find.byIcon(AlistenIcons.gearSix));
 
     Future<void> openAs(
       WidgetTester tester,

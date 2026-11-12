@@ -10,6 +10,7 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:flutter/material.dart';
@@ -270,7 +271,7 @@ void main() {
     Color? disc() {
       final button = tester.widget<AnimatedContainer>(
         find.ancestor(
-          of: find.byIcon(Icons.arrow_upward_rounded),
+          of: find.byIcon(AlistenIcons.arrowUpBold),
           matching: find.byType(AnimatedContainer),
         ),
       );
@@ -416,7 +417,7 @@ void main() {
 
     type('hello');
     await tester.pump();
-    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.tap(find.byIcon(AlistenIcons.arrowUpBold));
     await tester.pump();
 
     expect(room.transport.requests, hasLength(1));

@@ -46,9 +46,19 @@ flutter:
     - shaders/flowing_cover.frag
   assets:
     - assets/fonts/OFL.txt
+    - assets/fonts/Phosphor-LICENSE.txt
     - assets/licenses/commons-imaging/LICENSE.txt
     - assets/licenses/commons-imaging/NOTICE.txt
   fonts:
     - family: PlusJakartaSans
       fonts:
         - asset: assets/fonts/PlusJakartaSans.ttf
+    - family: PhosphorRegular
+      fonts:
+        - asset: assets/fonts/Phosphor.ttf
+    - family: PhosphorBold
+      fonts:
+        - asset: assets/fonts/Phosphor-Bold.ttf
+    - family: PhosphorFill
+      fonts:
+        - asset: assets/fonts/Phosphor-Fill.ttf

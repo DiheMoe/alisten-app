@@ -67,14 +67,17 @@ final notificationGatewayProvider = Provider<NotificationGateway>((ref) {
   throw UnimplementedError('notificationGateway 未注入');
 });
 
-/// OFL 和 Apache-2.0 要求随分发附上许可证（Apache 另含 NOTICE）。
-/// 内置字体和 gal 在 Android 上带入的 commons-imaging 不是 pub 包，
+/// OFL、MIT 和 Apache-2.0 要求随分发附上许可证（Apache 另含 NOTICE）。
+/// 内置字体、图标字体和 gal 在 Android 上带入的 commons-imaging 不是 pub 包，
 /// Flutter 不会替它们收集，须在此登记。
 void registerBundledLicenses() {
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks(const [
       'Plus Jakarta Sans',
     ], await rootBundle.loadString('assets/fonts/OFL.txt'));
+    yield LicenseEntryWithLineBreaks(const [
+      'Phosphor Icons',
+    ], await rootBundle.loadString('assets/fonts/Phosphor-LICENSE.txt'));
     const imaging = 'assets/licenses/commons-imaging';
     yield LicenseEntryWithLineBreaks(
       const ['commons-imaging'],

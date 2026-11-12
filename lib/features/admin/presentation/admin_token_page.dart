@@ -5,6 +5,7 @@ import 'package:alisten/features/admin/application/admin_sign_in_controller.dart
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
@@ -54,7 +55,7 @@ class _AdminTokenPageState extends ConsumerState<AdminTokenPage> {
       background: const PageGlow(),
       topBar: AlistenTopBar(
         leading: IconCircleButton(
-          icon: Icons.arrow_back_rounded,
+          icon: AlistenIcons.arrowLeft,
           semanticLabel: '返回',
           style: IconCircleButtonStyle.plain,
           onPressed: () => unawaited(Navigator.maybePop(context)),
@@ -101,8 +102,8 @@ class _AdminTokenPageState extends ConsumerState<AdminTokenPage> {
                 PillButton(
                   label: cooling ? '请等待 ${signIn.cooldownSeconds} 秒' : '进入后台',
                   icon: cooling
-                      ? Icons.hourglass_top_rounded
-                      : Icons.login_rounded,
+                      ? AlistenIcons.hourglassHigh
+                      : AlistenIcons.signIn,
                   expand: true,
                   busy: signIn.busy,
                   onPressed: cooling ? null : () => unawaited(_submit()),
