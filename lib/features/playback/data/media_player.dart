@@ -9,6 +9,7 @@ abstract interface class MediaPlayer {
   bool get playing;
   ProcessingState get processingState;
   Duration get position;
+  Duration get bufferedPosition;
 
   /// 无法加载或被后一次调用替换时抛出异常。
   Future<void> setAudioSource(AudioSource source, {Duration? initialPosition});
@@ -40,6 +41,9 @@ final class JustAudioPlayer implements MediaPlayer {
 
   @override
   Duration get position => _player.position;
+
+  @override
+  Duration get bufferedPosition => _player.bufferedPosition;
 
   @override
   Future<void> setAudioSource(

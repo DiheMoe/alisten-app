@@ -36,6 +36,15 @@ const _reloadDelay = Duration(seconds: 1);
 const _clockRetryDelay = Duration(milliseconds: 500);
 // seek 会造成可闻的卡顿，起播位置与房间位置相差不超过此值时不 seek。
 const _startToleranceMs = 100;
+// 起播前在缓冲区内补跳时，目标之后要有这么多数据才能立即播放：ExoPlayer 默认
+// 缓冲 2.5 秒才开始播放。
+const _bufferedAheadMs = 3000;
+// 下载通常比播放快得多，缓冲区很快就能越过房间位置；差得更远或等满时限时，
+// 直接 seek 到缓冲区之外重新请求。
+const _catchUpReachMs = 20000;
+const _catchUpWait = Duration(seconds: 2);
+const _catchUpPoll = Duration(milliseconds: 200);
+const _maxStartSeeks = 3;
 const _maxGain = 1.5;
 const _logSource = 'playback';
 
@@ -314,16 +323,55 @@ final class PlaybackController extends Notifier<LocalPlaybackState> {
     _publish();
   }
 
+  /// seek 要等到能播放才返回，这期间房间已经往前走了，所以出声前按最新的房间
+  /// 位置补跳，否则刚开播就落后，随后漂移校正的 seek 听得出来。补跳尽量等到
+  /// 落在已缓冲的数据里，不必重新请求。
   Future<void> _playFrom(int positionMs) async {
     final load = _load;
     _publish();
-    final offset = _engine.position.inMilliseconds - positionMs;
-    if (offset.abs() > _startToleranceMs) {
-      _publish(positionMs: positionMs);
-      await _engine.seek(Duration(milliseconds: positionMs));
+    var target = positionMs;
+    for (var seeks = 0; seeks < _maxStartSeeks; seeks++) {
+      final offset = _engine.position.inMilliseconds - target;
+      if (offset.abs() <= _startToleranceMs) break;
+      await _awaitBuffered(load);
       if (load != _load || _held) return;
+      final caughtUp = _roomPosition();
+      if (caughtUp == null) return _start();
+      target = caughtUp;
+      _publish(positionMs: target);
+      await _engine.seek(Duration(milliseconds: target));
+      if (load != _load || _held) return;
+      final next = _roomPosition();
+      if (next == null) return _start();
+      target = next;
     }
     await _engine.play();
+  }
+
+  // 返回时缓冲区已越过房间位置，或者等不到。往回跳时缓冲区里没有数据。
+  Future<void> _awaitBuffered(int load) async {
+    for (
+      var waited = Duration.zero;
+      waited < _catchUpWait;
+      waited += _catchUpPoll
+    ) {
+      final target = _roomPosition();
+      if (target == null || load != _load || _held) return;
+      final buffered = _engine.bufferedPosition.inMilliseconds;
+      if (target < _engine.position.inMilliseconds ||
+          buffered >= target + _bufferedAheadMs ||
+          target - buffered > _catchUpReachMs) {
+        return;
+      }
+      await Future<void>.delayed(_catchUpPoll);
+    }
+  }
+
+  // 房间此刻的播放位置；曲目尚未开始、已经放完或时钟未知时为 null。
+  int? _roomPosition() {
+    final nowPlaying = _nowPlaying;
+    final plan = nowPlaying == null ? null : _plan(nowPlaying);
+    return plan?.kind == StartPlanKind.play ? plan!.positionMs : null;
   }
 
   // 每次播放只请求一次检查，因为检查带回的每个快照都会让这次播放再次结束。

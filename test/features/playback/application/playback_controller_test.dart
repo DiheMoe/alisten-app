@@ -268,6 +268,65 @@ void main() {
     });
   });
 
+  group('a start that has to wait for data', () {
+    void slowNetwork(PlaybackHarness h) {
+      h.engine
+        ..seekDuration = const Duration(seconds: 3)
+        ..bufferRate = 20;
+    }
+
+    test('after a slow load waits for the buffer to pass the room position '
+        'and seeks inside it, without fetching again', () {
+      run((h) {
+        slowNetwork(h);
+        h.engine.loadDuration = const Duration(milliseconds: 1500);
+        h.hello(nowPlayingWith(), serverNow: trackStart + 30000);
+        h.async.elapse(const Duration(seconds: 3));
+
+        expect(h.state.status, LocalPlaybackStatus.playing);
+        final seek = h.engine.seeks.single.inMilliseconds;
+        expect(seek, inInclusiveRange(31500, 32500));
+        expect(
+          h.engine.calls.indexOf('play'),
+          greaterThan(h.engine.calls.indexOf('seek $seek')),
+        );
+
+        h.async.elapse(const Duration(seconds: 30));
+        expect(h.engine.seeks, hasLength(1), reason: 'no correction follows');
+      });
+    });
+
+    test('far behind the room seeks at once, then catches up inside the '
+        'buffer before it sounds, so no correction follows', () {
+      run((h) {
+        slowNetwork(h);
+        h.hello(
+          nowPlayingWith(durationMs: 300000),
+          serverNow: trackStart + 30000,
+        );
+        h.async.elapse(const Duration(seconds: 1));
+        unawaited(h.playback.toggleLocalPause());
+        h.async.elapse(const Duration(seconds: 90));
+        h.engine.seeks.clear();
+
+        unawaited(h.playback.toggleLocalPause());
+        h.async.elapse(const Duration(seconds: 6));
+
+        expect(h.state.status, LocalPlaybackStatus.playing);
+        expect(h.engine.seeks, hasLength(2));
+        expect(h.engine.seeks.first.inMilliseconds, closeTo(121000, 50));
+        expect(
+          h.engine.seeks.last.inMilliseconds -
+              h.engine.seeks.first.inMilliseconds,
+          inInclusiveRange(3000, 4000),
+        );
+
+        h.async.elapse(const Duration(seconds: 30));
+        expect(h.engine.seeks, hasLength(2), reason: 'no correction follows');
+      });
+    });
+  });
+
   test('an interruption pauses without drift seeks, its end plays from '
       'the room position, and a system stop keeps the next track silent '
       'until the user resumes', () {

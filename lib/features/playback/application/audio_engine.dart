@@ -73,6 +73,9 @@ abstract interface class AudioEngine {
   Stream<AudioEngineEvent> get events;
   Duration get position;
 
+  /// 数据已缓冲到的位置。在它之前、[position] 之后的 seek 不必重新请求数据。
+  Duration get bufferedPosition;
+
   /// 音源可以播放时完成，无法加载时抛出异常。不改变播放状态：正在播放的引擎
   /// 换上新音源后继续播放。
   Future<void> load(AudioLoadRequest request);
@@ -82,6 +85,7 @@ abstract interface class AudioEngine {
 
   Future<void> pause();
 
+  /// 到了新位置能播放时才完成，所以位置不在缓冲区里时要等数据。
   Future<void> seek(Duration position);
 
   Future<void> setVolume(double volume);

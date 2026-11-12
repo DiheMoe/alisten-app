@@ -82,6 +82,9 @@ RoomSnapshot snapshotWith(NowPlaying? nowPlaying) {
 /// 契约与基于 just_audio 的 audio handler 相同：事件异步到达；[load] 耗时
 /// [loadDuration]，保留播放意图后报告新音源的状态；[play] 开始播放即返回；
 /// 只有播放已加载的音源时位置才前进，播放中 seek 之后要再过 [seekLag] 才前进；
+/// 默认数据立即缓冲完；给出 [bufferRate] 时，从加载位置或缓冲区外的 seek 位置
+/// 起每毫秒缓冲这么多毫秒的音频，与 ExoPlayer 一样最多缓冲到当前位置之后 50 秒；
+/// seek 到缓冲区外要等 [seekDuration]；
 /// [release] 停止播放并卸载音源。
 final class FakeAudioEngine implements AudioEngine {
   FakeAudioEngine({int Function()? now}) : _now = now ?? (() => 0);
@@ -95,6 +98,10 @@ final class FakeAudioEngine implements AudioEngine {
   final List<String> calls = [];
   Duration loadDuration = Duration.zero;
   Duration seekLag = Duration.zero;
+  Duration seekDuration = Duration.zero;
+  int? bufferRate;
+  int _bufferFromMs = 0;
+  int _bufferSinceMs = 0;
   int loadFailures = 0;
 
   Exception loadError = Exception('load failed');
@@ -116,6 +123,19 @@ final class FakeAudioEngine implements AudioEngine {
 
   @override
   Duration get position => Duration(milliseconds: _positionMs);
+
+  @override
+  Duration get bufferedPosition {
+    final rate = bufferRate;
+    if (rate == null) return Duration(milliseconds: _positionMs + 600000);
+    final loaded = _bufferFromMs + (_now() - _bufferSinceMs) * rate;
+    return Duration(milliseconds: math.min(loaded, _positionMs + 50000));
+  }
+
+  void _bufferFrom(int positionMs) {
+    _bufferFromMs = positionMs;
+    _bufferSinceMs = _now();
+  }
 
   int get _positionMs {
     final since = _runningSince;
@@ -139,6 +159,7 @@ final class FakeAudioEngine implements AudioEngine {
       throw loadError;
     }
     _loaded = request.load;
+    _bufferFrom(request.positionMs);
     if (_playing) _runningSince = _now();
     _emitSource(
       _playing ? AudioEngineEventKind.playing : AudioEngineEventKind.ready,
@@ -170,7 +191,14 @@ final class FakeAudioEngine implements AudioEngine {
   Future<void> seek(Duration position) async {
     seeks.add(position);
     calls.add('seek ${position.inMilliseconds}');
-    _anchorMs = position.inMilliseconds;
+    final target = position.inMilliseconds;
+    if (target < _positionMs || target > bufferedPosition.inMilliseconds) {
+      if (seekDuration > Duration.zero) {
+        await Future<void>.delayed(seekDuration);
+      }
+      _bufferFrom(target);
+    }
+    _anchorMs = target;
     if (_runningSince != null) {
       _runningSince = _now() + seekLag.inMilliseconds;
     }
@@ -255,6 +283,9 @@ final class FakeMediaPlayer implements MediaPlayer {
 
   @override
   Duration get position => _position;
+
+  @override
+  Duration get bufferedPosition => _position;
 
   @override
   Future<void> setAudioSource(

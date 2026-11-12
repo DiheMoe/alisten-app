@@ -10,6 +10,9 @@ final class UnavailableAudioEngine implements AudioEngine {
   Duration get position => Duration.zero;
 
   @override
+  Duration get bufferedPosition => Duration.zero;
+
+  @override
   Future<void> load(AudioLoadRequest request) async {
     throw const AudioUnavailableException();
   }

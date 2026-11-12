@@ -51,6 +51,8 @@ final class AlistenAudioHandler extends BaseAudioHandler {
 
   Duration get position => _player.position;
 
+  Duration get bufferedPosition => _player.bufferedPosition;
+
   Future<void> loadSource(AudioLoadRequest request) async {
     final load = _load = request.load;
     _loading = true;
@@ -256,6 +258,9 @@ final class RoomAudioEngine implements AudioEngine {
 
   @override
   Duration get position => _handler.position;
+
+  @override
+  Duration get bufferedPosition => _handler.bufferedPosition;
 
   @override
   Future<void> load(AudioLoadRequest request) => _handler.loadSource(request);
