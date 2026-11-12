@@ -15,8 +15,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 final searchControllerProvider =
     NotifierProvider<SearchController, SearchState>(SearchController.new);
 
-bool canOpenPlaylists(TrackSource source) => source == TrackSource.netease;
-
 const _cacheLimit = 10;
 const _cacheTtlMs = 600000;
 const _invalidArgument = 'INVALID_ARGUMENT';
@@ -58,12 +56,9 @@ final class SearchController extends Notifier<SearchState> {
   /// 未给出 [source] 或 [view] 时沿用当前值。搜索会记入最近搜索。
   Future<void> submit(String keyword, {TrackSource? source, SearchView? view}) {
     final selected = source ?? state.source;
-    final chosen =
+    final shown =
         view ??
         (state.view == SearchView.recommend ? SearchView.all : state.view);
-    final shown = chosen == SearchView.playlists && !canOpenPlaylists(selected)
-        ? SearchView.all
-        : chosen;
     final query = SearchQuery(
       source: selected,
       view: shown,
@@ -220,8 +215,7 @@ final class SearchController extends Notifier<SearchState> {
     final withTracks =
         query.view == SearchView.all || query.view == SearchView.tracks;
     final withPlaylists =
-        query.view == SearchView.playlists ||
-        (query.view == SearchView.all && canOpenPlaylists(query.source));
+        query.view == SearchView.playlists || query.view == SearchView.all;
     final Future<_Part<SearchPage<TrackSummary>>?> tracksRequest = withTracks
         ? _capture(
             query,

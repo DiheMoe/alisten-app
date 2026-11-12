@@ -68,16 +68,14 @@ class PlaylistScreen extends ConsumerWidget {
           child: EmptyState(
             icon: Icons.cloud_off_rounded,
             title: playlistErrorMessage(error),
-            action: error is PlaylistUnavailable
-                ? null
-                : PillButton(
-                    label: '重试',
-                    icon: Icons.refresh_rounded,
-                    style: PillButtonStyle.secondary,
-                    onPressed: ref
-                        .read(playlistControllerProvider(key).notifier)
-                        .retry,
-                  ),
+            action: PillButton(
+              label: '重试',
+              icon: Icons.refresh_rounded,
+              style: PillButtonStyle.secondary,
+              onPressed: ref
+                  .read(playlistControllerProvider(key).notifier)
+                  .retry,
+            ),
           ),
         ),
       );

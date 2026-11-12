@@ -538,7 +538,7 @@ void main() {
     await openLinkSheet(tester);
 
     expect(find.text('歌单链接'), findsOneWidget);
-    expect(find.text('粘贴网易云音乐的歌单链接或分享文字'), findsOneWidget);
+    expect(find.text('粘贴网易云或 QQ 音乐的歌单链接'), findsOneWidget);
     expect(
       tester
           .widget<EditableText>(find.byType(EditableText).last)

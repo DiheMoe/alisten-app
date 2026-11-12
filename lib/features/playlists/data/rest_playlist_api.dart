@@ -14,7 +14,7 @@ import 'package:alisten/features/playlists/application/playlist_api.dart';
 
 const _logSource = 'playlists';
 
-// 服务端要先从网易云取回整个歌单，每次向网易云请求最多等 30 秒，大歌单要请求
+// 服务端要先从网易云或 QQ 音乐取回整个歌单，每次请求平台最多等 30 秒，大歌单要请求
 // 好几次；客户端先断开会让服务端已经创建的歌单变成结果未知。
 const _platformImportTimeout = Duration(seconds: 45);
 

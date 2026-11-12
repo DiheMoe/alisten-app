@@ -118,7 +118,7 @@ class _ImportLinkSheetState extends ConsumerState<ImportLinkSheet> {
           AlistenTextField(
             controller: _link,
             label: '歌单链接',
-            hint: '粘贴网易云音乐的歌单链接或分享文字',
+            hint: '粘贴网易云或 QQ 音乐的歌单链接',
             keyboardType: TextInputType.url,
             textInputAction: TextInputAction.next,
           ),

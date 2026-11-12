@@ -4,6 +4,7 @@ final _roomRef = RegExp(
   r'^(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[a-z0-9-]{1,32})$',
 );
 final _playlistId = RegExp(r'^[0-9]+$');
+const _playlistSources = {'netease', 'qq'};
 
 bool isRoomRef(String value) => _roomRef.hasMatch(value);
 
@@ -17,9 +18,9 @@ String? roomRoute(List<String> segments, {required Set<String> sections}) {
   }
   if (segments.length == 5 &&
       segments[2] == 'playlists' &&
-      segments[3] == 'netease' &&
+      _playlistSources.contains(segments[3]) &&
       _playlistId.hasMatch(segments[4])) {
-    return '/r/$room/playlists/netease/${segments[4]}';
+    return '/r/$room/playlists/${segments[3]}/${segments[4]}';
   }
   return null;
 }

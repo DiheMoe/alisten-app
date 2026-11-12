@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:alisten/core/realtime/room_transport.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/room/index.dart';
-import 'package:alisten/features/search/application/search_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // 同一个 id 可能同时存在于两个音源，所以用音源和 id 一起标识歌单。
@@ -29,19 +28,8 @@ final class PlaylistDetail {
   final List<TrackSummary> tracks;
 }
 
-/// 歌单无论连接状态如何都打不开。
-final class PlaylistUnavailable implements Exception {
-  const PlaylistUnavailable(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
-}
-
 String playlistErrorMessage(Object error) {
   return switch (error) {
-    PlaylistUnavailable(:final message) ||
     RoomRequestException(:final message) => message,
     _ => '歌单加载失败，请重试。',
   };
@@ -60,9 +48,6 @@ final class PlaylistController extends AsyncNotifier<PlaylistDetail> {
 
   @override
   Future<PlaylistDetail> build() async {
-    if (!canOpenPlaylists(key.source)) {
-      throw const PlaylistUnavailable('该来源不支持歌单');
-    }
     // 换房间即换连接，要丢弃这次构建，在新房间重新请求歌单。
     ref.watch(roomControllerProvider.select((state) => state.activeRoomId));
     if (!_open(ref.read(roomControllerProvider))) {

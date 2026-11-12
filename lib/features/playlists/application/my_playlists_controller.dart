@@ -410,7 +410,7 @@ final class MyPlaylistsController extends Notifier<MyPlaylistsState> {
   }
 
   /// 链接按 UTF-8 计算超过 2048 字节时不发请求。解析或导入任何一步失败都返回
-  /// 那一步的结果。解析的消息原样给用户看；解析已排除非网易云的歌单，导入这一步
+  /// 那一步的结果。解析的消息原样给用户看；解析已排除网易云和 QQ 音乐以外的歌单，导入这一步
   /// 的 INVALID_ARGUMENT 只可能是名字不合法，按命名规则改写。
   Future<MutationResult<ImportedPlaylist>> importLink(
     String link,

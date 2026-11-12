@@ -46,7 +46,7 @@ const invalidLinkText = '链接无效，已回到大厅';
 
 // 房间路由之下的相对路径片段，不是完整位置。
 const songSearchSegment = 'search';
-const playlistSegment = 'playlists/netease/:id';
+const playlistSegment = 'playlists/:source/:id';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final rootNavigator = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -279,23 +279,29 @@ final routerProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: playlistSegment,
                         parentNavigatorKey: rootNavigator,
-                        pageBuilder: _page(
-                          (context, state) => RoomRouteGate(
+                        pageBuilder: _page((context, state) {
+                          // 重定向已经按 roomRoute 只放行网易云和 QQ 音乐。
+                          final source = TrackSource.values.byName(
+                            state.pathParameters['source']!,
+                          );
+                          final id = state.pathParameters['id']!;
+                          return RoomRouteGate(
                             roomRef: state.pathParameters['ref']!,
                             child: PlaylistScreen(
-                              source: TrackSource.netease,
-                              id: state.pathParameters['id']!,
+                              source: source,
+                              id: id,
                               onResult: reportPick,
                               onNotice: notice,
                               saveAsMine: (name) => SavePlatformPlaylistButton(
-                                playlistId: state.pathParameters['id']!,
+                                source: source,
+                                playlistId: id,
                                 name: name,
                                 onOpenAccount: openAccount,
                                 onNotice: toasts.show,
                               ),
                             ),
-                          ),
-                        ),
+                          );
+                        }),
                       ),
                     ],
                   ],

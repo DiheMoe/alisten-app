@@ -538,8 +538,8 @@ void main() {
 
     for (final location in [
       '/r/x/foo',
-      // 只有网易云有歌单页。
-      '/r/x/playlists/qq/1',
+      // 只有网易云和 QQ 音乐有歌单页。
+      '/r/x/playlists/bilibili/1',
       '/r/Not_A_Room',
       '/s/abc',
       '/s/$shareIdA/x',

@@ -556,9 +556,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   List<Widget> _overview(SearchState search) {
     final best = search.bestMatch;
     final songs = search.overviewTracks;
-    final playlists = canOpenPlaylists(search.source)
-        ? search.overviewPlaylists
-        : const <PlaylistSummary>[];
+    final playlists = search.overviewPlaylists;
     return [
       if (best != null)
         SliverPadding(
@@ -746,14 +744,13 @@ class _Filters extends StatelessWidget {
             spacing: AlistenSpacing.xs,
             children: [
               for (final (choice, label) in _views)
-                if (choice != SearchView.playlists || canOpenPlaylists(source))
-                  ChipPill(
-                    label: label,
-                    selected: view == choice,
-                    onPressed: () {
-                      if (view != choice) onView(choice);
-                    },
-                  ),
+                ChipPill(
+                  label: label,
+                  selected: view == choice,
+                  onPressed: () {
+                    if (view != choice) onView(choice);
+                  },
+                ),
             ],
           ),
       ],

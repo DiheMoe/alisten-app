@@ -214,8 +214,8 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('a NetEase playlist offers to be saved under its name, or '
-      'under the default one when opened from a link', (tester) async {
+  testWidgets('a NetEase or QQ Music playlist offers to be saved under its '
+      'name, or under the default one when opened from a link', (tester) async {
     final page = await SearchPage.open(tester);
     page.transport.responses['search.playlists'] = {
       'items': [playlistJson('1001', name: '华语流行')],
@@ -232,11 +232,22 @@ void main() {
     SavePlatformPlaylistButton button() =>
         tester.widget(find.byType(SavePlatformPlaylistButton));
     expect(button().name, '华语流行');
+    expect(button().source, TrackSource.netease);
     expect(button().playlistId, '1001');
 
     page.router.go('/r/listen/playlists/netease/2002');
     await page.settle();
     expect(button().name, '导入的歌单');
     expect(button().playlistId, '2002');
+
+    page.router.go('/r/listen/playlists/qq/3003');
+    await page.settle();
+    expect(button().name, '导入的歌单');
+    expect(button().source, TrackSource.qq);
+    expect(button().playlistId, '3003');
+    final request = page.transport.requests.lastWhere(
+      (request) => request['type'] == 'playlist.tracks',
+    );
+    expect(request['data'], {'source': 'qq', 'playlistId': '3003'});
   });
 }

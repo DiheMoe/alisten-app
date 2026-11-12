@@ -22,8 +22,8 @@ void main() {
     }
   });
 
-  test('a room, a section of it, or a NetEase playlist in it has a '
-      'route', () {
+  test('a room, a section of it, or a NetEase or QQ Music playlist in it '
+      'has a route', () {
     expect(_route('/r/room-id'), '/r/room-id');
     expect(_route('/r/alias/queue'), '/r/alias/queue');
     expect(_route('/r/alias/chat'), '/r/alias/chat');
@@ -32,6 +32,7 @@ void main() {
       _route('/r/alias/playlists/netease/123'),
       '/r/alias/playlists/netease/123',
     );
+    expect(_route('/r/alias/playlists/qq/123'), '/r/alias/playlists/qq/123');
     const uuid = '123e4567-e89b-42d3-a456-426614174000';
     expect(_route('/r/$uuid'), '/r/$uuid');
   });
@@ -52,7 +53,8 @@ void main() {
       '/r/listen/foo',
       '/r/listen/queue/more',
       '/r/listen/',
-      '/r/alias/playlists/qq/123',
+      '/r/alias/playlists/bilibili/123',
+      '/r/alias/playlists/qq/12a',
       '/r/alias/playlists/netease/12a',
       '/r/alias/playlists/netease',
       '/r/FlutterDev',

@@ -41,6 +41,12 @@ void main() {
       controller.routeFor(
         Uri.parse('https://listen.example/r/alias/playlists/qq/123'),
       ),
+      '/r/alias/playlists/qq/123',
+    );
+    expect(
+      controller.routeFor(
+        Uri.parse('https://listen.example/r/alias/playlists/bilibili/123'),
+      ),
       isNull,
     );
     expect(

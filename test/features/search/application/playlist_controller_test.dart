@@ -44,21 +44,20 @@ void main() {
     expect(sent, ['search.tracks', 'search.playlists', 'playlist.tracks']);
   });
 
-  test('a source without playlists fails at once without a request', () async {
-    const qqPlaylist = PlaylistKey(TrackSource.qq, 'playlist');
+  test('a QQ Music playlist is asked for from QQ Music', () async {
+    const qqPlaylist = PlaylistKey(TrackSource.qq, '7256912512');
     final subscription = harness.container.listen(
       playlistControllerProvider(qqPlaylist),
       (_, _) {},
     );
-    await pumpEventQueue();
-
-    final state = harness.container.read(
-      playlistControllerProvider(qqPlaylist),
+    final detail = await harness.container.read(
+      playlistControllerProvider(qqPlaylist).future,
     );
-    expect(state.hasError, isTrue);
-    expect(state.error, isA<PlaylistUnavailable>());
-    expect((state.error! as PlaylistUnavailable).message, '该来源不支持歌单');
-    expect(harness.requests, isEmpty);
+
+    expect(detail.tracks, hasLength(21));
+    final request = harness.requests.single;
+    expect(request['type'], 'playlist.tracks');
+    expect(request['data'], {'source': 'qq', 'playlistId': '7256912512'});
     subscription.close();
   });
 

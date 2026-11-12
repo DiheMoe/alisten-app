@@ -37,24 +37,32 @@ void main() {
     expect(harness.state.recentSearches.single.query, 'jazz');
   });
 
-  test('qq has no playlists and loads further pages by appending', () async {
-    await harness.search.submit('jazz');
-    await harness.search.changeView(SearchView.playlists);
+  test(
+    'qq searches playlists too and loads further pages by appending',
+    () async {
+      await harness.search.submit('jazz');
+      expect(harness.state.source, TrackSource.qq);
+      expect(types(), ['search.tracks', 'search.playlists']);
+      expect(harness.state.overviewPlaylists, isNotEmpty);
 
-    expect(harness.state.view, SearchView.all);
-    expect(types().where((type) => type == 'search.playlists'), isEmpty);
+      await harness.search.changeView(SearchView.playlists);
+      expect(harness.state.view, SearchView.playlists);
+      final playlists = harness.requests.last;
+      expect(playlists['type'], 'search.playlists');
+      expect((playlists['data']! as Map<String, Object?>)['source'], 'qq');
 
-    await harness.search.changeView(SearchView.tracks);
-    expect(harness.state.tracks, hasLength(6));
-    expect(harness.state.hasMore, isTrue);
+      await harness.search.changeView(SearchView.tracks);
+      expect(harness.state.tracks, hasLength(6));
+      expect(harness.state.hasMore, isTrue);
 
-    await harness.search.loadMore();
-    final request = harness.requests.last['data']! as Map<String, Object?>;
-    expect(request['page'], 2);
-    expect(request['pageSize'], 20);
-    expect(harness.state.tracks, hasLength(12));
-    expect(harness.state.page, 2);
-  });
+      await harness.search.loadMore();
+      final request = harness.requests.last['data']! as Map<String, Object?>;
+      expect(request['page'], 2);
+      expect(request['pageSize'], 20);
+      expect(harness.state.tracks, hasLength(12));
+      expect(harness.state.page, 2);
+    },
+  );
 
   test('playlist view requests playlists only and knows the total', () async {
     harness.transport.responses['search.playlists'] = {
@@ -82,7 +90,7 @@ void main() {
       return answer.future;
     };
 
-    final first = harness.search.submit('first');
+    final first = harness.search.submit('first', view: SearchView.tracks);
     final second = harness.search.submit('second');
     await pumpEventQueue();
     expect(held.keys, containsAll(['first', 'second']));
@@ -113,7 +121,7 @@ void main() {
       return answer.future;
     };
 
-    final first = harness.search.submit('first');
+    final first = harness.search.submit('first', view: SearchView.tracks);
     final second = harness.search.submit('second');
     await pumpEventQueue();
     held['second']!.complete(tracksAnswer(['from-second']));
@@ -158,7 +166,7 @@ void main() {
   test('an undecodable response ends in SearchFailed, not loading', () async {
     harness.transport.responses['search.tracks'] = {'items': 'oops'};
 
-    await harness.search.submit('jazz');
+    await harness.search.submit('jazz', view: SearchView.tracks);
 
     final status = harness.state.status;
     expect(status, isA<SearchFailed>());
@@ -184,7 +192,7 @@ void main() {
   test(
     'cache is usable while disconnected and expires at ten minutes',
     () async {
-      await harness.search.submit('jazz');
+      await harness.search.submit('jazz', view: SearchView.tracks);
       harness.transport.emit(const RoomStopped(4404));
       await pumpEventQueue();
 
@@ -204,7 +212,7 @@ void main() {
 
   test('the eleventh cached result evicts the least recently used', () async {
     for (var i = 0; i < 10; i++) {
-      await harness.search.submit('k$i');
+      await harness.search.submit('k$i', view: SearchView.tracks);
     }
     await harness.search.submit('k0');
     expect(harness.requests, hasLength(10));

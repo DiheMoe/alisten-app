@@ -85,20 +85,23 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('QQ Music offers no playlists, NetEase does', (tester) async {
+  testWidgets('QQ Music and NetEase both offer playlists', (tester) async {
     final page = await SearchPage.open(tester);
+    List<Object?> playlistSources() => [
+      for (final request in page.transport.requests)
+        if (request['type'] == 'search.playlists')
+          (request['data']! as Map<String, Object?>)['source'],
+    ];
 
     await page.search('晴天');
     expect(find.text('最佳匹配'), findsOneWidget);
-    expect(find.text('歌单'), findsNothing);
-    expect(
-      page.transport.requests.where((r) => r['type'] == 'search.playlists'),
-      isEmpty,
-    );
+    expect(find.text('歌单'), findsWidgets);
+    expect(playlistSources(), ['qq']);
 
     await tester.tap(find.text('网易云'));
     await page.settle();
     expect(find.text('歌单'), findsWidgets);
+    expect(playlistSources(), ['qq', 'netease']);
   });
 
   testWidgets('a temporary room offers to pick a Bilibili link and no other', (
@@ -122,6 +125,7 @@ void main() {
   testWidgets('a search that finds nothing says so', (tester) async {
     final page = await SearchPage.open(tester);
     page.transport.responses['search.tracks'] = tracksAnswer([]);
+    page.transport.responses['search.playlists'] = {'items': [], 'total': 0};
 
     await page.search('没有这首歌');
 

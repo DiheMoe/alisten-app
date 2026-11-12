@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// [name] 是搜索结果里的歌单名；从链接直接打开时没有摘要，调用方传“导入的歌单”。
 class SavePlatformPlaylistButton extends StatelessWidget {
   const SavePlatformPlaylistButton({
+    required this.source,
     required this.playlistId,
     required this.name,
     required this.onOpenAccount,
@@ -20,6 +21,7 @@ class SavePlatformPlaylistButton extends StatelessWidget {
     super.key,
   });
 
+  final TrackSource source;
   final String playlistId;
   final String name;
   final VoidCallback onOpenAccount;
@@ -43,7 +45,7 @@ class SavePlatformPlaylistButton extends StatelessWidget {
         guestMessage: '注册或登录之后就能保存这个歌单。',
         onOpenAccount: onOpenAccount,
         onSubmit: (name) => list.importPlatform(
-          source: TrackSource.netease,
+          source: source,
           playlistId: playlistId,
           name: name,
         ),
