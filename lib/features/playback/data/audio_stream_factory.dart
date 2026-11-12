@@ -39,8 +39,12 @@ final class AudioStreamFactory {
   }
 
   // just_audio 的代理会打印音源抛出的错误，因此错误中不得包含签名播放地址，
-  // 也不得包装含该地址的错误对象。
-  Future<StreamAudioResponse> _open(Uri uri, int? start, int? end) async {
+  // 也不得包装含该地址的错误对象。返回的地址是跳转之后实际取数据的地址。
+  Future<(StreamAudioResponse, Uri)> _open(
+    Uri uri,
+    int? start,
+    int? end,
+  ) async {
     final token = CancelToken();
     _active.add(token);
     final Response<ResponseBody> response;
@@ -82,7 +86,7 @@ final class AudioStreamFactory {
       sourceLength = contentLength;
       offset = 0;
     }
-    return StreamAudioResponse(
+    final audio = StreamAudioResponse(
       rangeRequestsSupported:
           partial ||
           (headers.value('accept-ranges')?.contains('bytes') ?? false),
@@ -92,6 +96,7 @@ final class AudioStreamFactory {
       offset: offset,
       stream: _body(response.data!.stream, token),
     );
+    return (audio, uri.resolveUri(response.realUri));
   }
 
   static int? _remaining(int? sourceLength, int offset, int? end) {
@@ -154,14 +159,29 @@ final class AudioStreamException implements Exception {
   }
 }
 
+/// 服务端的播放地址会跳转到音乐平台的限时地址。之后的分段请求（起播位置、seek、
+/// 断流重连）直接发给跳转后的地址，否则每次都要经服务端重新解析，多等一两秒；
+/// 限时地址失效时再经播放地址解析一次。
 final class _DioStreamAudioSource extends StreamAudioSource {
   _DioStreamAudioSource(this.uri, this.factory);
 
   final Uri uri;
   final AudioStreamFactory factory;
+  Uri? _redirected;
 
   @override
-  Future<StreamAudioResponse> request([int? start, int? end]) {
-    return factory._open(uri, start, end);
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    final redirected = _redirected;
+    if (redirected != null) {
+      try {
+        return (await factory._open(redirected, start, end)).$1;
+      } on AudioStreamException catch (error) {
+        if (error.reason == DioExceptionType.cancel.name) rethrow;
+        _redirected = null;
+      }
+    }
+    final (response, location) = await factory._open(uri, start, end);
+    if (location != uri) _redirected = location;
+    return response;
   }
 }
