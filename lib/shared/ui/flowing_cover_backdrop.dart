@@ -11,8 +11,9 @@ import 'package:alisten/shared/ui/visible_frames.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-// 与极光相同：色块大而柔和，约 30 帧/秒已足够平滑，也不随 120 Hz 屏幕翻倍。
-const _frameInterval = Duration(milliseconds: 33);
+// 色块大而柔和，转一圈要一两分钟，20 帧/秒已看不出跳动；整屏着色是房间里最费电
+// 的一项，帧数直接决定耗电。也不随 120 Hz 屏幕翻倍。
+const _frameInterval = Duration(milliseconds: 50);
 
 const _periodASeconds = 120.0;
 const _periodBSeconds = 70.0;

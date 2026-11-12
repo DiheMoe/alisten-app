@@ -81,7 +81,7 @@ void main() {
     expect(_flow(), findsNothing);
   });
 
-  testWidgets('a cover flows at about 30 frames a second, and replaces the '
+  testWidgets('a cover flows at about 20 frames a second, and replaces the '
       'aurora once it has faded in', (tester) async {
     final png = (await tester.runAsync(_png))!;
 
@@ -91,7 +91,7 @@ void main() {
 
     await tester.pump(_second);
     expect(find.byType(AuroraBackground), findsNothing);
-    expect(await _framesIn(tester, _second), inInclusiveRange(25, 31));
+    expect(await _framesIn(tester, _second), inInclusiveRange(17, 21));
   });
 
   testWidgets('the shader renders at half the screen resolution and the '

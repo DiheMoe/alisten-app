@@ -27,8 +27,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const _holdAfterDrag = Duration(seconds: 3);
 
-// 用定时器而非 Ticker：Ticker 按屏幕刷新率出帧，120 Hz 屏上点亮歌词时要多画一倍。
-const _frameInterval = Duration(milliseconds: 16);
+// 用定时器而非 Ticker：Ticker 按屏幕刷新率出帧，120 Hz 屏上要多画一倍。
+// 行在滚动时按 60 帧/秒出帧；只是逐字点亮时，一个字要唱几百毫秒，30 帧/秒已经
+// 连贯，省下一半的重绘。
+const _scrollInterval = Duration(milliseconds: 16);
+const _sweepInterval = Duration(milliseconds: 33);
 
 // 强调字唱完后还要回落。
 const _settleAfterLastWordMs = 2000;
@@ -72,6 +75,7 @@ class _LyricsViewState extends ConsumerState<LyricsView>
   bool _alignQueued = false;
 
   Timer? _frames;
+  Duration _framesEvery = _sweepInterval;
   Timer? _nextEvent;
   bool _frameQueued = false;
   bool _smoothShown = true;
@@ -217,7 +221,14 @@ class _LyricsViewState extends ConsumerState<LyricsView>
         _motion.active ||
         (_playing && _smooth && _animating(positionMs));
     if (continuous) {
-      _frames ??= Timer.periodic(_frameInterval, (_) => _requestFrame());
+      final interval = _clock.busy || _motion.active
+          ? _scrollInterval
+          : _sweepInterval;
+      if (_frames == null || interval != _framesEvery) {
+        _frames?.cancel();
+        _framesEvery = interval;
+        _frames = Timer.periodic(interval, (_) => _requestFrame());
+      }
       return;
     }
     _frames?.cancel();

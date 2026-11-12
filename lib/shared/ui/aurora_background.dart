@@ -28,9 +28,24 @@ class _AuroraBackgroundState extends State<AuroraBackground>
   // 只累计实际漂移的时长，暂停后恢复不会跳变。
   Duration _drifted = Duration.zero;
 
+  bool _colourful = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final colourful = AlistenColors.of(context).aurora
+        .any((color) => HSLColor.fromColor(color).saturation > 0.05);
+    if (colourful != _colourful) {
+      _colourful = colourful;
+      visibleFramesChanged();
+    }
+  }
+
   @override
   void visibleFramesChanged() {
-    final drifting = onScreen && !keyboardUp && !animationsRemoved;
+    // 没有色相的光斑（界面自己的黑白灰）漂移起来看不出变化，不为它出帧。
+    final drifting =
+        onScreen && !keyboardUp && !animationsRemoved && _colourful;
     final timer = _timer;
     if (drifting == (timer != null)) return;
     if (timer == null) {

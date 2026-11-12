@@ -11,7 +11,7 @@ import 'app_test_harness.dart';
 const periodicFrames = 4;
 
 /// 房间页的背景每秒约 30 帧，另加半秒一次的刷新。
-const roomPageFrames = 31 + periodicFrames;
+const roomPageFrames = 21 + periodicFrames;
 
 /// 先让进出场动画、提示等有时限的变化结束，再以 120 Hz 的节奏推进 1 秒，返回
 /// 其间实际画出的帧数。

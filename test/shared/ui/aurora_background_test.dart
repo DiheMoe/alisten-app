@@ -8,6 +8,12 @@ import 'package:alisten/shared/ui/aurora_background.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+final _cover = ColorScheme.fromSeed(
+  seedColor: const Color(0xFF2E9E48),
+  brightness: Brightness.dark,
+  dynamicSchemeVariant: AlistenColors.schemeVariant,
+);
+
 void main() {
   const second = Duration(seconds: 1);
 
@@ -15,12 +21,13 @@ void main() {
     bool disableAnimations = false,
     bool tickers = true,
     GlobalKey<NavigatorState>? navigator,
+    ColorScheme? scheme,
   }) {
     return MediaQuery(
       data: MediaQueryData(disableAnimations: disableAnimations),
       child: MaterialApp(
         navigatorKey: navigator,
-        theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
+        theme: buildAlistenTheme(scheme ?? _cover),
         home: TickerMode(enabled: tickers, child: const AuroraBackground()),
       ),
     );
@@ -29,6 +36,14 @@ void main() {
   testWidgets('the aurora drifts at about 30 frames a second', (tester) async {
     await tester.pumpWidget(aurora());
     expect(await _framesIn(tester, second), inInclusiveRange(25, 31));
+  });
+
+  testWidgets('an aurora without colour, as in a room with no cover, draws '
+      'no frames: its drift cannot be seen', (tester) async {
+    await tester.pumpWidget(
+      aurora(scheme: AlistenColors.brandScheme(Brightness.dark)),
+    );
+    expect(await _framesIn(tester, second), 0);
   });
 
   testWidgets('a loop of the aurora takes 24 seconds', (tester) async {

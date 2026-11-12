@@ -75,10 +75,10 @@ void main() {
 
     room.router.go(RoomMode.lyrics.routeIn('listen'));
 
-    expect(await idleFrames(tester), lessThanOrEqualTo(62 + roomPageFrames));
+    expect(await idleFrames(tester), lessThanOrEqualTo(32 + roomPageFrames));
   });
 
-  testWidgets('a word line being sung draws about 60 frames a second, not '
+  testWidgets('a word line being sung draws about 30 frames a second, not '
       'one for each refresh of the screen', (tester) async {
     final room = await enterBusyRoom(
       tester,
@@ -87,7 +87,7 @@ void main() {
 
     room.router.go(RoomMode.lyrics.routeIn('listen'));
 
-    expect(await idleFrames(tester), inInclusiveRange(40, 62 + roomPageFrames));
+    expect(await idleFrames(tester), inInclusiveRange(25, 32 + roomPageFrames));
   });
 
   testWidgets('pages over an active room draw no more than the half-second '
