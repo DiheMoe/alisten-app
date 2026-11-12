@@ -147,7 +147,7 @@ class _PlayButton extends StatelessWidget {
     final pending = isPendingPlayback(status);
     final diameter = _diameter(large: large);
     final iconSize = large ? AlistenSizes.playIcon : AlistenSizes.icon;
-    final ink = large ? Theme.of(context).colorScheme.surface : colors.onGlass;
+    final ink = large ? colors.onControl : colors.onGlass;
     final target = _PlayButton.target(large: large);
     final disc = SizedBox.square(
       dimension: target,
@@ -157,7 +157,7 @@ class _PlayButton extends StatelessWidget {
           height: diameter,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: large ? colors.onGlass : colors.glassFill,
+            color: large ? colors.control : colors.glassFill,
             border: large ? null : Border.all(color: colors.glassStroke),
           ),
           child: Center(

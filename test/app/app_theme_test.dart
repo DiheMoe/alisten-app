@@ -49,11 +49,19 @@ void main() {
     return container;
   }
 
-  Color room(ProviderContainer container) =>
-      container.read(roomThemeProvider).colorScheme.primary;
+  Color room(
+    ProviderContainer container, [
+    Brightness brightness = Brightness.dark,
+  ]) {
+    final themes = container.read(roomThemeProvider);
+    return switch (brightness) {
+      Brightness.light => themes.light,
+      Brightness.dark => themes.dark,
+    }.colorScheme.primary;
+  }
 
-  Color roomCover(String cover) =>
-      _FakeCoverLoader.scheme(cover, Brightness.dark).primary;
+  Color roomCover(String cover, [Brightness brightness = Brightness.dark]) =>
+      _FakeCoverLoader.scheme(cover, brightness).primary;
 
   ColorScheme brand(Brightness brightness) => ColorScheme.fromSeed(
     seedColor: const Color(0xFF6D5BFF),
@@ -72,8 +80,13 @@ void main() {
     expect(themes.dark.colorScheme.primary, brand(Brightness.dark).primary);
     expect(themes.dark.extension<AlistenColors>(), isNotNull);
     expect(themes.dark.splashFactory, NoSplash.splashFactory);
-    expect(room(container), brand(Brightness.dark).primary);
-    expect(container.read(roomThemeProvider).brightness, Brightness.dark);
+    for (final brightness in Brightness.values) {
+      expect(room(container, brightness), brand(brightness).primary);
+    }
+    expect(
+      container.read(roomThemeProvider).light.brightness,
+      Brightness.light,
+    );
     expect(covers.reads, isEmpty);
   });
 
@@ -123,7 +136,7 @@ void main() {
     expect(themes.dark.colorScheme.primary, brand(Brightness.dark).primary);
   });
 
-  test('the room takes the dark colours of the playing cover once they are '
+  test('the room takes the colours of the playing cover once they are '
       'read', () async {
     final container = await open(playing: nowPlayingWith());
 
@@ -131,35 +144,46 @@ void main() {
     expect(room(container), brand(Brightness.dark).primary);
     await pumpEventQueue();
 
-    expect(room(container), roomCover(_coverA));
-    expect(container.read(roomThemeProvider).brightness, Brightness.dark);
-    // 不论设置里的深浅模式，房间只读取深色配色。
-    expect(covers.reads, [(testTrackMeta.coverUrl, Brightness.dark)]);
+    for (final brightness in Brightness.values) {
+      expect(room(container, brightness), roomCover(_coverA, brightness));
+    }
+    expect(
+      covers.reads,
+      unorderedEquals([
+        (testTrackMeta.coverUrl, Brightness.light),
+        (testTrackMeta.coverUrl, Brightness.dark),
+      ]),
+    );
   });
 
-  test('the brightness of the pages follows the settings, the room stays '
-      'dark', () async {
+  test('the room follows the brightness in the settings', () async {
     final container = await open(
       playing: nowPlayingWith(),
       stored: {'alisten.theme': 'light'},
     );
     await pumpEventQueue();
 
-    expect(container.read(appThemeProvider).mode, ThemeMode.light);
-    expect(container.read(roomThemeProvider).brightness, Brightness.dark);
+    expect(container.read(roomThemeProvider).mode, ThemeMode.light);
+    expect(
+      room(container, Brightness.light),
+      roomCover(_coverA, Brightness.light),
+    );
+    // 只读取当前深浅模式下的封面配色。
+    expect(covers.reads, [(testTrackMeta.coverUrl, Brightness.light)]);
 
     await container
         .read(settingsControllerProvider.notifier)
         .setTheme(AppTheme.dark);
     await pumpEventQueue();
     expect(container.read(appThemeProvider).mode, ThemeMode.dark);
+    expect(container.read(roomThemeProvider).mode, ThemeMode.dark);
+    expect(room(container), roomCover(_coverA));
 
     await container
         .read(settingsControllerProvider.notifier)
         .setTheme(AppTheme.system);
     await pumpEventQueue();
-    expect(container.read(appThemeProvider).mode, ThemeMode.system);
-    expect(room(container), roomCover(_coverA));
+    expect(container.read(roomThemeProvider).mode, ThemeMode.system);
   });
 
   test(

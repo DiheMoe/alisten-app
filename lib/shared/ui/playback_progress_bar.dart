@@ -49,7 +49,7 @@ class PlaybackProgressBar extends StatelessWidget {
             size: const Size.fromHeight(AlistenSizes.progressTrack),
             painter: _TrackPainter(
               played: known ? position / durationMs : 0,
-              ink: colors.onGlass,
+              ink: colors.control,
               empty: colors.outline,
               glow: colors.glow,
               rtl: Directionality.of(context) == TextDirection.rtl,

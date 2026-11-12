@@ -11,6 +11,8 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
     required this.glow,
     required this.glowTextShadows,
     required this.coverShadow,
+    required this.control,
+    required this.onControl,
     required this.aurora,
     required this.scrim,
     required this.glassFill,
@@ -29,8 +31,9 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
     required this.danger,
   });
 
-  /// [immersive] 用于房间：深色、颜色取自封面，流动背景压暗，文字和控件靠
-  /// 不透明度分层。房间外的页面保持安静的中性底色。
+  /// [immersive] 用于房间：颜色取自封面，流动背景是房间的主角。深色时压暗，
+  /// 浅色时用白色冲淡成干净的浅色，文字和控件靠不透明度分层。房间外的页面保持
+  /// 安静的中性底色。
   factory AlistenColors.fromScheme(
     ColorScheme scheme, {
     bool immersive = false,
@@ -61,12 +64,16 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
     ).toColor();
     final surface = scheme.surface;
     final glow = vivid(scheme.primary);
-    // 房间的流动封面要压得够暗，白字和歌词才有对比。
-    final scrimAlphas = immersive
-        ? const [0.62, 0.58, 0.82]
-        : dark
-        ? const [0.4, 0.22, 0.6]
-        : const [0.55, 0.42, 0.74];
+    final lightRoom = immersive && !dark;
+    // 房间的流动封面在深色时要压得够暗，白字和歌词才有对比；浅色时用纯白而不是
+    // 带色调的底色去冲淡，带色调的底色盖在饱和的封面上会发灰。
+    final scrimBase = lightRoom ? Colors.white : surface;
+    final scrimAlphas = switch ((immersive, dark)) {
+      (true, true) => const [0.68, 0.66, 0.84],
+      (true, false) => const [0.68, 0.6, 0.82],
+      (false, true) => const [0.4, 0.22, 0.6],
+      (false, false) => const [0.55, 0.42, 0.74],
+    };
     return AlistenColors(
       brand: brand.start,
       onBrand: brand.ink,
@@ -86,10 +93,14 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
           offset: const Offset(0, 16),
         ),
       ]),
-      // 房间没有封面时极光是深色底上的一抹颜色，不能亮到压过白字。
+      // 浅色房间里播放键和进度条用封面色；文字色在浅色下近于黑，填满一个圆显得
+      // 生硬。
+      control: lightRoom ? brand.start : scheme.onSurface,
+      onControl: lightRoom ? brand.ink : surface,
+      // 深色房间没有封面时，极光是深色底上的一抹颜色，不能亮到压过白字。
       aurora: List.unmodifiable([
         for (final color in [scheme.primary, scheme.tertiary, scheme.secondary])
-          immersive
+          immersive && dark
               ? _saturated(
                   color,
                   lightness: 0.42,
@@ -102,11 +113,11 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
         end: Alignment.bottomCenter,
         stops: const [0, 0.45, 1],
         colors: [
-          for (final alpha in scrimAlphas) surface.withValues(alpha: alpha),
+          for (final alpha in scrimAlphas) scrimBase.withValues(alpha: alpha),
         ],
       ),
-      // 房间里的面板是压在流动封面上的一层暗玻璃，不是提亮背景的白雾。
-      glassFill: immersive
+      // 深色房间里的面板是压在流动封面上的一层暗玻璃，不是提亮背景的白雾。
+      glassFill: immersive && dark
           ? Colors.black.withValues(alpha: 0.3)
           : Colors.white.withValues(alpha: dark ? 0.075 : 0.62),
       glassStroke: dark
@@ -116,7 +127,9 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
       bubble: Colors.white.withValues(alpha: dark ? 0.12 : 0.86),
       onGlass: scheme.onSurface,
       // 极光最亮处叠上玻璃面板时，不透明度再低，辅助文字就达不到 4.5:1。
-      onGlassMuted: scheme.onSurface.withValues(alpha: immersive ? 0.8 : 0.72),
+      onGlassMuted: scheme.onSurface.withValues(
+        alpha: immersive && dark ? 0.8 : 0.72,
+      ),
       raised: dark
           ? Color.alphaBlend(
               Colors.white.withValues(alpha: 0.06),
@@ -216,6 +229,12 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
   /// 封面这类实物图片下的阴影，不带颜色。
   final List<BoxShadow> coverShadow;
 
+  /// 播放键、进度条已播放部分这类跟随音乐的主控件。
+  final Color control;
+
+  /// 与 [control] 的对比度不低于 4.5:1。
+  final Color onControl;
+
   /// 固定三种颜色。
   final List<Color> aurora;
   final LinearGradient scrim;
@@ -250,6 +269,8 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
     Color? glow,
     List<Shadow>? glowTextShadows,
     List<BoxShadow>? coverShadow,
+    Color? control,
+    Color? onControl,
     List<Color>? aurora,
     LinearGradient? scrim,
     Color? glassFill,
@@ -273,6 +294,8 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
       glow: glow ?? this.glow,
       glowTextShadows: glowTextShadows ?? this.glowTextShadows,
       coverShadow: coverShadow ?? this.coverShadow,
+      control: control ?? this.control,
+      onControl: onControl ?? this.onControl,
       aurora: aurora ?? this.aurora,
       scrim: scrim ?? this.scrim,
       glassFill: glassFill ?? this.glassFill,
@@ -305,6 +328,8 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
       coverShadow: List.unmodifiable(
         BoxShadow.lerpList(coverShadow, other.coverShadow, t)!,
       ),
+      control: Color.lerp(control, other.control, t)!,
+      onControl: Color.lerp(onControl, other.onControl, t)!,
       aurora: List.unmodifiable([
         for (var index = 0; index < aurora.length; index++)
           Color.lerp(aurora[index], other.aurora[index], t)!,
@@ -336,6 +361,8 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
         other.glow == glow &&
         listEquals(other.glowTextShadows, glowTextShadows) &&
         listEquals(other.coverShadow, coverShadow) &&
+        other.control == control &&
+        other.onControl == onControl &&
         listEquals(other.aurora, aurora) &&
         other.scrim == scrim &&
         other.glassFill == glassFill &&
@@ -361,6 +388,8 @@ final class AlistenColors extends ThemeExtension<AlistenColors> {
     glow,
     Object.hashAll(glowTextShadows),
     Object.hashAll(coverShadow),
+    control,
+    onControl,
     Object.hashAll(aurora),
     scrim,
     glassFill,

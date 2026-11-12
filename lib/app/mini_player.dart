@@ -413,7 +413,7 @@ class MiniPlayerProgress extends ConsumerWidget {
       size: const Size.fromHeight(AlistenSizes.progressTrack / 2),
       painter: _ProgressPainter(
         played: (position / duration).clamp(0.0, 1.0),
-        ink: colors.onGlass,
+        ink: colors.control,
         track: colors.onGlass.withValues(alpha: _trackAlpha),
         glow: colors.glow,
         rtl: Directionality.of(context) == TextDirection.rtl,

@@ -38,8 +38,8 @@ void main() {
     }
   });
 
-  test('in the room, text on a glass panel reaches 4.5:1 over the brightest '
-      'part of the dimmed cover', () {
+  test('in the room, text and the play controls stay legible over the '
+      'thinnest part of the cover backdrop', () {
     double contrast(Color a, Color b) {
       final (light, dark) = (a.computeLuminance(), b.computeLuminance());
       return light > dark
@@ -48,25 +48,39 @@ void main() {
     }
 
     for (var hue = 0.0; hue < 360; hue += 30) {
-      final scheme = ColorScheme.fromSeed(
-        seedColor: HSLColor.fromAHSL(1, hue, 0.85, 0.55).toColor(),
-        brightness: Brightness.dark,
-        dynamicSchemeVariant: AlistenColors.schemeVariant,
-      );
-      final colors = AlistenColors.fromScheme(scheme, immersive: true);
-      // 遮罩最薄处压在封面最亮的颜色上。
-      final thinnest = colors.scrim.colors.reduce((a, b) => a.a < b.a ? a : b);
-      final backdrop = Color.alphaBlend(thinnest, colors.glow);
-      final panel = Color.alphaBlend(colors.glassFill, backdrop);
-      for (final (name, ink) in [
-        ('onGlass', colors.onGlass),
-        ('onGlassMuted', Color.alphaBlend(colors.onGlassMuted, panel)),
-      ]) {
-        expect(
-          contrast(ink, panel),
-          greaterThanOrEqualTo(4.5),
-          reason: '$hue $name',
+      for (final brightness in Brightness.values) {
+        final scheme = ColorScheme.fromSeed(
+          seedColor: HSLColor.fromAHSL(1, hue, 0.85, 0.55).toColor(),
+          brightness: brightness,
+          dynamicSchemeVariant: AlistenColors.schemeVariant,
         );
+        final colors = AlistenColors.fromScheme(scheme, immersive: true);
+        // 遮罩最薄处压在对文字最不利的封面颜色上：深色房间是封面最亮的颜色，
+        // 浅色房间是近于黑的阴影。
+        final thinnest = colors.scrim.colors.reduce(
+          (a, b) => a.a < b.a ? a : b,
+        );
+        final worstCover = brightness == Brightness.dark
+            ? colors.glow
+            : const Color(0xFF101010);
+        final backdrop = Color.alphaBlend(thinnest, worstCover);
+        final panel = Color.alphaBlend(colors.glassFill, backdrop);
+        for (final (name, ink, background) in [
+          ('onGlass on the backdrop', colors.onGlass, backdrop),
+          ('onGlass on a panel', colors.onGlass, panel),
+          (
+            'onGlassMuted on a panel',
+            Color.alphaBlend(colors.onGlassMuted, panel),
+            panel,
+          ),
+          ('onControl on control', colors.onControl, colors.control),
+        ]) {
+          expect(
+            contrast(ink, background),
+            greaterThanOrEqualTo(4.5),
+            reason: '$hue $brightness $name',
+          );
+        }
       }
     }
   });
