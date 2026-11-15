@@ -498,7 +498,7 @@ final class RestAlistenApi implements AlistenApi {
     http.RestEndpoint endpoint, {
     Map<String, Object?> body = const {},
   }) async {
-    final token = endpoint.auth == http.HttpAuth.member
+    final token = endpoint.auth.usesMemberToken
         ? await _memberTokenReader()
         : null;
     await _transport.execute(endpoint, body: body, token: token);
@@ -600,7 +600,7 @@ final class RestAlistenApi implements AlistenApi {
     Map<String, String> pathParameters = const {},
     Map<String, Object?> body = const {},
   }) async {
-    final token = endpoint.auth == http.HttpAuth.member
+    final token = endpoint.auth.usesMemberToken
         ? await _memberTokenReader()
         : null;
     final response = await _transport.execute(

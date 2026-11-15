@@ -302,6 +302,7 @@ final class _Generator {
         'description',
         'method',
         'path',
+        'params',
         'status',
         'location',
         'auth',
@@ -310,9 +311,10 @@ final class _Generator {
       }, where);
       final name = _text(operation['name'], '$where.name');
       final auth = _text(operation['auth'], '$where.auth');
-      if (!const {'none', 'member', 'admin'}.contains(auth)) {
+      if (!const {'none', 'member', 'account', 'admin'}.contains(auth)) {
         throw FormatException('$where.auth: unsupported value "$auth"');
       }
+      _checkPathParameters(operation, where);
       final type = _pascal(name, '$where.name');
       _addClass('${type}Request', operation['request'], '$where.request');
       _addClass('${type}Response', operation['response'], '$where.response');
@@ -683,6 +685,26 @@ final class _Generator {
       values.add((dart: dart, wire: wireValues[index]));
     }
     return _Enum(name, values);
+  }
+
+  // 生成的接口把路径参数当作字符串填进路径，所以 params 只能给路径里的参数
+  // 声明字符串类型。
+  void _checkPathParameters(_Json operation, String where) {
+    final path = _text(operation['path'], '$where.path');
+    final inPath = _pathParameter
+        .allMatches(path)
+        .map((match) => match.group(1)!)
+        .toSet();
+    final params = _schemaMap(operation['params'], '$where.params');
+    for (final MapEntry(key: name, value: schema) in params.entries) {
+      final paramWhere = '$where.params.$name';
+      if (!inPath.contains(name)) {
+        throw FormatException('$paramWhere: $path has no such parameter');
+      }
+      if (_parseValue(schema, paramWhere) != _string) {
+        throw FormatException('$paramWhere: path parameters must be strings');
+      }
+    }
   }
 
   void _addEndpoint(String name, _Json binding, String auth, String where) {

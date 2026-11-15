@@ -260,7 +260,7 @@ final class RestPlaylistApi implements PlaylistApi {
 
   // 读不出 token 与没有 token 一样：请求没有发出，不是结果未知。
   Future<String?> _tokenFor(http.RestEndpoint endpoint) async {
-    if (endpoint.auth != http.HttpAuth.member) return null;
+    if (!endpoint.auth.usesMemberToken) return null;
     try {
       return await _memberTokenReader();
     } on Object {

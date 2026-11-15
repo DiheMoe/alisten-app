@@ -168,7 +168,16 @@ void _checkKind(Map<String, Object?> json, String kind, String owner) {
   }
 }
 
-enum HttpAuth { none, member, ticket, admin }
+enum HttpAuth {
+  none,
+  member,
+  account,
+  ticket,
+  admin;
+
+  // account 接口同样带成员 token，服务端另外要求这个成员已经注册账号。
+  bool get usesMemberToken => this == member || this == account;
+}
 
 final class RestEndpoint {
   const RestEndpoint({

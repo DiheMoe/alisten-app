@@ -342,6 +342,64 @@ void main() {
       );
     });
 
+    test('account endpoints keep their own auth value', () {
+      final idl = _minimalIdl();
+      (idl['x-http']! as List<Object?>).add(<String, Object?>{
+        'name': 'listMine',
+        'method': 'GET',
+        'path': '/api/me/things',
+        'auth': 'account',
+        'response': <String, Object?>{r'$ref': r'#/$defs/Empty'},
+      });
+
+      final output = generateHttp(idl);
+
+      expect(output, contains('static const listMine = RestEndpoint('));
+      expect(output, contains('auth: HttpAuth.account,'));
+    });
+
+    test('path parameter types are accepted and stay strings', () {
+      final output = generateHttp(_idlWithThing());
+
+      expect(output, contains("path: '/api/things/{id}',"));
+      expect(output, contains("pathParameters: <String>['id'],"));
+      final protocol = generateProtocol(_idlWithThing());
+      final response = protocol.indexOf('class GetThingResponse {');
+      expect(response, isNonNegative);
+      expect(
+        protocol.substring(response, protocol.indexOf('\n}\n', response)),
+        contains('final String id;'),
+      );
+    });
+
+    test('path parameter types that are not strings, or name no parameter, '
+        'fail with their IDL path', () {
+      final changes = <(String, Map<String, Object?>)>[
+        ('other', <String, Object?>{r'$ref': r'#/$defs/ThingID'}),
+        ('id', <String, Object?>{'type': 'integer'}),
+        ('id', <String, Object?>{r'$ref': r'#/$defs/Source'}),
+      ];
+      for (final (name, schema) in changes) {
+        final idl = _idlWithThing();
+        _schema(
+          (idl['x-http']! as List<Object?>).last! as Map<String, Object?>,
+          <String>['params'],
+        )[name] = schema;
+
+        expect(
+          () => generateHttp(idl),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              contains('x-http[2].params.$name'),
+            ),
+          ),
+          reason: '$name: $schema',
+        );
+      }
+    });
+
     test('real IDL names all 28 admin endpoints', () {
       final output = generateHttp(_backendIdl());
 
@@ -378,6 +436,26 @@ void main() {
         expect(output, contains('static const $name = RestEndpoint('));
       }
       expect(RegExp('auth: HttpAuth.admin,').allMatches(output).length, 28);
+    }, skip: _backendSkip);
+
+    test('real IDL asks for an account on playlists and pairing codes', () {
+      final output = generateHttp(_backendIdl());
+      String endpoint(String name) {
+        final start = output.indexOf('static const $name = RestEndpoint(');
+        expect(start, isNonNegative, reason: name);
+        return output.substring(start, output.indexOf(');', start));
+      }
+
+      for (final name in <String>[
+        'listMyPlaylists',
+        'copyMyPlaylistItems',
+        'copySharedPlaylist',
+        'createPairingCode',
+      ]) {
+        expect(endpoint(name), contains('auth: HttpAuth.account,'));
+      }
+      expect(endpoint('getMe'), contains('auth: HttpAuth.member,'));
+      expect(endpoint('getSharedPlaylist'), contains('auth: HttpAuth.none,'));
     }, skip: _backendSkip);
 
     test('endpoint name conflicts fail with both IDL paths', () {
@@ -1290,6 +1368,33 @@ void main() {
   check(RestEndpoints.values.length == 4, 'endpoint list');
 }
 ''';
+
+Map<String, Object?> _idlWithThing() {
+  final idl = _minimalIdl();
+  (idl[r'$defs']! as Map<String, Object?>)['ThingID'] = <String, Object?>{
+    'type': 'string',
+    'description': 'eight hex digits',
+    'pattern': r'^[0-9a-f]{8}$',
+  };
+  (idl['x-http']! as List<Object?>).add(<String, Object?>{
+    'name': 'getThing',
+    'method': 'GET',
+    'path': '/api/things/{id}',
+    'params': <String, Object?>{
+      'id': <String, Object?>{r'$ref': r'#/$defs/ThingID'},
+    },
+    'auth': 'none',
+    'response': <String, Object?>{
+      'type': 'object',
+      'additionalProperties': false,
+      'properties': <String, Object?>{
+        'id': <String, Object?>{r'$ref': r'#/$defs/ThingID'},
+      },
+      'required': <Object?>['id'],
+    },
+  });
+  return idl;
+}
 
 Map<String, Object?> _minimalIdl() {
   final decoded = jsonDecode(r'''
