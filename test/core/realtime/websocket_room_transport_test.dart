@@ -855,6 +855,7 @@ Map<String, Object?> _snapshotData() {
       'lyric': '',
     },
     'pending': null,
+    'next': null,
     'items': [_entryData()],
     'members': {
       'sessions': [

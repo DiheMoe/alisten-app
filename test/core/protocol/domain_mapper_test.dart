@@ -1,5 +1,6 @@
 import 'package:alisten/core/protocol/domain_mapper.dart';
 import 'package:alisten/core/protocol/protocol.gen.dart' as protocol;
+import 'package:alisten/domain/room/room.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -42,5 +43,43 @@ void main() {
     expect(cover('http://example.com/1.jpg'), 'http://example.com/1.jpg');
     expect(cover('https://example.com/1.jpg'), 'https://example.com/1.jpg');
     expect(cover(''), '');
+  });
+
+  test('the next track that queue updates and snapshots name is accepted, '
+      'with or without a time to load it', () {
+    for (final loadWithinMs in [60000, null]) {
+      final next = <String, Object?>{
+        'entryId': 'next-entry',
+        'mediaUrl': '/media/qq/next',
+        'loadWithinMs': loadWithinMs,
+      };
+
+      final event = toDomainEvent(protocol.RoomEventTypes.queueUpdated, 1, 2, {
+        'pending': null,
+        'next': next,
+        'items': <Object?>[],
+      });
+      final snapshot = toDomainSnapshot(
+        protocol.RoomSnapshot.fromJson({
+          'term': 1,
+          'seq': 2,
+          'room': {
+            'id': 'room-id',
+            'name': '房间',
+            'description': '',
+            'kind': 'ephemeral',
+          },
+          'playMode': 'sequential',
+          'nowPlaying': null,
+          'pending': null,
+          'next': next,
+          'items': <Object?>[],
+          'members': {'sessions': <Object?>[], 'onlineCount': 0},
+        }),
+      );
+
+      expect(event, isA<QueueUpdatedEvent>());
+      expect(snapshot.room.id, 'room-id');
+    }
   });
 }

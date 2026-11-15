@@ -5,7 +5,7 @@ import 'package:alisten/core/protocol/protocol_runtime.dart';
 export 'package:alisten/core/protocol/protocol_runtime.dart'
     show ProtocolMismatchException, WsEvent, WsRequest, WsResponse;
 
-const protocolVersion = 'f653116b60b2c244';
+const protocolVersion = '10a70c0dce07a9a7';
 
 class APIKey {
   const APIKey({required this.key});
@@ -529,6 +529,41 @@ class MyPlaylistItem {
   };
 }
 
+class NextTrack {
+  const NextTrack({
+    required this.entryId,
+    required this.loadWithinMs,
+    required this.mediaUrl,
+  });
+
+  factory NextTrack.fromJson(Map<String, Object?> json) {
+    return NextTrack(
+      entryId: readString(
+        requiredField(json, 'entryId', 'NextTrack'),
+        'NextTrack.entryId',
+      ),
+      loadWithinMs: switch (requiredField(json, 'loadWithinMs', 'NextTrack')) {
+        null => null,
+        final value => readInt(value, 'NextTrack.loadWithinMs'),
+      },
+      mediaUrl: readString(
+        requiredField(json, 'mediaUrl', 'NextTrack'),
+        'NextTrack.mediaUrl',
+      ),
+    );
+  }
+
+  final String entryId;
+  final int? loadWithinMs;
+  final String mediaUrl;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'entryId': entryId,
+    'loadWithinMs': loadWithinMs,
+    'mediaUrl': mediaUrl,
+  };
+}
+
 class NowPlaying {
   const NowPlaying({
     required this.durationMs,
@@ -892,6 +927,7 @@ class RoomSnapshot {
   const RoomSnapshot({
     required this.items,
     required this.members,
+    required this.next,
     required this.nowPlaying,
     required this.pending,
     required this.playMode,
@@ -918,6 +954,12 @@ class RoomSnapshot {
           'RoomSnapshot.members',
         ),
       ),
+      next: switch (requiredField(json, 'next', 'RoomSnapshot')) {
+        null => null,
+        final value => NextTrack.fromJson(
+          readObject(value, 'RoomSnapshot.next'),
+        ),
+      },
       nowPlaying: switch (requiredField(json, 'nowPlaying', 'RoomSnapshot')) {
         null => null,
         final value => NowPlaying.fromJson(
@@ -952,6 +994,7 @@ class RoomSnapshot {
 
   final List<Entry> items;
   final Members members;
+  final NextTrack? next;
   final NowPlaying? nowPlaying;
   final Entry? pending;
   final PlayMode playMode;
@@ -962,6 +1005,7 @@ class RoomSnapshot {
   Map<String, Object?> toJson() => <String, Object?>{
     'items': items.map((item) => item.toJson()).toList(growable: false),
     'members': members.toJson(),
+    'next': next?.toJson(),
     'nowPlaying': nowPlaying?.toJson(),
     'pending': pending?.toJson(),
     'playMode': playMode.toJson(),
@@ -1887,7 +1931,11 @@ class PlaybackUpdated {
 }
 
 class QueueUpdated {
-  const QueueUpdated({required this.items, required this.pending});
+  const QueueUpdated({
+    required this.items,
+    required this.next,
+    required this.pending,
+  });
 
   factory QueueUpdated.fromJson(Map<String, Object?> json) {
     return QueueUpdated(
@@ -1901,6 +1949,12 @@ class QueueUpdated {
                     Entry.fromJson(readObject(item, 'QueueUpdated.items[]')),
               )
               .toList(growable: false),
+      next: switch (requiredField(json, 'next', 'QueueUpdated')) {
+        null => null,
+        final value => NextTrack.fromJson(
+          readObject(value, 'QueueUpdated.next'),
+        ),
+      },
       pending: switch (requiredField(json, 'pending', 'QueueUpdated')) {
         null => null,
         final value => Entry.fromJson(
@@ -1911,10 +1965,12 @@ class QueueUpdated {
   }
 
   final List<Entry> items;
+  final NextTrack? next;
   final Entry? pending;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'items': items.map((item) => item.toJson()).toList(growable: false),
+    'next': next?.toJson(),
     'pending': pending?.toJson(),
   };
 }

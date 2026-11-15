@@ -351,6 +351,7 @@ Map<String, Object?> _snapshotJson(RoomSnapshot snapshot) {
             'lyric': nowPlaying.lyric,
           },
     'pending': pending == null ? null : _entryJson(pending),
+    'next': null,
     'items': snapshot.items.map(_entryJson).toList(),
     'members': {
       'sessions': snapshot.members.map(_memberJson).toList(),

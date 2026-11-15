@@ -356,6 +356,7 @@ Map<String, Object?> _snapshotJson() {
       'lyric': '',
     },
     'pending': null,
+    'next': null,
     'items': [_entryJson()],
     'members': {
       'sessions': [_memberJson()],
