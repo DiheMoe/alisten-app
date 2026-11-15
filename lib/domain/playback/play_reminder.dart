@@ -59,7 +59,7 @@ final class PlayReminderTracker {
       for (final entry in [snapshot.pending, ...snapshot.items, playing])
         if (entry != null && entry.requestedBy?.id == memberId) entry.id,
     };
-    // 条目开播时先在一个事件中离开队列，下一个事件才开始播放，
+    // 同一次切歌先后收到开播和队列两个事件，两者之间的房间状态只更新了一半，
     // 所以不切歌的实时事件只添加条目。
     if (!live || playing?.id != _playingEntryId) {
       _firstSeen.removeWhere((id, _) => !own.contains(id));

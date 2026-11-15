@@ -58,10 +58,43 @@ void main() {
     expect(observe(_snapshot(playing: other, items: [own]), at: 0), isNull);
     // 上一首放完了，下一首正在准备。
     expect(observe(_snapshot(pending: own), at: 40000), isNull);
-    // 服务端在条目开始播放之前把它移出队列。
-    expect(observe(_snapshot(), at: 41000), isNull);
 
-    expect(observe(_snapshot(playing: own), at: 42000), same(own));
+    // 开播的事件先到，条目随后的事件才离开待播。
+    expect(
+      observe(_snapshot(playing: own, pending: own), at: 42000),
+      same(own),
+    );
+    expect(observe(_snapshot(playing: own), at: 42000), isNull);
+  });
+
+  test('an own entry that waited in the queue is reminded of when it starts '
+      'while still listed there', () {
+    final tracker = PlayReminderTracker();
+    final other = _entry('other-entry', testMember);
+    final own = _entry('own-entry', _me);
+    final later = _entry('later-entry', _me);
+    QueueEntry? observe(RoomSnapshot snapshot, {required int at}) {
+      return tracker.observe(
+        snapshot: snapshot,
+        memberId: _me.id,
+        live: true,
+        enabled: true,
+        nowMs: at,
+      );
+    }
+
+    final waiting = [own, later];
+    expect(observe(_snapshot(playing: other, items: waiting), at: 0), isNull);
+
+    expect(
+      observe(_snapshot(playing: own, items: waiting), at: 40000),
+      same(own),
+    );
+    expect(observe(_snapshot(playing: own, items: [later]), at: 40000), isNull);
+    expect(
+      observe(_snapshot(playing: later, items: [later]), at: 80000),
+      same(later),
+    );
   });
 }
 
