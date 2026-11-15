@@ -25,6 +25,16 @@ const testQueueEntry = QueueEntry(
   status: QueueEntryStatus.ready,
 );
 
+const testWaitingEntry = QueueEntry(
+  id: 'waiting-entry-id',
+  track: testTrack,
+  meta: testTrackMeta,
+  requestedBy: testMember,
+  auto: false,
+  likes: 0,
+  status: QueueEntryStatus.ready,
+);
+
 const testNowPlaying = NowPlaying(
   entry: testQueueEntry,
   mediaUrl: '/media/netease/track-id',
@@ -47,7 +57,7 @@ RoomSnapshot testRoomSnapshot({int term = 1, int seq = 1}) {
     playMode: RoomPlayMode.sequential,
     nowPlaying: testNowPlaying,
     pending: null,
-    items: const [testQueueEntry],
+    items: const [testWaitingEntry],
     members: const [testMember],
     onlineCount: 1,
   );

@@ -150,8 +150,19 @@ class QueueView extends ConsumerWidget {
       );
     }
     final playing = snapshot.nowPlaying?.entry;
-    final pending = snapshot.pending;
-    final waiting = snapshot.items;
+    // 切歌时开播的事件先到，条目随后的事件才离开待播和等待的歌，这中间不把它
+    // 再列一遍。
+    bool started(QueueEntry entry) => entry.id == playing?.id;
+    final pending = switch (snapshot.pending) {
+      final entry? when !started(entry) => entry,
+      _ => null,
+    };
+    final waiting = snapshot.items.any(started)
+        ? [
+            for (final entry in snapshot.items)
+              if (!started(entry)) entry,
+          ]
+        : snapshot.items;
     final indexOf = {
       for (var index = 0; index < waiting.length; index++)
         waiting[index].id: index,

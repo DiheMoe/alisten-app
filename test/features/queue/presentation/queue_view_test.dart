@@ -319,6 +319,30 @@ void main() {
     expect(find.text('点歌'), findsNothing);
   });
 
+  testWidgets('a song that started and has not left the queue yet is shown '
+      'only as playing', (tester) async {
+    final room = await _pumpQueue(
+      tester,
+      _snapshot(playing: _entry('b'), items: [_entry('b'), _entry('c')]),
+    );
+
+    expect(find.text('歌b'), findsOneWidget);
+    expect(find.text('等待中 1 首'), findsOneWidget);
+
+    room.show(
+      _snapshot(
+        playing: _entry('b'),
+        pending: _entry('b'),
+        items: [_entry('c')],
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('歌b'), findsOneWidget);
+    expect(find.text('下一首'), findsNothing);
+    expect(find.text('等待中 1 首'), findsOneWidget);
+  });
+
   testWidgets('the queue has no vote to skip', (tester) async {
     final semantics = tester.ensureSemantics();
     await _pumpQueue(
