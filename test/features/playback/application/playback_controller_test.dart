@@ -195,6 +195,30 @@ void main() {
     });
   });
 
+  test('the next track, announced before it starts, makes no sound until '
+      'its start time and then plays from the beginning', () {
+    run((h) {
+      h.hello(nowPlayingWith(), serverNow: trackStart + 20000);
+      h.async.elapse(const Duration(seconds: 1));
+      expect(h.state.status, LocalPlaybackStatus.playing);
+
+      h.engine.loadDuration = const Duration(milliseconds: 300);
+      h.play(nowPlayingWith(entryId: 'next', startedAtMs: h.serverNow + 1500));
+      h.async.elapse(const Duration(milliseconds: 1400));
+
+      expect(h.engine.requests.last.positionMs, 0);
+      expect(h.state.status, LocalPlaybackStatus.waiting);
+      expect(h.engine.sounded, ['entry-id']);
+
+      h.async.elapse(const Duration(milliseconds: 200));
+
+      expect(h.engine.sounded, ['entry-id', 'next']);
+      expect(h.engine.seeks, isEmpty);
+      expect(h.engine.position.inMilliseconds, closeTo(100, 20));
+      expect(h.state.status, LocalPlaybackStatus.playing);
+    });
+  });
+
   test('the start timer plans again when it fires', () {
     run((h) {
       h.hello(nowPlayingWith(), serverNow: trackStart - 2000);

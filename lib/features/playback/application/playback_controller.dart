@@ -222,6 +222,8 @@ final class PlaybackController extends Notifier<LocalPlaybackState> {
       _publish();
       return;
     }
+    // 引擎换上新音源后会接着播放，还没到开播时间的曲目加载好也不能出声。
+    if (plan?.kind != StartPlanKind.play) unawaited(_engine.pause());
     unawaited(_loadSource(nowPlaying, plan?.positionMs ?? 0));
   }
 

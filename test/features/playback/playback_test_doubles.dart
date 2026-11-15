@@ -96,6 +96,9 @@ final class FakeAudioEngine implements AudioEngine {
   final List<double> volumes = [];
 
   final List<String> calls = [];
+
+  /// 每次开始出声时播放的曲目，按先后记录。
+  final List<String> sounded = [];
   Duration loadDuration = Duration.zero;
   Duration seekLag = Duration.zero;
   Duration seekDuration = Duration.zero;
@@ -160,7 +163,7 @@ final class FakeAudioEngine implements AudioEngine {
     }
     _loaded = request.load;
     _bufferFrom(request.positionMs);
-    if (_playing) _runningSince = _now();
+    if (_playing) _sound();
     _emitSource(
       _playing ? AudioEngineEventKind.playing : AudioEngineEventKind.ready,
     );
@@ -173,8 +176,13 @@ final class FakeAudioEngine implements AudioEngine {
     if (_playing) return;
     _playing = true;
     if (_loaded == null) return;
-    _runningSince = _now();
+    _sound();
     _emitSource(AudioEngineEventKind.playing);
+  }
+
+  void _sound() {
+    _runningSince = _now();
+    sounded.add(requests.last.identity.entryId);
   }
 
   @override
