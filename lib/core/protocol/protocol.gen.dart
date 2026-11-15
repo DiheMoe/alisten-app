@@ -5,7 +5,7 @@ import 'package:alisten/core/protocol/protocol_runtime.dart';
 export 'package:alisten/core/protocol/protocol_runtime.dart'
     show ProtocolMismatchException, WsEvent, WsRequest, WsResponse;
 
-const protocolVersion = '42749e16714e0d7c';
+const protocolVersion = 'f653116b60b2c244';
 
 class APIKey {
   const APIKey({required this.key});

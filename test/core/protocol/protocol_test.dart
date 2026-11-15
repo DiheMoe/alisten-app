@@ -293,6 +293,28 @@ void main() {
       );
     });
 
+    test('playlists and pairing codes ask for an account and carry the '
+        'member token', () {
+      final account = http.RestEndpoints.values
+          .where((endpoint) => endpoint.auth == http.HttpAuth.account)
+          .map((endpoint) => endpoint.name);
+
+      expect(account, hasLength(17));
+      expect(
+        account,
+        containsAll(<String>[
+          'listMyPlaylists',
+          'copyMyPlaylistItems',
+          'copySharedPlaylist',
+          'createPairingCode',
+        ]),
+      );
+      expect(
+        http.HttpAuth.values.where((auth) => auth.usesMemberToken),
+        <http.HttpAuth>[http.HttpAuth.member, http.HttpAuth.account],
+      );
+    });
+
     test(
       'path descriptors encode parameters and reject wrong parameter sets',
       () {

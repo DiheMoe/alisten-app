@@ -660,12 +660,12 @@ void main() {
       final before = opened.api.getMeCalls;
       server.failNext(
         'listMine',
-        apiError('FORBIDDEN', message: '注册账号之后才能使用歌单', status: 403),
+        apiError('FORBIDDEN', message: '还没有注册账号', status: 403),
       );
 
       await controller.load();
 
-      expect(list.read().error, '注册账号之后才能使用歌单');
+      expect(list.read().error, '还没有注册账号');
       await pumpEventQueue();
       expect(opened.api.getMeCalls, before + 1);
     });
@@ -676,7 +676,7 @@ void main() {
       final before = opened.api.getMeCalls;
       server.failNext(
         'create',
-        apiError('FORBIDDEN', message: '注册账号之后才能使用歌单', status: 403),
+        apiError('FORBIDDEN', message: '还没有注册账号', status: 403),
       );
 
       final result = await controller.create('夜跑');
@@ -686,7 +686,7 @@ void main() {
         result,
         isA<MutationFailed<MyPlaylist>>()
             .having((r) => r.code, 'code', 'FORBIDDEN')
-            .having((r) => r.message, 'message', '注册账号之后才能使用歌单'),
+            .having((r) => r.message, 'message', '还没有注册账号'),
       );
       expect(opened.api.getMeCalls, before + 1);
     });
