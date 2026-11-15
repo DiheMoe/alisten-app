@@ -219,6 +219,94 @@ void main() {
     });
   });
 
+  group('the next track', () {
+    const nextQq = NextTrack(
+      entryId: 'next',
+      mediaUrl: '/media/qq/next',
+      loadWithinMs: 60000,
+    );
+    final nextUri = Uri.parse('http://server.test/media/qq/next');
+
+    test('is preloaded no earlier than the server allows, and the switch '
+        'loads that same address without preloading it again', () {
+      run((h) {
+        h.transport.emitHello(
+          snapshotWith(nowPlayingWith())
+              .copyWith(term: 1, seq: 1, next: nextQq),
+          trackStart + 30000,
+        );
+        h.async.flushMicrotasks();
+        // 结束前 60 秒才能请求，再留 1 秒的余量：开播后第 121 秒。
+        h.async.elapse(const Duration(milliseconds: 90900));
+        expect(h.engine.preloads, isEmpty);
+
+        h.async.elapse(const Duration(milliseconds: 200));
+        expect(h.engine.preloads, [nextUri]);
+
+        h.play(
+          nowPlayingWith(
+            entryId: 'next',
+            mediaUrl: '/media/qq/next',
+            startedAtMs: h.serverNow + 1500,
+          ),
+        );
+        h.async.elapse(const Duration(seconds: 2));
+
+        expect(h.engine.requests.last.uri, nextUri);
+        expect(h.engine.preloads, [nextUri]);
+        expect(h.state.status, LocalPlaybackStatus.playing);
+      });
+    });
+
+    test('follows the room when it changes, and an address without a time '
+        'limit waits as long', () {
+      run((h) {
+        h.hello(nowPlayingWith(durationMs: 100000), serverNow: trackStart);
+        h.queue(next: nextQq);
+        h.async.elapse(const Duration(seconds: 10));
+        h.queue(
+          next: const NextTrack(
+            entryId: 'link',
+            mediaUrl: '/media/link/x',
+            loadWithinMs: null,
+          ),
+        );
+        h.async.elapse(const Duration(seconds: 30));
+        expect(h.engine.preloads, isEmpty);
+
+        h.async.elapse(const Duration(seconds: 2));
+        expect(h.engine.preloads, [
+          Uri.parse('http://server.test/media/link/x'),
+        ]);
+
+        h.queue();
+        h.queue(next: nextQq);
+        expect(h.engine.preloads.last, nextUri);
+      });
+    });
+
+    test('is not preloaded while this device is paused, and is once it '
+        'resumes', () {
+      run((h) {
+        h.hello(
+          nowPlayingWith(durationMs: 60000),
+          serverNow: trackStart + 10000,
+        );
+        h.async.elapse(const Duration(seconds: 1));
+        unawaited(h.playback.toggleLocalPause());
+        h.async.flushMicrotasks();
+        h.queue(next: nextQq);
+        h.async.elapse(const Duration(seconds: 5));
+        expect(h.engine.preloads, isEmpty);
+
+        unawaited(h.playback.toggleLocalPause());
+        h.async.flushMicrotasks();
+
+        expect(h.engine.preloads, [nextUri]);
+      });
+    });
+  });
+
   test('the start timer plans again when it fires', () {
     run((h) {
       h.hello(nowPlayingWith(), serverNow: trackStart - 2000);

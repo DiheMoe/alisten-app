@@ -46,6 +46,11 @@ const _catchUpWait = Duration(seconds: 2);
 const _catchUpPoll = Duration(milliseconds: 200);
 const _maxStartSeeks = 3;
 const _maxGain = 1.5;
+// 下一首在这首结束前多久预加载。播放地址有时效时服务端给出 loadWithinMs，
+// 没有时效的也等到同样的时候，免得和正在放的这首抢带宽。
+const _preloadLeadMs = 60000;
+// 时钟估计有误差，晚一点请求，不会早于服务端允许的时间。
+const _preloadMarginMs = 1000;
 const _logSource = 'playback';
 
 /// 本设备上当前房间播放的所有者。每次加载都有编号，旧加载的结果和引擎事件一律
@@ -77,6 +82,7 @@ final class PlaybackController extends Notifier<LocalPlaybackState> {
   PlaybackIdentity? _checkedEnd;
   Timer? _startTimer;
   Timer? _reloadTimer;
+  Timer? _preloadTimer;
   Timer? _ticker;
   int _ticks = 0;
   DriftCorrection _drift = const DriftCorrection();
@@ -100,7 +106,14 @@ final class PlaybackController extends Notifier<LocalPlaybackState> {
     // 这类派生 provider 不保证这一点。
     ref.listen(
       roomControllerProvider.select((room) => room.snapshot?.nowPlaying),
-      (_, next) => _onNowPlaying(next),
+      (_, next) {
+        _onNowPlaying(next);
+        _schedulePreload();
+      },
+    );
+    ref.listen(
+      roomControllerProvider.select((room) => room.snapshot?.next),
+      (_, _) => _schedulePreload(),
     );
     ref.listen(roomControllerProvider.select(_inRoom), (_, inRoom) {
       if (!inRoom) _leave();
@@ -410,6 +423,7 @@ final class PlaybackController extends Notifier<LocalPlaybackState> {
   Future<void> _pause() async {
     _userPaused = true;
     _startTimer?.cancel();
+    _preloadTimer?.cancel();
     _waiting = false;
     _stopTicker();
     _publish();
@@ -426,6 +440,38 @@ final class PlaybackController extends Notifier<LocalPlaybackState> {
       _reloaded = false;
     }
     _continue();
+    _schedulePreload();
+  }
+
+  // 开播的事件先于队列的事件到达，这之间房间说的下一首就是刚开播的这首。
+  void _schedulePreload() {
+    _preloadTimer?.cancel();
+    final nowPlaying = _nowPlaying;
+    final next = ref.read(roomControllerProvider).snapshot?.next;
+    if (nowPlaying == null ||
+        next == null ||
+        next.entryId == nowPlaying.entry.id ||
+        _userPaused ||
+        _stopped ||
+        _unavailable) {
+      return;
+    }
+    final now = _serverNow();
+    final uri = _mediaUri(next.mediaUrl);
+    if (now == null || uri == null) return;
+    final due =
+        nowPlaying.startedAtMs +
+        nowPlaying.durationMs -
+        (next.loadWithinMs ?? _preloadLeadMs) +
+        _preloadMarginMs;
+    if (due > now) {
+      _preloadTimer = Timer(
+        Duration(milliseconds: due - now),
+        _schedulePreload,
+      );
+      return;
+    }
+    _engine.preload(uri);
   }
 
   void _continue() {
@@ -593,6 +639,7 @@ final class PlaybackController extends Notifier<LocalPlaybackState> {
   void _cancelTimers() {
     _startTimer?.cancel();
     _reloadTimer?.cancel();
+    _preloadTimer?.cancel();
     _stopTicker();
   }
 

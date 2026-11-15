@@ -92,6 +92,7 @@ final class FakeAudioEngine implements AudioEngine {
   final int Function() _now;
   final _events = StreamController<AudioEngineEvent>.broadcast();
   final List<AudioLoadRequest> requests = [];
+  final List<Uri> preloads = [];
   final List<Duration> seeks = [];
   final List<double> volumes = [];
 
@@ -168,6 +169,9 @@ final class FakeAudioEngine implements AudioEngine {
       _playing ? AudioEngineEventKind.playing : AudioEngineEventKind.ready,
     );
   }
+
+  @override
+  void preload(Uri uri) => preloads.add(uri);
 
   @override
   Future<void> play() async {
@@ -478,6 +482,21 @@ final class PlaybackHarness {
     transport.emit(
       RoomEventReceived(
         PlaybackUpdatedEvent(term: 1, seq: ++_seq, nowPlaying: nowPlaying),
+      ),
+    );
+    async.flushMicrotasks();
+  }
+
+  void queue({NextTrack? next, List<QueueEntry> items = const []}) {
+    transport.emit(
+      RoomEventReceived(
+        QueueUpdatedEvent(
+          term: 1,
+          seq: ++_seq,
+          pending: null,
+          items: items,
+          next: next,
+        ),
       ),
     );
     async.flushMicrotasks();

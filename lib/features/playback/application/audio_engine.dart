@@ -80,6 +80,10 @@ abstract interface class AudioEngine {
   /// 换上新音源后继续播放。
   Future<void> load(AudioLoadRequest request);
 
+  /// 提前取回 [uri] 的开头，之后加载它时先用这段数据起播。只保留最近一次，
+  /// 不影响正在播放的音源。
+  void preload(Uri uri);
+
   /// 开始播放即返回，不等播放结束。
   Future<void> play();
 

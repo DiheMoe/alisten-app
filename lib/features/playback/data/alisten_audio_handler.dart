@@ -104,6 +104,8 @@ final class AlistenAudioHandler extends BaseAudioHandler {
     mediaItem.add(item.copyWith(artUri: file));
   }
 
+  void preload(Uri uri) => _streams.preload(uri);
+
   Future<void> startPlayback() async {
     // just_audio 的 play() 在播放暂停、停止或结束时才完成，但会立即置
     // `playing`，所以不等待它；失败也会从错误流到达。
@@ -129,7 +131,9 @@ final class AlistenAudioHandler extends BaseAudioHandler {
     _loading = false;
     _failed = false;
     _reported = null;
-    _streams.cancelAll();
+    _streams
+      ..cancelAll()
+      ..dropPreload();
     await _player.stop();
     _publish();
   }
@@ -264,6 +268,9 @@ final class RoomAudioEngine implements AudioEngine {
 
   @override
   Future<void> load(AudioLoadRequest request) => _handler.loadSource(request);
+
+  @override
+  void preload(Uri uri) => _handler.preload(uri);
 
   @override
   Future<void> play() => _handler.startPlayback();

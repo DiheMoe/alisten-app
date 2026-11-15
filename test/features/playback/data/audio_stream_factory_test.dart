@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:alisten/features/playback/data/audio_stream_factory.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart';
 
 void main() {
   final uri = Uri.parse('https://media.test/a.mp3?sig=secret');
@@ -101,6 +102,94 @@ void main() {
 
       expect((error! as AudioStreamException).reason, 'cancel');
       expect([for (final r in adapter.requests) r.uri], [uri, cdn]);
+    });
+  });
+
+  group('a preloaded opening', () {
+    const head = AudioStreamFactory.preloadBytes;
+    const total = head * 3;
+    final cdn = Uri.parse('https://cdn.test/a.mp3?expires=1');
+
+    // 媒体地址跳转到 CDN；每个字节的值是它的位置对 251 取余，拼错了看得出来。
+    ResponseBody file(RequestOptions options, {int length = total}) {
+      final range = RegExp(r'bytes=(\d+)-(\d*)')
+          .firstMatch(options.headers['range'] as String);
+      final start = int.parse(range!.group(1)!);
+      final last = range.group(2)!.isEmpty
+          ? length - 1
+          : int.parse(range.group(2)!);
+      return ResponseBody(
+        Stream.value(
+          Uint8List.fromList([for (var i = start; i <= last; i++) i % 251]),
+        ),
+        206,
+        headers: {
+          'content-range': ['bytes $start-$last/$length'],
+          'content-type': ['audio/mpeg'],
+        },
+        redirects: [if (options.uri == uri) RedirectRecord(302, 'GET', cdn)],
+      );
+    }
+
+    Future<List<int>> read(StreamAudioResponse response) async {
+      return [for (final chunk in await response.stream.toList()) ...chunk];
+    }
+
+    test('starts the source from memory and goes on from the redirected '
+        'address, and outlives switching sources', () async {
+      final adapter = _FakeAdapter(file);
+      final factory = factoryWith(adapter)..preload(uri);
+      await pumpEventQueue();
+      factory.cancelAll();
+
+      final source = factory.source(uri);
+      expect(adapter.requests, hasLength(1));
+      final response = await source.request(10);
+      final bytes = await read(response);
+
+      expect(response.offset, 10);
+      expect(response.sourceLength, total);
+      expect(bytes, hasLength(total - 10));
+      expect(bytes.first, 10);
+      expect(bytes[head - 10], head % 251);
+      expect(bytes.last, (total - 1) % 251);
+      expect([for (final r in adapter.requests) r.uri], [uri, cdn]);
+      expect(adapter.requests.first.headers['range'], 'bytes=0-${head - 1}');
+      expect(adapter.requests.last.headers['range'], 'bytes=$head-');
+    });
+
+    test('is used once, and only by its own address', () async {
+      final adapter = _FakeAdapter(file);
+      final factory = factoryWith(adapter)..preload(uri);
+      await pumpEventQueue();
+
+      await read(
+        await factory.source(Uri.parse('https://media.test/b')).request(0),
+      );
+      await read(await factory.source(uri).request(0, 100));
+      await read(await factory.source(uri).request(0, 100));
+
+      expect(
+        [for (final r in adapter.requests) r.uri.path],
+        ['/a.mp3', '/b', '/a.mp3'],
+      );
+    });
+
+    test('fails rather than joining it to a different file', () async {
+      var first = true;
+      final adapter = _FakeAdapter((options) {
+        final answer = file(options, length: first ? total : total + 1);
+        first = false;
+        return answer;
+      });
+      final factory = factoryWith(adapter)..preload(uri);
+      await pumpEventQueue();
+
+      final response = await factory.source(uri).request(0);
+      final error = await read(response)
+          .then<Object?>((_) => null, onError: (Object error) => error);
+
+      expect(error, isA<AudioStreamException>());
     });
   });
 

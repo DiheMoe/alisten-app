@@ -18,6 +18,9 @@ final class UnavailableAudioEngine implements AudioEngine {
   }
 
   @override
+  void preload(Uri uri) {}
+
+  @override
   Future<void> play() async {}
 
   @override
