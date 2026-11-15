@@ -37,6 +37,37 @@ void main() {
     expect(replica.state.seq, 2);
   });
 
+  test('a queue update sets the next track, a switch keeps it until the '
+      'queue update that follows', () {
+    const next = NextTrack(
+      entryId: 'next',
+      mediaUrl: '/media/qq/next',
+      loadWithinMs: 60000,
+    );
+    final replica = RoomReplica(testRoomSnapshot());
+
+    replica.receive(
+      const QueueUpdatedEvent(
+        term: 1,
+        seq: 2,
+        pending: null,
+        items: [],
+        next: next,
+      ),
+    );
+    expect(replica.state.next, next);
+
+    replica.receive(
+      const PlaybackUpdatedEvent(term: 1, seq: 3, nowPlaying: null),
+    );
+    expect(replica.state.next, next);
+
+    replica.receive(
+      const QueueUpdatedEvent(term: 1, seq: 4, pending: null, items: []),
+    );
+    expect(replica.state.next, isNull);
+  });
+
   test('gap requests sync and state events wait while notices are independently delivered', () {
     final replica = RoomReplica(testRoomSnapshot());
     final gap = replica.receive(

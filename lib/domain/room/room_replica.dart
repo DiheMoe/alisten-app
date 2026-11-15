@@ -123,6 +123,7 @@ final class RoomReplica {
         seq: seq,
         pending: event.pending,
         items: event.items,
+        next: event.next,
       ),
       MembersUpdatedEvent() => _state.copyWith(
         term: term,

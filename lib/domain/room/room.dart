@@ -97,6 +97,31 @@ final class NowPlaying {
   final String? lyricTrans;
 }
 
+/// 房间接下来要放的那首，只用来提前加载：开播的不一定是它。
+final class NextTrack {
+  const NextTrack({
+    required this.entryId,
+    required this.mediaUrl,
+    required this.loadWithinMs,
+  });
+
+  final String entryId;
+  final String mediaUrl;
+
+  /// 不为 null 时播放地址有时效，只能在正在放的这首结束前这么多毫秒之内请求。
+  final int? loadWithinMs;
+
+  @override
+  bool operator ==(Object other) =>
+      other is NextTrack &&
+      other.entryId == entryId &&
+      other.mediaUrl == mediaUrl &&
+      other.loadWithinMs == loadWithinMs;
+
+  @override
+  int get hashCode => Object.hash(entryId, mediaUrl, loadWithinMs);
+}
+
 final class RoomSnapshot {
   const RoomSnapshot({
     required this.term,
@@ -108,6 +133,7 @@ final class RoomSnapshot {
     required this.items,
     required this.members,
     required this.onlineCount,
+    this.next,
   });
 
   final int term;
@@ -119,6 +145,7 @@ final class RoomSnapshot {
   final List<QueueEntry> items;
   final List<Member> members;
   final int onlineCount;
+  final NextTrack? next;
 
   RoomSnapshot copyWith({
     required int term,
@@ -130,6 +157,7 @@ final class RoomSnapshot {
     List<QueueEntry>? items,
     List<Member>? members,
     int? onlineCount,
+    Object? next = _unchanged,
   }) {
     return RoomSnapshot(
       term: term,
@@ -145,6 +173,7 @@ final class RoomSnapshot {
       items: items ?? this.items,
       members: members ?? this.members,
       onlineCount: onlineCount ?? this.onlineCount,
+      next: identical(next, _unchanged) ? this.next : next as NextTrack?,
     );
   }
 }
@@ -174,10 +203,12 @@ final class QueueUpdatedEvent extends RoomEvent {
     required super.seq,
     required this.pending,
     required this.items,
+    this.next,
   });
 
   final QueueEntry? pending;
   final List<QueueEntry> items;
+  final NextTrack? next;
 }
 
 final class MembersUpdatedEvent extends RoomEvent {

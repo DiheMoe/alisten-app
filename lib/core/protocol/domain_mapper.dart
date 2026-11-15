@@ -178,6 +178,7 @@ RoomSnapshot toDomainSnapshot(protocol.RoomSnapshot snapshot) {
         : toDomainNowPlaying(snapshot.nowPlaying!),
     pending: snapshot.pending == null ? null : toDomainEntry(snapshot.pending!),
     items: snapshot.items.map(toDomainEntry).toList(growable: false),
+    next: _next(snapshot.next),
     members: snapshot.members.sessions
         .map(toDomainMember)
         .toList(growable: false),
@@ -223,6 +224,16 @@ QueueUpdatedEvent _queueUpdated(int term, int seq, Map<String, Object?> data) {
     seq: seq,
     pending: event.pending == null ? null : toDomainEntry(event.pending!),
     items: event.items.map(toDomainEntry).toList(growable: false),
+    next: _next(event.next),
+  );
+}
+
+NextTrack? _next(protocol.NextTrack? next) {
+  if (next == null) return null;
+  return NextTrack(
+    entryId: next.entryId,
+    mediaUrl: next.mediaUrl,
+    loadWithinMs: next.loadWithinMs,
   );
 }
 

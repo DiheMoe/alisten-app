@@ -78,8 +78,13 @@ void main() {
         }),
       );
 
-      expect(event, isA<QueueUpdatedEvent>());
-      expect(snapshot.room.id, 'room-id');
+      final expected = NextTrack(
+        entryId: 'next-entry',
+        mediaUrl: '/media/qq/next',
+        loadWithinMs: loadWithinMs,
+      );
+      expect((event as QueueUpdatedEvent).next, expected);
+      expect(snapshot.next, expected);
     }
   });
 }
