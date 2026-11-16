@@ -47,6 +47,8 @@
 	<true/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>保存登录二维码到相册</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>保存登录二维码到相册</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

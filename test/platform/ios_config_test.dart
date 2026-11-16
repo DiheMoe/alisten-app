@@ -60,6 +60,20 @@ void main() {
       late String plist;
       setUp(() => plist = File('ios/Runner/$name').readAsStringSync());
 
+      // file_picker 和 gal 引用了照片库的接口，App Store 要求两个用途说明都在。
+      test('says why it may use the photo library', () {
+        for (final key in [
+          'NSPhotoLibraryUsageDescription',
+          'NSPhotoLibraryAddUsageDescription',
+        ]) {
+          expect(
+            plist,
+            matches(RegExp('<key>$key</key>\\s*<string>[^<]+</string>')),
+            reason: key,
+          );
+        }
+      });
+
       test('disables Flutter built-in deep linking', () {
         expect(
           plist,
