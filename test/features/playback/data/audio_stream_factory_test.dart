@@ -2,6 +2,7 @@
 // ignore_for_file: experimental_member_use
 
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:alisten/features/playback/data/audio_stream_factory.dart';
@@ -15,6 +16,12 @@ void main() {
   AudioStreamFactory factoryWith(_FakeAdapter adapter) {
     return AudioStreamFactory(Dio()..httpClientAdapter = adapter);
   }
+
+  Future<List<int>> read(StreamAudioResponse response) async {
+    return [for (final chunk in await response.stream.toList()) ...chunk];
+  }
+
+  final flac = [...'fLaC'.codeUnits, 0, 0, 0, 0x22, ...List.filled(92, 0)];
 
   test('a failed request does not reveal the media URL', () async {
     final factory = factoryWith(
@@ -106,25 +113,143 @@ void main() {
   });
 
   group('the media type given to the player', () {
-    Future<String> typeOf(String? declared, {String path = '/a'}) async {
-      final adapter = _FakeAdapter(
-        (options) => ResponseBody(
-          Stream.value(Uint8List(2)),
+    // 按 Range 截取 [file] 作答；声明的类型和跳转后的文件名由 CDN 给出。
+    _FakeAdapter cdn(String? declared, {String path = '/a', List<int>? file}) {
+      final bytes = file ?? List.filled(100, 0);
+      return _FakeAdapter((options) {
+        final range = RegExp(r'bytes=(\d+)-(\d*)')
+            .firstMatch(options.headers['range'] as String)!;
+        final start = int.parse(range.group(1)!);
+        final last = range.group(2)!.isEmpty
+            ? bytes.length - 1
+            : math.min(int.parse(range.group(2)!), bytes.length - 1);
+        return ResponseBody(
+          Stream.value(Uint8List.fromList(bytes.sublist(start, last + 1))),
           206,
           headers: {
-            'content-range': ['bytes 0-1/100'],
+            'content-range': ['bytes $start-$last/${bytes.length}'],
             'content-type': ?declared == null ? null : [declared],
           },
           redirects: [
             RedirectRecord(302, 'GET', Uri.parse('https://cdn.test$path?k=1')),
           ],
-        ),
-      );
+        );
+      });
+    }
+
+    // 播放器第一次只要前两个字节。
+    Future<String> typeOf(
+      String? declared, {
+      String path = '/a',
+      List<int>? file,
+    }) async {
+      final adapter = cdn(declared, path: path, file: file);
       final response = await factoryWith(adapter).source(uri).request(0, 2);
       return response.contentType;
     }
 
-    test('names FLAC the way iOS knows it, as QQ Music does not', () async {
+    test('comes from the opening bytes, whatever the CDN declares', () async {
+      final mp3 = [0xFF, 0xFB, 0x90, 0x64, ...List.filled(96, 0)];
+      final mp4 = [
+        0,
+        0,
+        0,
+        0x20,
+        ...'ftypM4A '.codeUnits,
+        ...List.filled(88, 0),
+      ];
+
+      expect(await typeOf('audio/x-ogg', file: flac), 'audio/flac');
+      expect(
+        await typeOf('application/octet-stream', path: '/a.flac', file: mp3),
+        'audio/mpeg',
+      );
+      expect(await typeOf('audio/mpeg', file: mp4), 'audio/mp4');
+    });
+
+    test('is read without giving the player more than it asked for', () async {
+      final adapter = cdn('audio/x-ogg', file: flac);
+
+      final response = await factoryWith(adapter).source(uri).request(0, 2);
+
+      expect(await read(response), 'fL'.codeUnits);
+      expect(response.offset, 0);
+      expect(response.contentLength, 2);
+      expect(response.sourceLength, flac.length);
+      expect(adapter.requests, hasLength(1));
+    });
+
+    test('stays the same for the rest of the file', () async {
+      final source = factoryWith(cdn('audio/x-ogg', file: flac)).source(uri);
+
+      await source.request(0, 2);
+
+      expect((await source.request(50)).contentType, 'audio/flac');
+      expect((await source.request(0)).contentType, 'audio/flac');
+    });
+
+    test(
+      'is not taken from an ID3 tag, which FLAC files can carry too',
+      () async {
+        final tagged = [
+          ...'ID3'.codeUnits,
+          4,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0x10,
+          ...List.filled(90, 0),
+        ];
+
+        expect(await typeOf('audio/x-flac', file: tagged), 'audio/flac');
+        expect(
+          await typeOf(
+            'application/octet-stream',
+            path: '/a.mp3',
+            file: tagged,
+          ),
+          'audio/mpeg',
+        );
+      },
+    );
+
+    test('hands on the whole file after reading its opening, and cancelling '
+        'it cancels the request', () async {
+      final body = StreamController<Uint8List>();
+      final adapter = _FakeAdapter(
+        (_) => ResponseBody(
+          body.stream,
+          206,
+          headers: {
+            'content-range': ['bytes 0-99/100'],
+            'content-type': ['audio/x-ogg'],
+          },
+        ),
+      );
+      final source = factoryWith(adapter).source(uri);
+      body
+        ..add(Uint8List.fromList(flac.sublist(0, 3)))
+        ..add(Uint8List.fromList(flac.sublist(3, 20)));
+
+      final response = await source.request(0);
+      final received = <int>[];
+      final subscription = response.stream.listen(received.addAll);
+      body.add(Uint8List.fromList(flac.sublist(20, 30)));
+      await pumpEventQueue();
+
+      expect(response.contentType, 'audio/flac');
+      expect(received, flac.sublist(0, 30));
+
+      await subscription.cancel();
+      await pumpEventQueue();
+
+      expect(adapter.cancelled, isTrue);
+      await body.close();
+    });
+
+    test('uses the registered name for FLAC', () async {
       expect(await typeOf('audio/x-flac'), 'audio/flac');
       expect(await typeOf('audio/flac'), 'audio/flac');
     });
@@ -161,7 +286,12 @@ void main() {
     final cdn = Uri.parse('https://cdn.test/a.mp3?expires=1');
 
     // 媒体地址跳转到 CDN；每个字节的值是它的位置对 251 取余，拼错了看得出来。
-    ResponseBody file(RequestOptions options, {int length = total}) {
+    ResponseBody file(
+      RequestOptions options, {
+      int length = total,
+      List<int> opening = const [],
+      String declared = 'audio/mpeg',
+    }) {
       final range = RegExp(r'bytes=(\d+)-(\d*)')
           .firstMatch(options.headers['range'] as String);
       final start = int.parse(range!.group(1)!);
@@ -170,19 +300,18 @@ void main() {
           : int.parse(range.group(2)!);
       return ResponseBody(
         Stream.value(
-          Uint8List.fromList([for (var i = start; i <= last; i++) i % 251]),
+          Uint8List.fromList([
+            for (var i = start; i <= last; i++)
+              i < opening.length ? opening[i] : i % 251,
+          ]),
         ),
         206,
         headers: {
           'content-range': ['bytes $start-$last/$length'],
-          'content-type': ['audio/mpeg'],
+          'content-type': [declared],
         },
         redirects: [if (options.uri == uri) RedirectRecord(302, 'GET', cdn)],
       );
-    }
-
-    Future<List<int>> read(StreamAudioResponse response) async {
-      return [for (final chunk in await response.stream.toList()) ...chunk];
     }
 
     test('starts the source from memory and goes on from the redirected '
@@ -224,6 +353,25 @@ void main() {
         ['/a.mp3', '/b', '/a.mp3'],
       );
     });
+
+    test(
+      'tells the player the format its bytes show, for all of the file',
+      () async {
+        final adapter = _FakeAdapter(
+          (options) => file(
+            options,
+            opening: flac.sublist(0, 8),
+            declared: 'audio/x-ogg',
+          ),
+        );
+        final factory = factoryWith(adapter)..preload(uri);
+        await pumpEventQueue();
+        final source = factory.source(uri);
+
+        expect((await source.request(0, 2)).contentType, 'audio/flac');
+        expect((await source.request(head + 10)).contentType, 'audio/flac');
+      },
+    );
 
     test('fails rather than joining it to a different file', () async {
       var first = true;

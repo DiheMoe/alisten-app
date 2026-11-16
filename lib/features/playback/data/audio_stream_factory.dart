@@ -23,6 +23,8 @@ final class AudioStreamFactory {
   /// 预加载取回的开头大小：320 kbps 约 26 秒，无损也够起播。
   static const preloadBytes = 1 << 20;
 
+  static const _signatureLength = 8;
+
   final Dio _dio;
   final Duration _connectTimeout;
   final Duration _stallTimeout;
@@ -56,6 +58,56 @@ final class AudioStreamFactory {
   void dropPreload() {
     _preload?.token.cancel();
     _preload = null;
+  }
+
+  /// 先读出 [source] 开头至少 [length] 个字节（数据不够就读到结束），返回这些
+  /// 字节和从头开始的完整数据流。
+  static Future<(Uint8List, Stream<List<int>>)> _peek(
+    Stream<List<int>> source,
+    int length,
+  ) {
+    final opening = BytesBuilder(copy: false);
+    final peeked = Completer<(Uint8List, Stream<List<int>>)>();
+    final body = StreamController<List<int>>();
+    late final StreamSubscription<List<int>> subscription;
+    void ready() {
+      final bytes = opening.takeBytes();
+      body.add(bytes);
+      peeked.complete((bytes, body.stream));
+    }
+
+    subscription = source.listen(
+      (chunk) {
+        if (peeked.isCompleted) {
+          body.add(chunk);
+          return;
+        }
+        opening.add(chunk);
+        if (opening.length >= length) {
+          subscription.pause();
+          ready();
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!peeked.isCompleted) {
+          peeked.completeError(error, stackTrace);
+          return;
+        }
+        body.addError(error, stackTrace);
+        unawaited(body.close());
+      },
+      onDone: () {
+        if (!peeked.isCompleted) ready();
+        unawaited(body.close());
+      },
+      cancelOnError: true,
+    );
+    body
+      ..onListen = subscription.resume
+      ..onPause = subscription.pause
+      ..onResume = subscription.resume
+      ..onCancel = subscription.cancel;
+    return peeked.future;
   }
 
   void cancelAll() {
@@ -100,7 +152,7 @@ final class AudioStreamFactory {
       return _Head(
         bytes: Uint8List.sublistView(all, 0, length),
         sourceLength: sourceLength,
-        contentType: response.contentType,
+        contentType: _formatOf(all) ?? response.contentType,
         location: location,
       );
     } on Object {
@@ -172,9 +224,28 @@ final class AudioStreamFactory {
     return (audio, location);
   }
 
-  // iOS 的播放器从本地代理取数据，地址里没有扩展名，只按这里给出的类型识别
-  // 格式：不认 QQ 音乐无损文件声明的 audio/x-flac，也不认网易云部分 MP3 声明的
-  // application/octet-stream。
+  // iOS 的播放器从本地代理取数据，地址里没有扩展名，只按给它的类型识别格式。
+  // CDN 声明的类型靠不住（QQ 音乐的 FLAC 声明过 audio/x-ogg，网易云的 MP3
+  // 声明过 application/octet-stream），所以和 Android 的播放器一样先看文件开头。
+  // ID3 标签后面可能是 MP3，也可能是 FLAC，认不出格式。
+  static String? _formatOf(Uint8List opening) {
+    bool has(int offset, String signature) =>
+        opening.length >= offset + signature.length &&
+        String.fromCharCodes(opening, offset, offset + signature.length) ==
+            signature;
+    if (has(0, 'fLaC')) return 'audio/flac';
+    if (has(4, 'ftyp')) return 'audio/mp4';
+    // MPEG 音频帧同步字，层号 0 是保留值（ADTS 封装的 AAC 用它）。
+    if (opening.length >= 2 &&
+        opening[0] == 0xFF &&
+        (opening[1] & 0xE0) == 0xE0 &&
+        ((opening[1] >> 1) & 3) != 0) {
+      return 'audio/mpeg';
+    }
+    return null;
+  }
+
+  // 文件开头认不出格式时，按声明的类型和文件名推断。
   static String _mediaType(String? declared, Uri location) {
     final type = declared?.split(';').first.trim().toLowerCase() ?? '';
     if (type == 'audio/x-flac') return 'audio/flac';
@@ -260,12 +331,16 @@ final class _DioStreamAudioSource extends StreamAudioSource {
   _DioStreamAudioSource(this.uri, this.factory, this._head)
     : _redirected = _head == null || _head.location == uri
           ? null
-          : _head.location;
+          : _head.location,
+      _contentType = _head?.contentType;
 
   final Uri uri;
   final AudioStreamFactory factory;
   final _Head? _head;
   Uri? _redirected;
+
+  /// 第一段数据定下的格式，之后每段都报这个类型。
+  String? _contentType;
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
@@ -274,7 +349,57 @@ final class _DioStreamAudioSource extends StreamAudioSource {
     if (head != null && from < head.bytes.length) {
       return _fromHead(head, from, end);
     }
-    return _fetch(start, end);
+    if (_contentType == null && from == 0) return _identify(end);
+    final response = await _fetch(start, end);
+    final type = _contentType ??= response.contentType;
+    return _retyped(response, type);
+  }
+
+  // 播放器第一次往往只要前两个字节，认格式需要多取几个，多取的不交给它。
+  Future<StreamAudioResponse> _identify(int? end) async {
+    const length = AudioStreamFactory._signatureLength;
+    final response = await _fetch(
+      0,
+      end == null ? null : math.max(end, length),
+    );
+    final (opening, stream) = await AudioStreamFactory._peek(
+      response.stream,
+      length,
+    );
+    final type = _contentType ??=
+        AudioStreamFactory._formatOf(opening) ?? response.contentType;
+    if (end == null || end >= length) {
+      return _retyped(response, type, stream: stream);
+    }
+    await stream.listen(null).cancel();
+    final asked = Uint8List.sublistView(
+      opening,
+      0,
+      math.min(end, opening.length),
+    );
+    return _retyped(
+      response,
+      type,
+      stream: Stream.value(asked),
+      contentLength: asked.length,
+    );
+  }
+
+  static StreamAudioResponse _retyped(
+    StreamAudioResponse response,
+    String contentType, {
+    Stream<List<int>>? stream,
+    int? contentLength,
+  }) {
+    if (contentType == response.contentType && stream == null) return response;
+    return StreamAudioResponse(
+      rangeRequestsSupported: response.rangeRequestsSupported,
+      sourceLength: response.sourceLength,
+      contentLength: contentLength ?? response.contentLength,
+      offset: response.offset,
+      contentType: contentType,
+      stream: stream ?? response.stream,
+    );
   }
 
   // 开头直接从内存给出，之后的数据接着按范围请求。续取的必须是同一个文件，
