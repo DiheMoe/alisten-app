@@ -1,0 +1,104 @@
+name: testflight
+
+# Optional TestFlight publishing: skipped automatically when the ASC secrets
+# are not configured, so it does not affect other maintainers.
+# Trigger: manual run only.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check TestFlight secrets
+        id: check
+        env:
+          KEY: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::ASC secrets not configured, skipping TestFlight upload."
+          fi
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        if: steps.check.outputs.skip != 'true'
+        with:
+          channel: stable
+          flutter-version-file: .fvmrc
+          cache: true
+
+      - name: Import signing certificate
+        if: steps.check.outputs.skip != 'true'
+        env:
+          CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+        run: |
+          keychain_pwd="$(openssl rand -hex 16)"
+          keychain="$RUNNER_TEMP/build.keychain"
+          cert="$RUNNER_TEMP/cert.p12"
+          printf '%s' "$CERT_P12" | base64 --decode > "$cert"
+          security create-keychain -p "$keychain_pwd" "$keychain"
+          security unlock-keychain -p "$keychain_pwd" "$keychain"
+          security import "$cert" -k "$keychain" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$keychain_pwd" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain-db
+
+      - name: Install provisioning profile
+        if: steps.check.outputs.skip != 'true'
+        env:
+          PROFILE: ${{ secrets.APPLE_PROFILE }}
+        run: |
+          profile="$RUNNER_TEMP/profile.mobileprovision"
+          printf '%s' "$PROFILE" | base64 --decode > "$profile"
+          uuid="$(security cms -D -i "$profile" | plutil -extract UUID raw -o - -)"
+          dir="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$dir"
+          cp "$profile" "$dir/$uuid.mobileprovision"
+
+      - name: Configure team
+        if: steps.check.outputs.skip != 'true'
+        env:
+          TEAM: ${{ secrets.ASC_TEAM }}
+        # Keep the team ID out of the repo: append it at build time.
+        run: |
+          printf '\nDEVELOPMENT_TEAM = %s\n' "$TEAM" >> ios/Flutter/Release.xcconfig
+
+      - run: flutter pub get --enforce-lockfile
+        if: steps.check.outputs.skip != 'true'
+
+      - name: Build signed IPA
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          build_number="$(date -u +%Y%m%d)${{ github.run_number }}${{ github.run_attempt }}"
+          flutter build ipa --release --build-number "$build_number"
+
+      - name: Upload to TestFlight
+        if: steps.check.outputs.skip != 'true'
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          mkdir -p private_keys
+          printf '%s' "${{ secrets.ASC_KEY_P8 }}" > "private_keys/AuthKey_${KEY_ID}.p8"
+          xcrun altool --upload-app --type ios \
+            -f build/ios/ipa/*.ipa \
+            --apiKey "$KEY_ID" --apiIssuer "$ISSUER"
+
+      - name: Clean up keychain
+        if: ${{ always() && steps.check.outputs.skip != 'true' }}
+        run: |
+          security delete-keychain "$RUNNER_TEMP/build.keychain" || true
+          rm -rf "$HOME/Library/MobileDevice/Provisioning Profiles" || true
