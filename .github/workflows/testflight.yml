@@ -63,27 +63,59 @@ jobs:
         run: |
           profile="$RUNNER_TEMP/profile.mobileprovision"
           printf '%s' "$PROFILE" | base64 --decode > "$profile"
-          uuid="$(security cms -D -i "$profile" | plutil -extract UUID raw -o - -)"
+          plist="$RUNNER_TEMP/profile.plist"
+          security cms -D -i "$profile" > "$plist"
+          uuid="$(plutil -extract UUID raw -o - "$plist")"
+          name="$(plutil -extract Name raw -o - "$plist")"
+          if [ -z "$uuid" ] || [ -z "$name" ]; then
+            echo "::error::Could not read UUID or Name from the provisioning profile."
+            exit 1
+          fi
+          echo "Installing profile: $name"
           dir="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$dir"
           cp "$profile" "$dir/$uuid.mobileprovision"
+          echo "PROFILE_NAME=$name" >> "$GITHUB_ENV"
 
-      - name: Configure team
+      - name: Configure manual signing
         if: steps.check.outputs.skip != 'true'
         env:
           TEAM: ${{ secrets.ASC_TEAM }}
-        # Keep the team ID out of the repo: append it at build time.
         run: |
-          printf '\nDEVELOPMENT_TEAM = %s\n' "$TEAM" >> ios/Flutter/Release.xcconfig
+          # Keep the team ID out of the repo: append build settings at build
+          # time. CI has no Apple ID session, so signing must be manual.
+          {
+            printf '\nDEVELOPMENT_TEAM = %s\n' "$TEAM"
+            printf 'CODE_SIGN_STYLE = Manual\n'
+            printf 'CODE_SIGN_IDENTITY = Apple Distribution\n'
+            printf 'PROVISIONING_PROFILE_SPECIFIER = %s\n' "$PROFILE_NAME"
+          } >> ios/Flutter/Release.xcconfig
 
       - run: flutter pub get --enforce-lockfile
         if: steps.check.outputs.skip != 'true'
 
       - name: Build signed IPA
         if: steps.check.outputs.skip != 'true'
+        env:
+          TEAM: ${{ secrets.ASC_TEAM }}
         run: |
+          plist="$RUNNER_TEMP/ExportOptions.plist"
+          printf '%s\n' \
+            '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+            '<plist version="1.0"><dict>' \
+            '<key>method</key><string>app-store</string>' \
+            "<key>teamID</key><string>$TEAM</string>" \
+            '<key>signingStyle</key><string>manual</string>' \
+            '<key>signingCertificate</key><string>Apple Distribution</string>' \
+            '<key>provisioningProfiles</key><dict>' \
+            '<key>moe.dihe.alisten</key>' \
+            "<string>$PROFILE_NAME</string>" \
+            '</dict></dict></plist>' > "$plist"
+          plutil -lint "$plist"
           build_number="$(date -u +%Y%m%d)${{ github.run_number }}${{ github.run_attempt }}"
-          flutter build ipa --release --build-number "$build_number"
+          flutter build ipa --release --build-number "$build_number" \
+            --export-options-plist="$plist"
 
       - name: Upload to TestFlight
         if: steps.check.outputs.skip != 'true'
