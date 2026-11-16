@@ -158,18 +158,40 @@ final class AudioStreamFactory {
       sourceLength = contentLength;
       offset = 0;
     }
+    final location = uri.resolveUri(response.realUri);
     final audio = StreamAudioResponse(
       rangeRequestsSupported:
           partial ||
           (headers.value('accept-ranges')?.contains('bytes') ?? false),
       sourceLength: sourceLength,
       contentLength: contentLength ?? _remaining(sourceLength, offset, end),
-      contentType: headers.value('content-type') ?? 'application/octet-stream',
+      contentType: _mediaType(headers.value('content-type'), location),
       offset: offset,
       stream: _body(response.data!.stream, cancel),
     );
-    return (audio, uri.resolveUri(response.realUri));
+    return (audio, location);
   }
+
+  // iOS 的播放器从本地代理取数据，地址里没有扩展名，只按这里给出的类型识别
+  // 格式：不认 QQ 音乐无损文件声明的 audio/x-flac，也不认网易云部分 MP3 声明的
+  // application/octet-stream。
+  static String _mediaType(String? declared, Uri location) {
+    final type = declared?.split(';').first.trim().toLowerCase() ?? '';
+    if (type == 'audio/x-flac') return 'audio/flac';
+    if (type.isNotEmpty && type != 'application/octet-stream') return declared!;
+    final name = location.path.toLowerCase();
+    for (final MapEntry(key: extension, value: byName)
+        in _typesByExtension.entries) {
+      if (name.endsWith(extension)) return byName;
+    }
+    return 'application/octet-stream';
+  }
+
+  static const _typesByExtension = {
+    '.flac': 'audio/flac',
+    '.mp3': 'audio/mpeg',
+    '.m4a': 'audio/mp4',
+  };
 
   static int? _remaining(int? sourceLength, int offset, int? end) {
     final stop = end ?? sourceLength;

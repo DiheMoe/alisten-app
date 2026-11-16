@@ -105,6 +105,56 @@ void main() {
     });
   });
 
+  group('the media type given to the player', () {
+    Future<String> typeOf(String? declared, {String path = '/a'}) async {
+      final adapter = _FakeAdapter(
+        (options) => ResponseBody(
+          Stream.value(Uint8List(2)),
+          206,
+          headers: {
+            'content-range': ['bytes 0-1/100'],
+            'content-type': ?declared == null ? null : [declared],
+          },
+          redirects: [
+            RedirectRecord(302, 'GET', Uri.parse('https://cdn.test$path?k=1')),
+          ],
+        ),
+      );
+      final response = await factoryWith(adapter).source(uri).request(0, 2);
+      return response.contentType;
+    }
+
+    test('names FLAC the way iOS knows it, as QQ Music does not', () async {
+      expect(await typeOf('audio/x-flac'), 'audio/flac');
+      expect(await typeOf('audio/flac'), 'audio/flac');
+    });
+
+    test('follows the file name when the type says nothing', () async {
+      // 网易云有的 MP3 声明为 application/octet-stream;charset=UTF-8。
+      for (final declared in [
+        null,
+        '',
+        'application/octet-stream',
+        'application/octet-stream;charset=UTF-8',
+      ]) {
+        expect(await typeOf(declared, path: '/F000x.flac'), 'audio/flac');
+        expect(await typeOf(declared, path: '/M500x.MP3'), 'audio/mpeg');
+        expect(await typeOf(declared, path: '/C400x.m4a'), 'audio/mp4');
+        expect(
+          await typeOf(declared, path: '/unknown'),
+          'application/octet-stream',
+        );
+      }
+    });
+
+    test('keeps any other audio type as declared', () async {
+      expect(
+        await typeOf('audio/mpeg;charset=UTF-8', path: '/a.flac'),
+        'audio/mpeg;charset=UTF-8',
+      );
+    });
+  });
+
   group('a preloaded opening', () {
     const head = AudioStreamFactory.preloadBytes;
     const total = head * 3;
