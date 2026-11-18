@@ -8,17 +8,49 @@ sealed class ChatItem {
   final String key;
 }
 
+/// 自己发出、还没在房间时间线上出现的消息走到了哪一步。
+enum ChatDelivery {
+  sending,
+
+  /// 服务端已确认收到，等它广播回来。
+  sent,
+
+  /// 没有发出去，原因在 [ChatMessageItem.note]。
+  failed,
+
+  /// 发出后连接断了，不知道房间有没有收到。
+  unknown,
+}
+
 final class ChatMessageItem extends ChatItem {
   const ChatMessageItem({
     required super.key,
     required this.member,
     required this.text,
     required this.sentAtMs,
+    this.delivery,
+    this.note,
   });
 
   final Member member;
   final String text;
   final int sentAtMs;
+
+  /// 为 null 时消息已在房间的时间线上。
+  final ChatDelivery? delivery;
+
+  /// 没发出去或结果未知的原因。
+  final String? note;
+
+  ChatMessageItem withDelivery(ChatDelivery delivery, {String? note}) =>
+      ChatMessageItem(
+        key: key,
+        member: member,
+        text: text,
+        sentAtMs: sentAtMs,
+        delivery: delivery,
+        note: note,
+      );
 }
 
 final class ChatActivityItem extends ChatItem {

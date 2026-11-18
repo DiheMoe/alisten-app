@@ -6,9 +6,11 @@ import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/chat/application/chat_controller.dart';
 import 'package:alisten/features/chat/application/chat_item.dart';
 import 'package:alisten/features/chat/presentation/member_list.dart';
+import 'package:alisten/features/chat/presentation/send_flight.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/animated_resize.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
@@ -17,10 +19,11 @@ import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
 import 'package:alisten/shared/ui/outer_horizontal_drag.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/popover.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/section_header.dart';
-import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderDecoratedBox;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const _bottomDistance = 60.0;
@@ -37,6 +40,14 @@ const _lengthHintFrom = 450;
 const _stripAvatars = 5;
 
 const _stripStep = AlistenSizes.avatar - AlistenSpacing.sm;
+
+// 成员面板最多占屏幕的这一份高度，至少能放下标题和两三个成员。
+const _panelShare = 0.6;
+const _panelMinHeight = 160.0;
+
+// 向上推成员面板超过这么远，或甩出这么快（像素每秒），就收起。
+const _pushToClose = 24.0;
+const _flickToClose = 300.0;
 
 const _bubblePadding = EdgeInsets.symmetric(
   horizontal: AlistenSpacing.sm,
@@ -58,6 +69,14 @@ class ChatView extends ConsumerStatefulWidget {
 
 class _ChatViewState extends ConsumerState<ChatView> {
   final _scroll = ScrollController();
+
+  /// 正在从输入框飞进时间线的消息：行键对应落点气泡的键。房间广播回来时
+  /// 换成新的行键，落点不变。
+  final _flying = <String, GlobalKey>{};
+  final _flights = <OverlayEntry>{};
+
+  /// 时间线所在的区域，飞行只画在它和输入框里，不盖住成员条和房间顶栏。
+  final _timelineArea = GlobalKey();
 
   /// 布局在固定点之上的最新一行。读者离开底部期间新到的行布局在固定点之下，
   /// 正在读的内容才保持不动；为 null 时所有行都在固定点之上。
@@ -97,16 +116,95 @@ class _ChatViewState extends ConsumerState<ChatView> {
   @override
   void initState() {
     super.initState();
-    _anchorAtLatest(ref.read(chatControllerProvider).messages);
+    _anchorAtLatest(ref.read(chatControllerProvider).timeline);
     _scroll.addListener(_onScrolled);
   }
 
   @override
   void dispose() {
+    for (final flight in _flights) {
+      flight.remove();
+    }
     _scroll
       ..removeListener(_onScrolled)
       ..dispose();
     super.dispose();
+  }
+
+  // 开始发送：时间线回到最新一行，文字从输入框飞向它的气泡。
+  void _sent(String? key, FlightSource? source) {
+    _toLatest();
+    if (key == null ||
+        source == null ||
+        MediaQuery.disableAnimationsOf(context)) {
+      return;
+    }
+    final item = ref
+        .read(chatControllerProvider)
+        .pending
+        .where((item) => item.key == key)
+        .firstOrNull;
+    if (item == null) return;
+    final colors = AlistenColors.of(context);
+    final landing = GlobalKey();
+    setState(() => _flying[key] = landing);
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (_) => SendFlight(
+        text: item.text,
+        source: source,
+        padding: _bubblePadding,
+        textStyle: AlistenTypography.body.copyWith(color: colors.onBrand),
+        fill: colors.brand,
+        target: () => _landingOf(landing),
+        bounds: _flightBounds,
+        onLanded: () {
+          entry.remove();
+          _flights.remove(entry);
+          if (!mounted) return;
+          setState(() => _flying.removeWhere((_, key) => key == landing));
+        },
+      ),
+    );
+    _flights.add(entry);
+    Overlay.of(context).insert(entry);
+  }
+
+  // 从时间线顶部到聊天区底部（输入框）。
+  Rect? _flightBounds() {
+    if (!mounted) return null;
+    final timeline = _timelineArea.currentContext?.findRenderObject();
+    final chat = context.findRenderObject();
+    if (timeline is! RenderBox ||
+        chat is! RenderBox ||
+        !timeline.hasSize ||
+        !chat.hasSize) {
+      return null;
+    }
+    final area = MatrixUtils.transformRect(
+      chat.getTransformTo(null),
+      Offset.zero & chat.size,
+    );
+    final top = timeline.localToGlobal(Offset.zero).dy;
+    return Rect.fromLTRB(area.left, top, area.right, area.bottom);
+  }
+
+  FlightTarget? _landingOf(GlobalKey landing) {
+    final box = landing.currentContext?.findRenderObject();
+    if (box is! RenderDecoratedBox || !box.attached || !box.hasSize) {
+      return null;
+    }
+    final decoration = box.decoration;
+    return (
+      rect: MatrixUtils.transformRect(
+        box.getTransformTo(null),
+        Offset.zero & box.size,
+      ),
+      radius: decoration is BoxDecoration
+          ? decoration.borderRadius?.resolve(TextDirection.ltr) ??
+                BorderRadius.zero
+          : BorderRadius.zero,
+    );
   }
 
   // 动画瞄准的终点部分是估算的。滚动物理允许越过实际终点时（如 iOS），动画在
@@ -172,7 +270,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
   void _settle() {
     if (_following || _touching || !mounted || !_laidOut) return;
     final position = _scroll.position;
-    final messages = ref.read(chatControllerProvider).messages;
+    final messages = ref.read(chatControllerProvider).timeline;
     if (_anchor == messages.lastOrNull?.key ||
         position.isScrollingNotifier.value ||
         position.extentBefore >= _bottomDistance) {
@@ -197,6 +295,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
   // 停在底部的读者立即看到新行；离开底部或正在拖动的读者保持原位，新行放在
   // 固定点之下。
   void _onMessages(List<ChatItem>? previous, List<ChatItem> next) {
+    for (final key in [..._flying.keys]) {
+      if (next.any((item) => item.key == key)) continue;
+      final landing = _flying.remove(key);
+      final confirmed = ref
+          .read(chatControllerProvider.notifier)
+          .confirmedAs(key);
+      if (landing != null && confirmed != null) _flying[confirmed] = landing;
+    }
     final newest = next.lastOrNull?.key;
     if (newest == null || newest == previous?.lastOrNull?.key) return;
     if (!_laidOut) {
@@ -220,7 +326,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   // 在当前最早一行之上多显示窗口新增的行数。
   void _onVisibleCount(int? previous, int visibleCount) {
-    final messages = ref.read(chatControllerProvider).messages;
+    final messages = ref.read(chatControllerProvider).timeline;
     if (messages.isEmpty) return;
     final shown = messages.indexWhere((item) => item.key == _oldestShown);
     final grown = visibleCount - (previous ?? visibleCount);
@@ -270,7 +376,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
   // 位置部分是估算的，所以底部以下一次布局为准。
   void _arrive() {
     final position = _scroll.position;
-    final messages = ref.read(chatControllerProvider).messages;
+    final messages = ref.read(chatControllerProvider).timeline;
     if (_anchor == messages.lastOrNull?.key && position.pixels == 0) {
       _report(position);
       return;
@@ -288,7 +394,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
   @override
   Widget build(BuildContext context) {
     final messages = ref.watch(
-      chatControllerProvider.select((chat) => chat.messages),
+      chatControllerProvider.select((chat) => chat.timeline),
     );
     // 只为在其变化时重建，值经由 [_oldestShown] 生效。
     ref.watch(chatControllerProvider.select((chat) => chat.visibleCount));
@@ -297,7 +403,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     );
     ref
       ..listen(
-        chatControllerProvider.select((chat) => chat.messages),
+        chatControllerProvider.select((chat) => chat.timeline),
         _onMessages,
       )
       ..listen(
@@ -335,31 +441,34 @@ class _ChatViewState extends ConsumerState<ChatView> {
       );
     }
     return LayoutBuilder(
-      builder: (context, constraints) => Column(
-        children: [
-          if (constraints.maxHeight >= _stripMinHeight) const _MemberStrip(),
-          Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              excludeFromSemantics: true,
-              onTap: () => FocusScope.of(context).unfocus(),
-              // 房间页外层有左右切换模式的分页，横拖不能被消息的文字选择吞掉。
-              child: OuterHorizontalDrag(child: timeline),
+      builder: (context, constraints) {
+        return Column(
+          children: [
+            if (constraints.maxHeight >= _stripMinHeight) const _MemberStrip(),
+            Expanded(
+              child: GestureDetector(
+                key: _timelineArea,
+                behavior: HitTestBehavior.translucent,
+                excludeFromSemantics: true,
+                onTap: () => FocusScope.of(context).unfocus(),
+                // 房间页外层有左右切换模式的分页，横拖不能被消息的文字选择吞掉。
+                child: OuterHorizontalDrag(child: timeline),
+              ),
             ),
-          ),
-          // 聊天区比输入栏还矮时（如大字号横屏手机），消息让出全部高度，输入栏
-          // 贴底且可滚动，不会溢出。
-          ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: constraints.maxHeight),
-            child: SingleChildScrollView(
-              reverse: true,
-              primary: false,
-              physics: const ClampingScrollPhysics(),
-              child: _Composer(onSend: _toLatest),
+            // 聊天区比输入栏还矮时（如大字号横屏手机），消息让出全部高度，输入栏
+            // 贴底且可滚动，不会溢出。
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: constraints.maxHeight),
+              child: SingleChildScrollView(
+                reverse: true,
+                primary: false,
+                physics: const ClampingScrollPhysics(),
+                child: _Composer(onSend: _sent),
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     );
   }
 
@@ -389,6 +498,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                 ),
                 sliver: _RowList(
                   rows: rows.sublist(split),
+                  flying: _flying,
                   onShowEarlier: chat.showEarlier,
                 ),
               ),
@@ -402,6 +512,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                 ),
                 sliver: _RowList(
                   rows: rows.sublist(0, split).reversed.toList(growable: false),
+                  flying: _flying,
                   onShowEarlier: chat.showEarlier,
                 ),
               ),
@@ -415,9 +526,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
 // 下标 0 的行紧挨时间线的固定点。
 class _RowList extends StatelessWidget {
-  const _RowList({required this.rows, required this.onShowEarlier});
+  const _RowList({
+    required this.rows,
+    required this.flying,
+    required this.onShowEarlier,
+  });
 
   final List<_Row> rows;
+  final Map<String, GlobalKey> flying;
   final VoidCallback onShowEarlier;
 
   @override
@@ -447,7 +563,7 @@ class _RowList extends StatelessWidget {
                 ),
               ),
               _TimeRow(:final at) => _TimeLabel(at: at),
-              _MessageRow() => _MessageLine(row: row),
+              _MessageRow() => _MessageLine(row: row, landing: flying[row.key]),
               _ActivityRow(:final item) => _ActivityPill(item: item),
             },
           ),
@@ -546,11 +662,44 @@ const _stripMinHeight =
     2 * AlistenSizes.minTouchTarget;
 
 // 在线人数取服务端按会话（每台设备一个）计的值，与房间顶栏和大厅一致。
-class _MemberStrip extends ConsumerWidget {
+/// 成员条点开就地向下展开成员面板，往上推、点空白处或返回就收回成员条。
+class _MemberStrip extends ConsumerStatefulWidget {
   const _MemberStrip();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MemberStrip> createState() => _MemberStripState();
+}
+
+class _MemberStripState extends ConsumerState<_MemberStrip> {
+  bool _open = false;
+  double _panelHeight = 0;
+
+  void _toggle() {
+    if (!_open) {
+      final box = context.findRenderObject();
+      final media = MediaQuery.of(context);
+      final below = box is RenderBox && box.hasSize
+          ? box.localToGlobal(Offset(0, box.size.height)).dy
+          : 0.0;
+      // 不盖过键盘，也不超过屏幕的六成。
+      _panelHeight = math.min(
+        media.size.height * _panelShare,
+        media.size.height -
+            media.viewInsets.bottom -
+            media.padding.bottom -
+            below -
+            AlistenSpacing.xl,
+      );
+    }
+    setState(() => _open = !_open);
+  }
+
+  void _close() {
+    if (_open) setState(() => _open = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     final sessions = ref.watch(
       roomControllerProvider.select((room) => room.snapshot?.members),
@@ -567,11 +716,10 @@ class _MemberStrip extends ConsumerWidget {
     final muted = AlistenTypography.secondary.copyWith(
       color: colors.onGlassMuted,
     );
-    return Pressable(
+    final strip = Pressable(
       semanticLabel: '查看房间成员',
-      onPressed: () => unawaited(
-        showSheetPanel<void>(context, builder: (_) => const _MembersSheet()),
-      ),
+      expanded: _open,
+      onPressed: _toggle,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
           minHeight: AlistenSizes.minTouchTarget,
@@ -606,10 +754,18 @@ class _MemberStrip extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('成员', style: muted),
-                    Icon(
-                      AlistenIcons.caretRight,
-                      size: AlistenSizes.iconSm,
-                      color: colors.onGlassMuted,
+                    AnimatedRotation(
+                      turns: _open ? 0.5 : 0,
+                      duration: AlistenDurations.of(
+                        context,
+                        AlistenDurations.short,
+                      ),
+                      curve: AlistenCurves.standard,
+                      child: Icon(
+                        AlistenIcons.caretDown,
+                        size: AlistenSizes.iconSm,
+                        color: colors.onGlassMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -617,6 +773,22 @@ class _MemberStrip extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) => Popover(
+        open: _open,
+        onClose: _close,
+        childAnchor: Alignment.bottomCenter,
+        contentAnchor: Alignment.topCenter,
+        offset: const Offset(0, AlistenSpacing.xxs),
+        padding: EdgeInsets.zero,
+        content: _MembersPanel(
+          width: constraints.maxWidth - 2 * AlistenSpacing.xs,
+          maxHeight: _panelHeight,
+          onClose: _close,
+        ),
+        child: strip,
       ),
     );
   }
@@ -678,11 +850,35 @@ class _AvatarStack extends StatelessWidget {
   }
 }
 
-class _MembersSheet extends ConsumerWidget {
-  const _MembersSheet();
+class _MembersPanel extends ConsumerStatefulWidget {
+  const _MembersPanel({
+    required this.width,
+    required this.maxHeight,
+    required this.onClose,
+  });
+
+  final double width;
+  final double maxHeight;
+  final VoidCallback onClose;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MembersPanel> createState() => _MembersPanelState();
+}
+
+class _MembersPanelState extends ConsumerState<_MembersPanel> {
+  double _pushed = 0;
+
+  // 向上推过一点或向上甩就收起，方向与它展开的方向相反。
+  void _onPushEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (_pushed < -_pushToClose || velocity < -_flickToClose) {
+      widget.onClose();
+    }
+    _pushed = 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     final sessions = ref.watch(
       roomControllerProvider.select((room) => room.snapshot?.members),
@@ -693,22 +889,69 @@ class _MembersSheet extends ConsumerWidget {
     final self = ref.watch(
       roomControllerProvider.select((room) => room.member?.id),
     );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SectionHeader(
-          '房间成员',
-          padding: const EdgeInsets.only(bottom: AlistenSpacing.xs),
-          trailing: Text(
-            '$online 人在线',
-            style: AlistenTypography.secondary.copyWith(
-              color: colors.onGlassMuted,
+    final grabber = Semantics(
+      container: true,
+      button: true,
+      label: '收起成员',
+      onTap: widget.onClose,
+      child: SizedBox(
+        height: AlistenSizes.minTouchTarget * 0.6,
+        width: double.infinity,
+        child: Center(
+          child: Container(
+            width: AlistenSizes.sheetHandle.width,
+            height: AlistenSizes.sheetHandle.height,
+            decoration: BoxDecoration(
+              color: colors.onGlass.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(AlistenRadii.pill),
             ),
           ),
         ),
-        MemberList(sessions: sessions ?? const [], selfId: self),
-      ],
+      ),
+    );
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      // 读屏用“收起成员”按钮收起；手势不能把标题和按钮并成一个节点。
+      excludeFromSemantics: true,
+      onVerticalDragUpdate: (details) => _pushed += details.delta.dy,
+      onVerticalDragEnd: _onPushEnd,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: widget.width,
+          minWidth: widget.width,
+          maxHeight: math.max(widget.maxHeight, _panelMinHeight),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SectionHeader(
+              '房间成员',
+              padding: const EdgeInsets.fromLTRB(
+                AlistenSpacing.md,
+                AlistenSpacing.sm,
+                AlistenSpacing.md,
+                AlistenSpacing.xs,
+              ),
+              trailing: Text(
+                '$online 人在线',
+                style: AlistenTypography.secondary.copyWith(
+                  color: colors.onGlassMuted,
+                ),
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AlistenSpacing.sm,
+                ),
+                child: MemberList(sessions: sessions ?? const [], selfId: self),
+              ),
+            ),
+            grabber,
+          ],
+        ),
+      ),
     );
   }
 }
@@ -756,9 +999,13 @@ String _timeOf(DateTime at, DateTime now) {
 }
 
 class _MessageLine extends StatelessWidget {
-  const _MessageLine({required this.row});
+  const _MessageLine({required this.row, this.landing});
 
   final _MessageRow row;
+
+  /// 不为 null 时，这条消息正从输入框飞过来：气泡先藏着、占好位置，飞行中的
+  /// 气泡按它的键找到落点。
+  final GlobalKey? landing;
 
   @override
   Widget build(BuildContext context) {
@@ -769,6 +1016,7 @@ class _MessageLine extends StatelessWidget {
     final top = first ? round : joined;
     final bottom = last ? round : joined;
     final bubble = DecoratedBox(
+      key: landing,
       decoration: BoxDecoration(
         color: mine ? colors.brand : colors.bubble,
         borderRadius: mine
@@ -836,7 +1084,41 @@ class _MessageLine extends StatelessWidget {
                 ),
               ),
             ),
-          bubble,
+          if (mine && item.delivery != null)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (landing == null) ...[
+                  _DeliveryMark(item: item),
+                  const SizedBox(width: AlistenSpacing.xxs),
+                ],
+                Flexible(
+                  child: landing == null
+                      ? bubble
+                      : Opacity(
+                          opacity: 0,
+                          alwaysIncludeSemantics: true,
+                          child: bubble,
+                        ),
+                ),
+              ],
+            )
+          else
+            bubble,
+          if (mine && item.note != null && landing == null)
+            Padding(
+              padding: const EdgeInsets.only(
+                top: AlistenSpacing.xxs,
+                right: AlistenSpacing.xxs,
+              ),
+              child: Text(
+                item.note!,
+                textAlign: TextAlign.end,
+                style: AlistenTypography.secondary.copyWith(
+                  color: colors.danger,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -965,12 +1247,81 @@ class _ToLatestButton extends ConsumerWidget {
       ),
       child: !away
           ? const SizedBox.shrink()
-          : PillButton(
+          : _FloatingChip(
               key: ValueKey(unread > 0),
               label: unread > 0 ? '新消息 $unread 条' : '回到最新',
-              icon: AlistenIcons.arrowDown,
+              accent: unread > 0,
               onPressed: onPressed,
             ),
+    );
+  }
+}
+
+/// 浮在消息上面的小卡片。用面板的底色、描边和阴影，不用品牌色：自己的气泡
+/// 就是品牌色，同色的按钮叠在上面分不出来。
+class _FloatingChip extends StatelessWidget {
+  const _FloatingChip({
+    required this.label,
+    required this.accent,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String label;
+
+  /// 有新消息时文字用品牌色。
+  final bool accent;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AlistenColors.of(context);
+    final ink = accent ? colors.brand : colors.onGlass;
+    final shape = BorderRadius.circular(AlistenRadii.pill);
+    return Pressable(
+      onPressed: onPressed,
+      focusRadius: shape,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.raised,
+          borderRadius: shape,
+          border: Border.all(color: colors.glassStroke),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).colorScheme.shadow
+                  .withValues(alpha: 0.16),
+              blurRadius: AlistenSpacing.md,
+              offset: const Offset(0, AlistenSpacing.xxs),
+            ),
+          ],
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: AlistenSizes.minTouchTarget,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AlistenSpacing.md),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  AlistenIcons.arrowDown,
+                  size: AlistenSizes.iconSm,
+                  color: ink,
+                ),
+                const SizedBox(width: AlistenSpacing.xs),
+                Text(
+                  label,
+                  style: AlistenTypography.weighted(
+                    AlistenTypography.secondary,
+                    FontWeight.w700,
+                  ).copyWith(color: ink),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -978,8 +1329,9 @@ class _ToLatestButton extends ConsumerWidget {
 class _Composer extends ConsumerStatefulWidget {
   const _Composer({required this.onSend});
 
-  /// 开始发送时即调用，不等发送结果。
-  final VoidCallback onSend;
+  /// 开始发送时即调用，不等发送结果：带上本地消息的行键和输入框里那段文字的
+  /// 位置，没能发出时都为 null。
+  final void Function(String? key, FlightSource? source) onSend;
 
   @override
   ConsumerState<_Composer> createState() => _ComposerState();
@@ -988,6 +1340,7 @@ class _Composer extends ConsumerStatefulWidget {
 class _ComposerState extends ConsumerState<_Composer> {
   late final TextEditingController _input;
   final _focus = FocusNode();
+  final _field = GlobalKey();
 
   @override
   void initState() {
@@ -1023,9 +1376,17 @@ class _ComposerState extends ConsumerState<_Composer> {
     final state = ref.read(chatControllerProvider);
     final connected =
         ref.read(roomControllerProvider).status == RoomConnectionStatus.open;
-    if (!connected || state.sending || state.draft.trim().isEmpty) return;
+    if (!connected || state.draft.trim().isEmpty) return;
+    // 草稿清空之前量好文字的位置，飞行从那里开始。
+    final source = flightSourceOf(
+      _field.currentContext?.findRenderObject(),
+      text: _input.text,
+    );
+    final waiting = state.pending.length;
     unawaited(chat.send());
-    widget.onSend();
+    final pending = ref.read(chatControllerProvider).pending;
+    final sent = pending.length > waiting;
+    widget.onSend(sent ? pending.last.key : null, sent ? source : null);
   }
 
   @override
@@ -1033,9 +1394,6 @@ class _ComposerState extends ConsumerState<_Composer> {
     final colors = AlistenColors.of(context);
     final draft = ref.watch(
       chatControllerProvider.select((chat) => chat.draft),
-    );
-    final sending = ref.watch(
-      chatControllerProvider.select((chat) => chat.sending),
     );
     final sendError = ref.watch(
       chatControllerProvider.select((chat) => chat.sendError),
@@ -1057,6 +1415,7 @@ class _ComposerState extends ConsumerState<_Composer> {
     final left = chatMessageLimit - draft.trim().runes.length;
     final textStyle = AlistenTypography.body.copyWith(color: colors.onGlass);
     final field = DecoratedBox(
+      key: _field,
       decoration: BoxDecoration(
         color: colors.glassFill,
         borderRadius: BorderRadius.circular(AlistenRadii.lg),
@@ -1159,10 +1518,7 @@ class _ComposerState extends ConsumerState<_Composer> {
               children: [
                 Expanded(child: field),
                 const SizedBox(width: AlistenSpacing.xs),
-                _SendButton(
-                  sending: sending,
-                  onPressed: canSend ? _send : null,
-                ),
+                _SendButton(onPressed: canSend ? _send : null),
               ],
             ),
           ],
@@ -1215,9 +1571,8 @@ class _ComposerNotice extends StatelessWidget {
 }
 
 class _SendButton extends StatelessWidget {
-  const _SendButton({required this.sending, required this.onPressed});
+  const _SendButton({required this.onPressed});
 
-  final bool sending;
   final VoidCallback? onPressed;
 
   @override
@@ -1225,35 +1580,81 @@ class _SendButton extends StatelessWidget {
     final colors = AlistenColors.of(context);
     const size = AlistenSizes.minTouchTarget;
     // 不能发送时换成玻璃底，而不是整体变暗：变暗的封面色在深色房间里发浑。
-    // 发送中保持原色：它在工作，并非不可用。
-    final idle = onPressed == null && !sending;
+    final idle = onPressed == null;
     return Pressable(
-      onPressed: sending ? null : onPressed,
+      onPressed: onPressed,
       semanticLabel: '发送',
       dimWhenDisabled: false,
       focusRadius: BorderRadius.circular(size / 2),
-      child: Semantics(
-        value: sending ? busySemanticValue : null,
-        child: AnimatedContainer(
-          duration: AlistenDurations.of(context, AlistenDurations.short),
-          curve: AlistenCurves.standard,
-          width: size,
-          height: size,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: idle ? colors.glassFill : colors.brand,
-            border: Border.all(color: idle ? colors.glassStroke : colors.brand),
-          ),
-          child: sending
-              ? BusyIndicator(size: AlistenSizes.iconSm, color: colors.onBrand)
-              : Icon(
-                  AlistenIcons.arrowUpBold,
-                  size: AlistenSizes.icon,
-                  color: idle ? colors.onGlassMuted : colors.onBrand,
-                ),
+      child: AnimatedContainer(
+        duration: AlistenDurations.of(context, AlistenDurations.short),
+        curve: AlistenCurves.standard,
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: idle ? colors.glassFill : colors.brand,
+          border: Border.all(color: idle ? colors.glassStroke : colors.brand),
+        ),
+        child: Icon(
+          AlistenIcons.arrowUpBold,
+          size: AlistenSizes.icon,
+          color: idle ? colors.onGlassMuted : colors.onBrand,
         ),
       ),
     );
+  }
+}
+
+/// 自己的消息还没出现在房间时间线上时，气泡旁的标记：发送中转圈；没发出或
+/// 结果未知时是红色的叹号，点开可以重发或删除。
+class _DeliveryMark extends ConsumerWidget {
+  const _DeliveryMark({required this.item});
+
+  final ChatMessageItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = AlistenColors.of(context);
+    final chat = ref.read(chatControllerProvider.notifier);
+    return switch (item.delivery) {
+      ChatDelivery.sending => BusyIndicator(
+        size: AlistenSizes.inlineIcon,
+        color: colors.onGlassMuted,
+        semanticLabel: '发送中',
+      ),
+      ChatDelivery.failed || ChatDelivery.unknown => ActionMenuButton(
+        semanticLabel: '没有发出，重发或删除',
+        trigger: (open, toggle) => Pressable(
+          onPressed: toggle,
+          semanticLabel: '没有发出，重发或删除',
+          expanded: open,
+          focusRadius: BorderRadius.circular(AlistenSizes.iconSm),
+          child: Padding(
+            padding: const EdgeInsets.all(AlistenSpacing.xxs),
+            child: Icon(
+              AlistenIcons.warningCircleFill,
+              size: AlistenSizes.iconSm,
+              color: colors.danger,
+            ),
+          ),
+        ),
+        entries: [
+          ActionMenuEntry(
+            icon: AlistenIcons.arrowClockwise,
+            label: '重发',
+            onSelected: () => unawaited(chat.retry(item.key)),
+          ),
+          ActionMenuEntry(
+            icon: AlistenIcons.trash,
+            label: '删除',
+            danger: true,
+            onSelected: () => chat.discard(item.key),
+          ),
+        ],
+      ),
+      ChatDelivery.sent || null => const SizedBox.shrink(),
+    };
   }
 }

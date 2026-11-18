@@ -60,25 +60,106 @@ void main() {
     await pumpEventQueue();
   }
 
-  test('send trims the draft, refuses a second send while pending and keeps '
-      'text typed meanwhile', () async {
-    final completer = Completer<Map<String, Object?>>();
-    factory.last.requestCompleter = completer;
+  Future<Completer<Map<String, Object?>>> Function() holdRequests() {
+    final waiting = <Completer<Map<String, Object?>>>[];
+    factory.last.requestHandler = (type, data) {
+      final answer = Completer<Map<String, Object?>>();
+      waiting.add(answer);
+      return answer.future;
+    };
+    return () async {
+      await pumpEventQueue();
+      return waiting.removeAt(0);
+    };
+  }
+
+  ChatMessageItem echo(String content, {int seq = 2}) => ChatMessageItem(
+    key: '1:$seq',
+    member: testMember,
+    text: content,
+    sentAtMs: 1,
+  );
+
+  Future<void> receiveOwn(String content, {int seq = 2}) => receive(
+    ChatMessageEvent(
+      term: 1,
+      seq: seq,
+      member: testMember,
+      content: content,
+      sentAtMs: 1,
+    ),
+  );
+
+  List<ChatMessageItem> pending() => chat.state.pending;
+
+  test('a sent message joins the end of the timeline at once with the draft '
+      'emptied, and the next one goes without waiting', () async {
+    final next = holdRequests();
 
     chat.setDraft('  你好  ');
-    final first = chat.send();
-    chat.setDraft('继续输入');
-    final second = await chat.send();
+    unawaited(chat.send());
+    expect(chat.state.draft, isEmpty);
+    expect(chat.state.timeline.last, isA<ChatMessageItem>());
+    final first = chat.state.timeline.last as ChatMessageItem;
+    expect(first.text, '你好');
+    expect(first.member.id, testMember.id);
+    expect(first.delivery, ChatDelivery.sending);
 
-    expect(second, isA<MutationNotSent<void>>());
-    expect(factory.last.requests, hasLength(1));
-    expect(factory.last.requests.single['data'], {'content': '你好'});
-    expect(chat.state.sending, isTrue);
+    chat.setDraft('第二条');
+    unawaited(chat.send());
+    await pumpEventQueue();
 
-    completer.complete(const {});
-    expect(await first, isA<MutationSucceeded<void>>());
-    expect(chat.state.sending, isFalse);
-    expect(chat.state.draft, '继续输入');
+    expect([for (final item in pending()) item.text], ['你好', '第二条']);
+    expect(
+      [for (final request in factory.last.requests) request['data']],
+      [
+        {'content': '你好'},
+        {'content': '第二条'},
+      ],
+    );
+    (await next()).complete(const {});
+    (await next()).complete(const {});
+    await pumpEventQueue();
+    expect(
+      [for (final item in pending()) item.delivery],
+      [ChatDelivery.sent, ChatDelivery.sent],
+    );
+  });
+
+  test(
+    'the room echoing a message takes its place where the room put it',
+    () async {
+      final next = holdRequests();
+      chat.setDraft('你好');
+      unawaited(chat.send());
+      await pumpEventQueue();
+      final local = pending().single.key;
+
+      await receiveOwn('你好');
+
+      expect(pending(), isEmpty);
+      final last = chat.state.timeline.last as ChatMessageItem;
+      expect(last.key, echo('你好').key);
+      expect(last.delivery, isNull);
+      expect(chat.confirmedAs(local), last.key);
+      (await next()).complete(const {});
+      await pumpEventQueue();
+      expect(pending(), isEmpty);
+    },
+  );
+
+  test('the same text sent twice is matched one echo at a time', () async {
+    holdRequests();
+    chat.setDraft('哈');
+    unawaited(chat.send());
+    chat.setDraft('哈');
+    unawaited(chat.send());
+    await pumpEventQueue();
+
+    await receiveOwn('哈');
+    expect(pending(), hasLength(1));
+    await receiveOwn('哈', seq: 3);
+    expect(pending(), isEmpty);
   });
 
   test('an empty draft is not sent', () async {
@@ -86,6 +167,7 @@ void main() {
 
     expect(await chat.send(), isA<MutationNotSent<void>>());
     expect(factory.last.requests, isEmpty);
+    expect(pending(), isEmpty);
   });
 
   test('300 emoji, 600 UTF-16 units, are within the limit and sent', () async {
@@ -97,8 +179,8 @@ void main() {
     expect(chat.state.sendError, isNull);
   });
 
-  test('more than 500 characters is refused and says so until the draft is '
-      'edited', () async {
+  test('more than 500 characters is refused in the composer and says so until '
+      'the draft is edited', () async {
     chat.setDraft('😀' * 501);
 
     final result = await chat.send();
@@ -112,54 +194,16 @@ void main() {
       ),
     );
     expect(chat.state.sendError, '消息不能超过 500 字');
-    expect(chat.state.sending, isFalse);
     expect(chat.state.draft, '😀' * 501);
+    expect(pending(), isEmpty);
     expect(factory.last.requests, isEmpty);
 
     chat.setDraft('😀' * 500);
     expect(chat.state.sendError, isNull);
   });
 
-  test(
-    'unknown chat delivery is not a confirmed failure and is not resent',
-    () async {
-      factory.last.requestError = const RoomRequestException(
-        code: null,
-        message: '连接中断',
-        outcome: RoomRequestOutcome.unknown,
-      );
-      chat.setDraft('可能已发送');
-
-      final result = await chat.send();
-      await pumpEventQueue();
-
-      expect(result, isA<MutationUnknown<void>>());
-      expect(chat.state.sendError, contains('未知'));
-      expect(chat.state.sendError, isNot(contains('消息发送失败')));
-      expect(chat.state.draft, '可能已发送');
-      expect(factory.last.requests, hasLength(1));
-    },
-  );
-
-  test('a send that breaks unexpectedly ends sending, keeps the draft and is '
-      'not resent', () async {
-    factory.last.requestError = StateError('broken');
-    chat.setDraft('可能已发送');
-
-    final result = await chat.send();
-    await pumpEventQueue();
-
-    expect(result, isA<MutationUnknown<void>>());
-    expect(chat.state.sending, isFalse);
-    expect(chat.state.draft, '可能已发送');
-    expect(chat.state.sendError, contains('未知'));
-    expect(factory.last.requests, hasLength(1));
-
-    factory.last.requestError = null;
-    expect(await chat.send(), isA<MutationSucceeded<void>>());
-  });
-
-  test('a rejected chat mutation shows the confirmed server failure', () async {
+  test('a refused message stays as not sent with the reason, and can be sent '
+      'again or dropped', () async {
     factory.last.requestError = const RoomRequestException(
       code: 'FORBIDDEN',
       message: '不允许发言',
@@ -167,28 +211,69 @@ void main() {
     );
     chat.setDraft('不能发送');
 
-    final result = await chat.send();
+    expect(await chat.send(), isA<MutationFailed<void>>());
+    final failed = pending().single;
+    expect(failed.delivery, ChatDelivery.failed);
+    expect(failed.note, '不允许发言');
+    expect(chat.state.sendError, isNull);
+    expect(chat.state.draft, isEmpty);
 
-    expect(result, isA<MutationFailed<void>>());
-    expect(chat.state.sendError, contains('不允许发言'));
-    expect(chat.state.sendError, isNot(contains('未知')));
-  });
-
-  test('the draft stays in the controller until its text is sent', () async {
-    chat.setDraft('  草稿  ');
-    expect(chat.state.draft, '  草稿  ');
+    factory.last.requestError = null;
+    expect(await chat.retry(failed.key), isA<MutationSucceeded<void>>());
+    expect(factory.last.requests, hasLength(2));
+    expect(pending().single.delivery, ChatDelivery.sent);
 
     factory.last.requestError = const RoomRequestException(
       code: 'FORBIDDEN',
       message: '不允许发言',
       outcome: RoomRequestOutcome.failed,
     );
+    chat.setDraft('再试');
     await chat.send();
-    expect(chat.state.draft, '  草稿  ');
+    chat.discard(pending().last.key);
+    expect([for (final item in pending()) item.text], ['不能发送']);
+  });
 
-    factory.last.requestError = null;
-    await chat.send();
-    expect(chat.state.draft, isEmpty);
+  test('an unknown delivery is not resent by itself, and turns into the real '
+      'message if the room has it', () async {
+    factory.last.requestError = const RoomRequestException(
+      code: null,
+      message: '连接中断',
+      outcome: RoomRequestOutcome.unknown,
+    );
+    chat.setDraft('可能已发送');
+
+    expect(await chat.send(), isA<MutationUnknown<void>>());
+    await pumpEventQueue();
+    expect(pending().single.delivery, ChatDelivery.unknown);
+    expect(pending().single.note, contains('未知'));
+    expect(factory.last.requests, hasLength(1));
+
+    await receiveOwn('可能已发送');
+    expect(pending(), isEmpty);
+  });
+
+  test('a send that breaks unexpectedly is unknown and not resent', () async {
+    factory.last.requestError = StateError('broken');
+    chat.setDraft('可能已发送');
+
+    expect(await chat.send(), isA<MutationUnknown<void>>());
+    await pumpEventQueue();
+    expect(pending().single.delivery, ChatDelivery.unknown);
+    expect(factory.last.requests, hasLength(1));
+  });
+
+  test('changing rooms drops what was waiting', () async {
+    holdRequests();
+    chat.setDraft('留在旧房间');
+    unawaited(chat.send());
+    await pumpEventQueue();
+
+    await room.openRoom('two');
+    factory.last.emitHello();
+    await pumpEventQueue();
+
+    expect(pending(), isEmpty);
   });
 
   test('timeline window, unread count and activity text follow the '

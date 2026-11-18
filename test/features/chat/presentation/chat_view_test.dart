@@ -11,9 +11,11 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
+import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
-import 'package:alisten/shared/ui/sheet_panel.dart';
+import 'package:alisten/shared/ui/morph_panel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -330,10 +332,10 @@ void main() {
     expect(_fieldText(tester), '还没写完');
   });
 
-  testWidgets('the members of a room of 30 open in a sheet that scrolls '
-      'without overflowing, someone on two devices listed once', (
-    tester,
-  ) async {
+  testWidgets('the members of a room of 30 unfold from the strip in a panel '
+      'that scrolls without overflowing, someone on two devices listed once, '
+      'and a push up folds it back', (tester) async {
+    final semantics = tester.ensureSemantics();
     final room = _Room(tester);
     // 同一用户从两台设备进入，每台设备一个会话。
     await room.open(
@@ -345,19 +347,22 @@ void main() {
       ],
     );
     await room.showChat();
+    final strip = tester.getRect(find.bySemanticsLabel(RegExp('查看房间成员')));
 
     await tester.tap(find.text('31 人在线'));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
     expect(find.text('房间成员'), findsOneWidget);
-    final sheet = find.byType(SheetPanel);
+    final panel = find.byType(MorphPanel);
+    expect(tester.getRect(panel).top, greaterThanOrEqualTo(strip.bottom));
+    expect(tester.getRect(panel).top, lessThan(strip.bottom + 16));
     expect(
-      find.descendant(of: sheet, matching: find.text('31 人在线')),
+      find.descendant(of: panel, matching: find.text('31 人在线')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: sheet, matching: find.text('${_me.name}（我）')),
+      find.descendant(of: panel, matching: find.text('${_me.name}（我）')),
       findsOneWidget,
     );
     expect(find.text('2 台设备'), findsOneWidget);
@@ -365,11 +370,16 @@ void main() {
       find.text('成员29'),
       200,
       scrollable: find
-          .descendant(of: sheet, matching: find.byType(Scrollable))
+          .descendant(of: panel, matching: find.byType(Scrollable))
           .first,
     );
     expect(find.text('成员29'), findsOneWidget);
     expect(tester.takeException(), isNull);
+
+    await tester.drag(find.bySemanticsLabel('收起成员'), const Offset(0, -80));
+    await tester.pumpAndSettle();
+    expect(find.text('房间成员'), findsNothing);
+    semantics.dispose();
   });
 
   testWidgets('an activity reads as who did what, in the middle', (
@@ -641,4 +651,246 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  group('sending', () {
+    // 飞行逐帧推进，一次长时间的 pump 只有一帧。
+    Future<void> frames(WidgetTester tester, Duration duration) async {
+      for (var left = duration; left > Duration.zero; left -= _frame) {
+        await tester.pump(_frame);
+      }
+    }
+
+    Future<List<Completer<Map<String, Object?>>>> holdAnswers(
+      _Room room,
+    ) async {
+      final answers = <Completer<Map<String, Object?>>>[];
+      room.transport.requestHandler = (type, data) {
+        final answer = Completer<Map<String, Object?>>();
+        answers.add(answer);
+        return answer.future;
+      };
+      return answers;
+    }
+
+    testWidgets('a sent message flies out of the input into its bubble, which '
+        'then spins until the room has it', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final room = _Room(tester);
+      await room.open();
+      await room.showChat();
+      final answers = await holdAnswers(room);
+
+      await tester.enterText(find.byType(TextField), '飞过去');
+      await tester.pump();
+      final typed = tester.getRect(find.byType(EditableText));
+      await tester.tap(find.bySemanticsLabel('发送'));
+      await tester.pump();
+
+      expect(_fieldText(tester), isEmpty);
+      final copies = find.text('飞过去');
+      expect(copies, findsNWidgets(2));
+      // 飞行中的气泡从输入框里那段文字的位置出发，时间线上的气泡先藏着。
+      expect(
+        (tester.getRect(copies.last).center.dy - typed.center.dy).abs(),
+        lessThan(24),
+      );
+      expect(
+        tester
+            .widget<Opacity>(
+              find
+                  .ancestor(of: copies.first, matching: find.byType(Opacity))
+                  .first,
+            )
+            .opacity,
+        0,
+      );
+
+      // 飞行中的文字与气泡里的一样，不带缺少 Material 时的下划线。
+      final flying = tester.renderObject<RenderParagraph>(copies.last);
+      expect(
+        flying.text.style?.decoration ?? TextDecoration.none,
+        TextDecoration.none,
+      );
+
+      await frames(tester, const Duration(milliseconds: 150));
+      final midway = tester.getRect(copies.last).center.dy;
+      expect(midway, lessThan(typed.center.dy - 24));
+
+      await frames(tester, const Duration(seconds: 1));
+      expect(find.text('飞过去'), findsOneWidget);
+      expect(find.byType(BusyIndicator), findsOneWidget);
+      expect(find.bySemanticsLabel('发送中'), findsOneWidget);
+      expect(find.text('发送中'), findsNothing);
+      // 发送按钮不转圈，可以接着发下一条。
+      expect(
+        find.descendant(
+          of: find.bySemanticsLabel('发送'),
+          matching: find.byType(BusyIndicator),
+        ),
+        findsNothing,
+      );
+
+      answers.single.complete(const {});
+      room.say(_me, '飞过去');
+      await room.deliver();
+      expect(find.text('飞过去'), findsOneWidget);
+      expect(find.byType(BusyIndicator), findsNothing);
+
+      semantics.dispose();
+      unawaited(room.transport.stop());
+    });
+
+    testWidgets('a message the room refuses says why, and its mark offers to '
+        'send it again or drop it', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final room = _Room(tester);
+      await room.open();
+      await room.showChat();
+      room.transport.requestError = const RoomRequestException(
+        code: 'FORBIDDEN',
+        message: '不允许发言',
+        outcome: RoomRequestOutcome.failed,
+      );
+
+      await tester.enterText(find.byType(TextField), '不能发');
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel('发送'));
+      await tester.pump();
+      await frames(tester, const Duration(seconds: 1));
+
+      expect(find.text('不允许发言'), findsOneWidget);
+      expect(find.byType(BusyIndicator), findsNothing);
+
+      room.transport.requestError = null;
+      await tester.tap(find.bySemanticsLabel('没有发出，重发或删除'));
+      await frames(tester, const Duration(milliseconds: 600));
+      await tester.tap(find.text('重发'));
+      await frames(tester, const Duration(milliseconds: 600));
+      expect(room.transport.requests, hasLength(2));
+      expect(find.text('不允许发言'), findsNothing);
+
+      semantics.dispose();
+      unawaited(room.transport.stop());
+    });
+
+    testWidgets('a long message leaves exactly as the input showed it, '
+        'within the input, and lands as its bubble', (tester) async {
+      final room = _Room(tester);
+      await room.open();
+      // 矮一点的屏幕，消息的气泡比时间线还高。
+      tester.view.physicalSize = const Size(360, 600) * 3;
+      await room.showChat();
+      await holdAnswers(room);
+      final long = '很长的消息' * 99;
+
+      await tester.enterText(find.byType(TextField), long);
+      await tester.pump();
+      final input = tester
+          .state<EditableTextState>(find.byType(EditableText))
+          .renderEditable;
+      final field = MatrixUtils.transformRect(
+        input.getTransformTo(null),
+        Offset.zero & input.size,
+      );
+      final lines = input.getBoxesForSelection(
+        TextSelection(baseOffset: 0, extentOffset: long.length),
+      );
+      final firstLine = MatrixUtils.transformRect(
+        input.getTransformTo(null),
+        lines.first.toRect(),
+      );
+      await tester.tap(find.bySemanticsLabel('发送'));
+      await tester.pump();
+
+      // 起飞那一帧：飞出的文字按输入框的宽度排，第一行仍在原处，不超出输入框。
+      final flying = find.text(long).last;
+      final paragraph = tester.renderObject<RenderParagraph>(flying);
+      final firstBox = MatrixUtils.transformRect(
+        paragraph.getTransformTo(null),
+        paragraph
+            .getBoxesForSelection(
+              TextSelection(baseOffset: 0, extentOffset: long.length),
+            )
+            .first
+            .toRect(),
+      );
+      expect(firstBox.left, closeTo(firstLine.left, 1));
+      expect(firstBox.top, closeTo(firstLine.top, 1));
+      expect(firstBox.width, closeTo(firstLine.width, 1));
+      final clip = tester.getRect(
+        find.ancestor(of: flying, matching: find.byType(ClipRRect)).first,
+      );
+      expect(clip.top, greaterThanOrEqualTo(field.top - 12));
+      expect(clip.bottom, lessThanOrEqualTo(field.bottom + 12));
+
+      // 消息比时间线还高时，飞行也只画在时间线和输入框里，不盖住上面的
+      // 成员条和房间顶栏。
+      final timelineTop = tester.getTopLeft(_timeline).dy;
+      var checked = 0;
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(_frame);
+        if (find.text(long).evaluate().length < 2) break;
+        final flying = find.text(long).last;
+        // 画出来的部分裁在时间线以内；外框落地时的回弹只多出几个像素。
+        final drawn = find.ancestor(
+          of: flying,
+          matching: find.byType(ClipRect),
+        );
+        expect(
+          tester.getRect(drawn.first).top,
+          greaterThanOrEqualTo(timelineTop - 1),
+        );
+        final frame = find.ancestor(
+          of: flying,
+          matching: find.byType(ClipRRect),
+        );
+        expect(
+          tester.getRect(frame.first).top,
+          greaterThanOrEqualTo(timelineTop - 8),
+        );
+        checked++;
+      }
+      expect(checked, greaterThan(5), reason: 'the flight was looked at');
+
+      await frames(tester, const Duration(seconds: 1));
+      expect(find.text(long), findsOneWidget);
+      unawaited(room.transport.stop());
+    });
+
+    testWidgets('without animations the bubble is simply there', (
+      tester,
+    ) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      final room = _Room(tester);
+      await room.open();
+      await room.showChat();
+      await holdAnswers(room);
+
+      await tester.enterText(find.byType(TextField), '直接出现');
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel('发送'));
+      await tester.pump();
+
+      expect(_fieldText(tester), isEmpty);
+      expect(find.text('直接出现'), findsOneWidget);
+      expect(
+        tester
+            .widgetList<Opacity>(
+              find.ancestor(
+                of: find.text('直接出现'),
+                matching: find.byType(Opacity),
+              ),
+            )
+            .every((opacity) => opacity.opacity > 0),
+        isTrue,
+      );
+      unawaited(room.transport.stop());
+    });
+  });
 }
+
+const _frame = Duration(milliseconds: 16);
