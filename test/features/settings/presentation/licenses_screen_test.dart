@@ -45,7 +45,7 @@ void main() {
       tester,
       overrides: [openSourceLicensesProvider.overrideWith(_FlakyLicenses.new)],
     );
-    appContainer(tester).read(routerProvider).go('/settings/licenses');
+    appContainer(tester).read(routerProvider).go('/settings/about/licenses');
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(find.bySemanticsLabel('加载中'), findsOneWidget);
@@ -93,7 +93,7 @@ void main() {
       ..devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     await pumpAlistenApp(tester);
-    appContainer(tester).read(routerProvider).go('/settings/licenses');
+    appContainer(tester).read(routerProvider).go('/settings/about/licenses');
     await tester.pump();
 
     await tester.pump(const Duration(seconds: 14));

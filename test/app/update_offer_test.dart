@@ -73,7 +73,7 @@ void main() {
       await pumpAlistenApp(tester, releases: releases, overrides: [_clock]);
       expect(releases.calls, 1);
       releases.holding = null;
-      appContainer(tester).read(routerProvider).go('/settings');
+      appContainer(tester).read(routerProvider).go('/settings/about');
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('检查更新'),

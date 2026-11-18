@@ -60,6 +60,7 @@ Future<void> _openSettings(
   FakeAvatarCache? avatarCache,
   FakeReleaseSource? releases,
   Map<String, Object> preferences = const {},
+  SettingsSection? at,
 }) async {
   tester.view
     ..physicalSize = const Size(360, 780) * 3
@@ -79,6 +80,10 @@ Future<void> _openSettings(
   );
   appContainer(tester).read(routerProvider).go('/settings');
   await tester.pumpAndSettle();
+  if (at != null) {
+    appContainer(tester).read(routerProvider).go('/settings/${at.path}');
+    await tester.pumpAndSettle();
+  }
 }
 
 // 测试绑定不登记 Flutter 工具生成的 NOTICES（发布版由 ServicesBinding 登记），
@@ -133,19 +138,29 @@ void main() {
       'and name no roles', (tester) async {
     await _openSettings(tester);
 
-    for (final text in ['界面字号', '资源档位', '减少动态效果', '本机音量', '房主', '管理员']) {
+    const absent = ['界面字号', '资源档位', '减少动态效果', '本机音量', '房主', '管理员'];
+    for (final text in absent) {
       expect(find.textContaining(text), findsNothing, reason: text);
     }
-    await _show(tester, find.text(protocolVersion));
+    for (final section in SettingsSection.values) {
+      await _openSettings(tester, at: section);
+      for (final text in absent) {
+        expect(
+          find.textContaining(text),
+          findsNothing,
+          reason: '$text in ${section.title}',
+        );
+      }
+    }
+    await _openSettings(tester, at: SettingsSection.about);
+    expect(find.text(protocolVersion), findsOneWidget);
     expect(find.text(appVersion), findsOneWidget);
-    for (final text in ['界面字号', '资源档位', '减少动态效果', '本机音量', '房主', '管理员']) {
-      expect(find.textContaining(text), findsNothing, reason: text);
-    }
   });
 
   Future<void> pumpDirect(
     WidgetTester tester, {
     Widget? accountActions,
+    Widget? page,
     FakeAlistenApi? api,
     FakeCredentialStore? credentials,
   }) async {
@@ -161,16 +176,12 @@ void main() {
         ),
         child: MaterialApp(
           theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
-          home: SettingsScreen(
-            appVersion: appVersion,
-            protocolVersion: protocolVersion,
-            onProfileResult: (_) {},
-            onNotice: (_, _) {},
-            onOpenLicenses: () {},
-            onOpenServers: () {},
-            onOpenAdmin: () {},
-            accountActions: accountActions,
-          ),
+          home:
+              page ??
+              AccountSettingsScreen(
+                onProfileResult: (_) {},
+                accountActions: accountActions,
+              ),
         ),
       ),
     );
@@ -207,7 +218,7 @@ void main() {
     await pumpDirect(tester, api: api, credentials: credentials);
     if (restored) {
       await ProviderScope.containerOf(
-        tester.element(find.byType(SettingsScreen)),
+        tester.element(find.byType(AccountSettingsScreen)),
       ).read(identityControllerProvider.notifier).restore();
       await tester.pumpAndSettle();
     }
@@ -247,6 +258,7 @@ void main() {
     final api = FakeAlistenApi()..recordListens = false;
     await _openSettings(
       tester,
+      at: SettingsSection.privacy,
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
@@ -265,6 +277,7 @@ void main() {
       'account share it', (tester) async {
     await _openSettings(
       tester,
+      at: SettingsSection.privacy,
       api: FakeAlistenApi()
         ..account = const Account(username: 'mao', github: false),
       credentials: FakeCredentialStore()..memberToken = 'account-token',
@@ -291,6 +304,7 @@ void main() {
       );
     await _openSettings(
       tester,
+      at: SettingsSection.privacy,
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
@@ -314,6 +328,7 @@ void main() {
       );
     await _openSettings(
       tester,
+      at: SettingsSection.privacy,
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
@@ -334,6 +349,7 @@ void main() {
     final gate = api.setListenRecordingGate = Completer<void>();
     await _openSettings(
       tester,
+      at: SettingsSection.privacy,
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
@@ -357,7 +373,12 @@ void main() {
   ) async {
     final api = FakeAlistenApi();
     final credentials = FakeCredentialStore();
-    await _openSettings(tester, api: api, credentials: credentials);
+    await _openSettings(
+      tester,
+      api: api,
+      credentials: credentials,
+      at: SettingsSection.privacy,
+    );
     await _show(tester, _recordToggle);
 
     expect(_recordSwitch(tester).value, isTrue);
@@ -393,14 +414,17 @@ void main() {
       appContainer(tester).read(identityControllerProvider).member,
       isNotNull,
     );
+    appContainer(tester).read(routerProvider).go('/settings');
+    await tester.pumpAndSettle();
+    expect(api.getMeCalls, 2, reason: 'the settings read it on opening');
     // 例如在 Web 上关掉了。
     api.recordListens = false;
 
-    appContainer(tester).read(routerProvider).go('/settings');
+    await tester.tap(find.text('隐私与记录'));
     await tester.pumpAndSettle();
     await _show(tester, _recordToggle);
 
-    expect(api.getMeCalls, 2);
+    expect(api.getMeCalls, 3, reason: 'and the page of the switch again');
     expect(_recordSwitch(tester).value, isFalse);
   });
 
@@ -411,6 +435,7 @@ void main() {
     final api = FakeAlistenApi()..getMeResult = Completer<Member>();
     await pumpDirect(
       tester,
+      page: PrivacySettingsScreen(onNotice: (_, _) {}, onOpenHistory: () {}),
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
@@ -457,6 +482,7 @@ void main() {
     final api = FakeAlistenApi()..getMeError = Exception('offline');
     await pumpDirect(
       tester,
+      page: PrivacySettingsScreen(onNotice: (_, _) {}, onOpenHistory: () {}),
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
@@ -474,6 +500,7 @@ void main() {
     final api = FakeAlistenApi()..getMeError = Exception('offline');
     await _openSettings(
       tester,
+      at: SettingsSection.privacy,
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
@@ -501,7 +528,7 @@ void main() {
   testWidgets('signing in on a child page reads the play history switch '
       'again when the first read failed', (tester) async {
     final api = FakeAlistenApi();
-    await _openSettings(tester, api: api);
+    await _openSettings(tester, api: api, at: SettingsSection.privacy);
     await _show(tester, _recordToggle);
     final reads = api.getMeCalls;
     api.getMeResult = Completer<Member>();
@@ -529,6 +556,7 @@ void main() {
     final api = FakeAlistenApi();
     await _openSettings(
       tester,
+      at: SettingsSection.privacy,
       api: api,
       preferences: {
         'alisten.play-history': history,
@@ -537,7 +565,7 @@ void main() {
     );
     appContainer(tester).read(routerProvider).go('/history');
     await tester.pumpAndSettle();
-    appContainer(tester).read(routerProvider).go('/settings');
+    appContainer(tester).read(routerProvider).go('/settings/privacy');
     await tester.pumpAndSettle();
     await _show(tester, _recordToggle);
 
@@ -564,10 +592,9 @@ void main() {
         overrides: await alistenAppOverrides(),
         child: MaterialApp(
           theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
-          home: SettingsScreen(
+          home: AboutSettingsScreen(
             appVersion: appVersion,
             protocolVersion: protocolVersion,
-            onProfileResult: (_) {},
             onNotice: (_, _) {},
             onOpenLicenses: () {},
             onOpenServers: () => opened++,
@@ -630,10 +657,9 @@ void main() {
         overrides: await alistenAppOverrides(),
         child: MaterialApp(
           theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
-          home: SettingsScreen(
+          home: AboutSettingsScreen(
             appVersion: appVersion,
             protocolVersion: protocolVersion,
-            onProfileResult: (_) {},
             onNotice: (_, _) {},
             onOpenLicenses: () {},
             onOpenServers: () => servers++,
@@ -687,6 +713,7 @@ void main() {
   ) async {
     await _openSettings(
       tester,
+      at: SettingsSection.appearance,
       system: const MediaQueryData(platformBrightness: Brightness.dark),
     );
     Brightness brightness() =>
@@ -699,10 +726,14 @@ void main() {
           'system',
     );
 
+    // 主题是右边的下拉菜单：点开它，再选浅色。
+    await tester.tap(find.text('跟随系统'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('浅色'));
     await tester.pumpAndSettle();
 
     expect(brightness(), Brightness.light);
+    expect(find.text('浅色'), findsOneWidget);
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.getString('alisten.theme'), 'light');
   });
@@ -712,6 +743,7 @@ void main() {
     final systemSettings = FakeSystemSettings();
     await _openSettings(
       tester,
+      at: SettingsSection.notifications,
       notifications: FakeNotificationGateway(),
       systemSettings: systemSettings,
     );
@@ -729,6 +761,7 @@ void main() {
     final systemSettings = FakeSystemSettings()..opens = false;
     await _openSettings(
       tester,
+      at: SettingsSection.notifications,
       notifications: FakeNotificationGateway(),
       systemSettings: systemSettings,
     );
@@ -752,6 +785,7 @@ void main() {
   ) async {
     await _openSettings(
       tester,
+      at: SettingsSection.notifications,
       notifications: FakeNotificationGateway()..granted = true,
     );
     await _show(tester, find.text('已允许'));
@@ -762,19 +796,25 @@ void main() {
 
   testWidgets('the storage settings, between privacy and about, show how much '
       'covers and avatars take together', (tester) async {
+    final coverCache = FakeCoverCache(bytes: (21.4 * 1024 * 1024).round());
+    final avatarCache = FakeAvatarCache(bytes: 2 * 1024 * 1024);
     await _openSettings(
       tester,
-      coverCache: FakeCoverCache(bytes: (21.4 * 1024 * 1024).round()),
-      avatarCache: FakeAvatarCache(bytes: 2 * 1024 * 1024),
+      coverCache: coverCache,
+      avatarCache: avatarCache,
     );
-    await _show(tester, find.text('版本'));
 
+    double top(String text) => tester.getTopLeft(find.text(text)).dy;
+    expect(top('存储'), greaterThan(top('隐私与记录')));
+    expect(top('存储'), lessThan(top('关于')));
+    expect(find.text('23.4 MB'), findsOneWidget, reason: 'summary');
+
+    await tester.tap(find.text('存储'));
+    await tester.pumpAndSettle();
+    expect(find.text('图片缓存'), findsOneWidget);
     expect(find.text('23.4 MB'), findsOneWidget);
     expect(find.text('封面缓存'), findsNothing);
-    double top(String text) => tester.getTopLeft(find.text(text)).dy;
-    expect(top('存储'), greaterThan(top('记录播放历史')));
-    expect(top('存储'), lessThan(top('图片缓存')));
-    expect(top('清除缓存'), lessThan(top('关于')));
+    expect(find.text('清除缓存'), findsOneWidget);
   });
 
   group('open-source licenses', () {
@@ -791,7 +831,7 @@ void main() {
     // 和 NOTICE。
     testWidgets('the licenses list commons-imaging with its NOTICE and its '
         'Apache License', (tester) async {
-      await _openSettings(tester);
+      await _openSettings(tester, at: SettingsSection.about);
       await _show(tester, find.text('开源许可'));
       await tester.tap(find.text('开源许可'));
       await tester.pumpAndSettle();
@@ -831,7 +871,7 @@ void main() {
 
     testWidgets('the about section opens the licenses of the bundled font and '
         'of the dependencies, each expanding to its full text', (tester) async {
-      await _openSettings(tester);
+      await _openSettings(tester, at: SettingsSection.about);
       await _show(tester, find.text('开源许可'));
       await tester.tap(find.text('开源许可'));
       await tester.pumpAndSettle();
@@ -881,7 +921,12 @@ void main() {
       Map<String, Object> preferences = const {},
     }) async {
       final releases = FakeReleaseSource();
-      await _openSettings(tester, releases: releases, preferences: preferences);
+      await _openSettings(
+        tester,
+        releases: releases,
+        preferences: preferences,
+        at: SettingsSection.about,
+      );
       await _show(tester, find.text('检查更新'));
       expect(find.text('协议版本'), findsOneWidget);
       return releases;
@@ -970,6 +1015,7 @@ void main() {
     final measuring = Completer<void>();
     await _openSettings(
       tester,
+      at: SettingsSection.storage,
       coverCache: FakeCoverCache(bytes: 10 * 1024)..measuring = measuring,
     );
     await _show(tester, find.text('清除缓存'));
@@ -989,6 +1035,7 @@ void main() {
     final measuring = Completer<void>();
     await _openSettings(
       tester,
+      at: SettingsSection.storage,
       coverCache: FakeCoverCache()..measuring = measuring,
     );
     await _show(tester, find.text('清除缓存'));
@@ -1005,7 +1052,12 @@ void main() {
     final clearing = Completer<void>();
     final cache = FakeCoverCache(bytes: 5 * 1024 * 1024)..clearing = clearing;
     final avatars = FakeAvatarCache(bytes: 1024 * 1024);
-    await _openSettings(tester, coverCache: cache, avatarCache: avatars);
+    await _openSettings(
+      tester,
+      coverCache: cache,
+      avatarCache: avatars,
+      at: SettingsSection.storage,
+    );
     await _show(tester, find.text('清除缓存'));
     expect(find.text('6.0 MB'), findsOneWidget);
     PillButton clear() =>
@@ -1039,7 +1091,12 @@ void main() {
     final cache = FakeCoverCache(bytes: 5 * 1024 * 1024)
       ..clearError = const FileSystemException('busy');
     final avatars = FakeAvatarCache(bytes: 1024 * 1024);
-    await _openSettings(tester, coverCache: cache, avatarCache: avatars);
+    await _openSettings(
+      tester,
+      coverCache: cache,
+      avatarCache: avatars,
+      at: SettingsSection.storage,
+    );
     await _show(tester, find.text('清除缓存'));
 
     await tester.tap(find.text('清除缓存'));
@@ -1081,6 +1138,8 @@ void main() {
 
     expect(api.getMeCalls, 2);
     expect(find.text('听众'), findsOneWidget);
+    await tester.tap(find.text('听众'));
+    await tester.pumpAndSettle();
     await _openProfileSheet(tester);
     expect(tester.widget<EditableText>(_field('昵称')).controller.text, '听众');
   });
@@ -1090,6 +1149,7 @@ void main() {
     final api = FakeAlistenApi();
     await _openSettings(
       tester,
+      at: SettingsSection.account,
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
@@ -1114,6 +1174,7 @@ void main() {
     final api = FakeAlistenApi();
     await _openSettings(
       tester,
+      at: SettingsSection.account,
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
@@ -1140,12 +1201,17 @@ void main() {
     final api = FakeAlistenApi();
     await _openSettings(
       tester,
+      at: SettingsSection.appearance,
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
+    await tester.tap(find.text('跟随系统'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('深色'));
     await tester.pumpAndSettle();
     expect(api.updateMeCalls, 0);
+    appContainer(tester).read(routerProvider).go('/settings/account');
+    await tester.pumpAndSettle();
 
     await _openProfileSheet(tester);
     await tester.enterText(_field('昵称'), '新昵称');
@@ -1171,6 +1237,7 @@ void main() {
       ..updateMeError = const FormatException('broken');
     await _openSettings(
       tester,
+      at: SettingsSection.account,
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );
@@ -1213,6 +1280,7 @@ void main() {
       ..updateMeError = const FormatException('broken');
     await _openSettings(
       tester,
+      at: SettingsSection.account,
       api: api,
       credentials: FakeCredentialStore()..memberToken = 'stored-token',
     );

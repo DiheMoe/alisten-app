@@ -36,7 +36,14 @@ const _pages = {
   '/history',
   '/playlists',
   '/settings',
-  '/settings/licenses',
+  '/settings/account',
+  '/settings/appearance',
+  '/settings/notifications',
+  '/settings/privacy',
+  '/settings/privacy/history',
+  '/settings/storage',
+  '/settings/about',
+  '/settings/about/licenses',
   '/settings/servers',
   '/settings/admin',
   '/settings/account/login',
@@ -61,7 +68,21 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   // 面板在根导航器上，链接换掉打开它的页面后仍开着，所以不用页面的 context 跳转。
   late final GoRouter router;
-  void openAccount() => router.go('/settings');
+  void openAccount() => router.go('/settings/account');
+
+  Widget history(BuildContext context, GoRouterState state) => HistoryScreen(
+    onResult: reportPick,
+    onNotice: toasts.show,
+    onCopyTitle: (title) => copySongTitle(toasts, title),
+    saveToPlaylist: (from, track, title) => unawaited(
+      showSaveToPlaylistSheet(
+        from,
+        SaveOneTrack(track: track, title: title),
+        onOpenAccount: openAccount,
+        onNotice: toasts.show,
+      ),
+    ),
+  );
 
   router = GoRouter(
     navigatorKey: rootNavigator,
@@ -99,24 +120,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ),
             routes: [
-              GoRoute(
-                path: 'history',
-                pageBuilder: _page(
-                  (context, state) => HistoryScreen(
-                    onResult: reportPick,
-                    onNotice: toasts.show,
-                    onCopyTitle: (title) => copySongTitle(toasts, title),
-                    saveToPlaylist: (from, track, title) => unawaited(
-                      showSaveToPlaylistSheet(
-                        from,
-                        SaveOneTrack(track: track, title: title),
-                        onOpenAccount: openAccount,
-                        onNotice: toasts.show,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              GoRoute(path: 'history', pageBuilder: _page(history)),
               GoRoute(
                 path: 'playlists',
                 pageBuilder: _page(
@@ -159,27 +163,124 @@ final routerProvider = Provider<GoRouter>((ref) {
                 pageBuilder: _page(
                   (context, state) => SettingsScreen(
                     appVersion: appVersion,
-                    protocolVersion: protocolVersion,
-                    onProfileResult: (result) =>
-                        reportMutation(toasts, result, success: (_) => '资料已保存'),
-                    onNotice: toasts.show,
-                    onOpenLicenses: () => context.go('/settings/licenses'),
-                    onOpenServers: () => context.go('/settings/servers'),
-                    onOpenAdmin: () => context.go('/settings/admin'),
-                    accountActions: AccountActions(
-                      onOpenLogin: () => context.go('/settings/account/login'),
-                      onOpenRegister: () =>
-                          context.go('/settings/account/register'),
-                      onNotice: toasts.show,
-                    ),
+                    onOpen: (section) =>
+                        context.go('/settings/${section.path}'),
                   ),
                 ),
                 routes: [
                   GoRoute(
-                    path: 'licenses',
+                    path: SettingsSection.account.path,
                     pageBuilder: _page(
-                      (context, state) => const LicensesScreen(),
+                      (context, state) => AccountSettingsScreen(
+                        onProfileResult: (result) => reportMutation(
+                          toasts,
+                          result,
+                          success: (_) => '资料已保存',
+                        ),
+                        accountActions: AccountActions(
+                          onOpenLogin: () =>
+                              context.go('/settings/account/login'),
+                          onOpenRegister: () =>
+                              context.go('/settings/account/register'),
+                          onNotice: toasts.show,
+                        ),
+                      ),
                     ),
+                    routes: [
+                      GoRoute(
+                        path: 'login',
+                        pageBuilder: _page(
+                          (context, state) => LoginScreen(
+                            onDone: () => context.go('/settings/account'),
+                            onOpenRegister: () =>
+                                context.go('/settings/account/register'),
+                            onOpenPairing: () =>
+                                context.go('/settings/account/pair'),
+                            onNotice: toasts.show,
+                          ),
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'register',
+                        pageBuilder: _page(
+                          (context, state) => RegisterScreen(
+                            onDone: () {
+                              toasts.show(ToastKind.success, '已注册');
+                              context.go('/settings/account');
+                            },
+                          ),
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'pair',
+                        pageBuilder: _page((context, state) {
+                          final extra = state.extra;
+                          return PairScreen(
+                            prefill: extra is PairPrefill ? extra : null,
+                            onDone: () {
+                              toasts.show(ToastKind.success, '已登录');
+                              context.go('/settings/account');
+                            },
+                          );
+                        }),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: SettingsSection.appearance.path,
+                    pageBuilder: _page(
+                      (context, state) => const AppearanceSettingsScreen(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: SettingsSection.notifications.path,
+                    pageBuilder: _page(
+                      (context, state) =>
+                          NotificationSettingsScreen(onNotice: toasts.show),
+                    ),
+                  ),
+                  GoRoute(
+                    path: SettingsSection.privacy.path,
+                    pageBuilder: _page(
+                      (context, state) => PrivacySettingsScreen(
+                        onNotice: toasts.show,
+                        // 从这里看的播放历史返回这里，不回大厅。
+                        onOpenHistory: () =>
+                            context.go('/settings/privacy/history'),
+                      ),
+                    ),
+                    routes: [
+                      GoRoute(path: 'history', pageBuilder: _page(history)),
+                    ],
+                  ),
+                  GoRoute(
+                    path: SettingsSection.storage.path,
+                    pageBuilder: _page(
+                      (context, state) =>
+                          StorageSettingsScreen(onNotice: toasts.show),
+                    ),
+                  ),
+                  GoRoute(
+                    path: SettingsSection.about.path,
+                    pageBuilder: _page(
+                      (context, state) => AboutSettingsScreen(
+                        appVersion: appVersion,
+                        protocolVersion: protocolVersion,
+                        onNotice: toasts.show,
+                        onOpenLicenses: () =>
+                            context.go('/settings/about/licenses'),
+                        onOpenServers: () => context.go('/settings/servers'),
+                        onOpenAdmin: () => context.go('/settings/admin'),
+                      ),
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'licenses',
+                        pageBuilder: _page(
+                          (context, state) => const LicensesScreen(),
+                        ),
+                      ),
+                    ],
                   ),
                   GoRoute(
                     path: 'servers',
@@ -189,43 +290,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                         onNotice: toasts.show,
                       ),
                     ),
-                  ),
-                  GoRoute(
-                    path: 'account/login',
-                    pageBuilder: _page(
-                      (context, state) => LoginScreen(
-                        onDone: () => context.go('/settings'),
-                        onOpenRegister: () =>
-                            context.go('/settings/account/register'),
-                        onOpenPairing: () =>
-                            context.go('/settings/account/pair'),
-                        onNotice: toasts.show,
-                      ),
-                    ),
-                  ),
-                  GoRoute(
-                    path: 'account/register',
-                    pageBuilder: _page(
-                      (context, state) => RegisterScreen(
-                        onDone: () {
-                          toasts.show(ToastKind.success, '已注册');
-                          context.go('/settings');
-                        },
-                      ),
-                    ),
-                  ),
-                  GoRoute(
-                    path: 'account/pair',
-                    pageBuilder: _page((context, state) {
-                      final extra = state.extra;
-                      return PairScreen(
-                        prefill: extra is PairPrefill ? extra : null,
-                        onDone: () {
-                          toasts.show(ToastKind.success, '已登录');
-                          context.go('/settings');
-                        },
-                      );
-                    }),
                   ),
                   GoRoute(
                     path: 'admin',

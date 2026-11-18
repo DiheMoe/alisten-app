@@ -58,6 +58,11 @@ abstract final class AlistenIcons {
     fontFamily: 'PhosphorRegular',
     matchTextDirection: true,
   );
+  static const bell = IconData(
+    0xe0ce,
+    fontFamily: 'PhosphorRegular',
+    matchTextDirection: true,
+  );
   static const broom = IconData(
     0xec54,
     fontFamily: 'PhosphorRegular',
@@ -81,6 +86,11 @@ abstract final class AlistenIcons {
   static const caretUpBold = IconData(
     0xe13c,
     fontFamily: 'PhosphorBold',
+    matchTextDirection: true,
+  );
+  static const caretUpDown = IconData(
+    0xe140,
+    fontFamily: 'PhosphorRegular',
     matchTextDirection: true,
   );
   static const chatsCircle = IconData(
@@ -208,6 +218,11 @@ abstract final class AlistenIcons {
     fontFamily: 'PhosphorRegular',
     matchTextDirection: true,
   );
+  static const hardDrives = IconData(
+    0xe2a0,
+    fontFamily: 'PhosphorRegular',
+    matchTextDirection: true,
+  );
   static const heart = IconData(
     0xe2a8,
     fontFamily: 'PhosphorRegular',
@@ -230,6 +245,11 @@ abstract final class AlistenIcons {
   );
   static const imageBroken = IconData(
     0xe7a8,
+    fontFamily: 'PhosphorRegular',
+    matchTextDirection: true,
+  );
+  static const info = IconData(
+    0xe2ce,
     fontFamily: 'PhosphorRegular',
     matchTextDirection: true,
   );
@@ -300,6 +320,11 @@ abstract final class AlistenIcons {
   );
   static const musicNote = IconData(
     0xe33c,
+    fontFamily: 'PhosphorRegular',
+    matchTextDirection: true,
+  );
+  static const palette = IconData(
+    0xe6c8,
     fontFamily: 'PhosphorRegular',
     matchTextDirection: true,
   );
@@ -375,6 +400,11 @@ abstract final class AlistenIcons {
   );
   static const shareNetwork = IconData(
     0xe408,
+    fontFamily: 'PhosphorRegular',
+    matchTextDirection: true,
+  );
+  static const shieldCheck = IconData(
+    0xe40c,
     fontFamily: 'PhosphorRegular',
     matchTextDirection: true,
   );

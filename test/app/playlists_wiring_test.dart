@@ -182,7 +182,7 @@ void main() {
     await settle(tester);
 
     expect(tester.takeException(), isNull);
-    expect(router.state.uri.path, '/settings');
+    expect(router.state.uri.path, '/settings/account');
     semantics.dispose();
   });
 
@@ -229,7 +229,7 @@ void main() {
     await settle();
 
     expect(tester.takeException(), isNull);
-    expect(router.state.uri.path, '/settings');
+    expect(router.state.uri.path, '/settings/account');
     semantics.dispose();
   });
 

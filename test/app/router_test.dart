@@ -30,6 +30,7 @@ void main() {
     for (final (from, to, page) in [
       ('/', '/settings', SettingsScreen),
       ('/', '/history', HistoryScreen),
+      ('/settings/privacy', '/settings/privacy/history', HistoryScreen),
       ('/settings', '/settings/servers', ServerScreen),
       ('/settings', '/settings/admin', AdminScreen),
       ('/settings', '/settings/account/login', LoginScreen),
@@ -70,6 +71,26 @@ void main() {
         expect(shown(), findsNothing);
       });
     }
+
+    testWidgets('play history opened from the privacy settings goes back to '
+        'them, not to the lobby', (tester) async {
+      await pumpAlistenApp(tester);
+      final router = appContainer(tester).read(routerProvider);
+      router.go('/settings/privacy');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('查看播放历史'));
+      await tester.pumpAndSettle();
+      expect(find.byType(HistoryScreen), findsOneWidget);
+
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(
+        router.routeInformationProvider.value.uri.path,
+        '/settings/privacy',
+      );
+      expect(find.byType(PrivacySettingsScreen), findsOneWidget);
+    });
 
     testWidgets('settings dragged away stay closed when the next page opens', (
       tester,
@@ -143,7 +164,7 @@ void main() {
         ModalRoute.of(tester.element(find.byType(LobbyScreen))),
         isA<ZoomPageRoute<dynamic>>(),
       );
-      router.go('/settings/licenses');
+      router.go('/settings/about/licenses');
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
       expect(
@@ -274,7 +295,7 @@ void main() {
       },
     );
     final router = appContainer(tester).read(routerProvider);
-    router.go('/settings');
+    router.go('/settings/about');
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('版本'),
@@ -304,9 +325,8 @@ void main() {
     expect(find.text('已切换到 周末听歌会'), findsOneWidget);
   });
 
-  testWidgets('a login from the login route toasts and returns to settings', (
-    tester,
-  ) async {
+  testWidgets('a login from the login route toasts and returns to the account '
+      'settings', (tester) async {
     await pumpAlistenApp(tester);
     final router = appContainer(tester).read(routerProvider);
     router.go('/settings/account/login');
@@ -317,8 +337,8 @@ void main() {
     await tester.tap(find.widgetWithText(PillButton, '登录'));
     await tester.pumpAndSettle();
 
-    expect(router.state.uri.path, '/settings');
-    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(router.state.uri.path, '/settings/account');
+    expect(find.byType(AccountSettingsScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
     expect(find.text('已登录'), findsOneWidget);
   });
@@ -383,12 +403,12 @@ void main() {
       expect(active(tester), isTrue);
       final siteReads = api.getSiteCalls;
 
-      router.go('/settings');
+      router.go('/settings/account');
       await tester.pumpAndSettle();
 
       expect(active(tester), isFalse);
       expect(find.byType(AdminScreen), findsNothing);
-      // 后台可能刚开关了 GitHub 登录或注册，设置页要重新读取。
+      // 后台可能刚开关了 GitHub 登录或注册，账号页要重新读取。
       expect(api.getSiteCalls, siteReads + 1);
 
       router.go('/settings/admin');
@@ -540,7 +560,7 @@ void main() {
       addTearDown(tester.view.reset);
       await pumpAlistenApp(tester);
       final router = appContainer(tester).read(routerProvider);
-      router.go('/settings');
+      router.go('/settings/about');
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('版本'),

@@ -232,7 +232,13 @@ final class SettingsController extends Notifier<SettingsState> {
 
   /// 重新读取成员，不会创建成员，失败时资料保持原样。读取失败时返回 false；返回
   /// true 而仍然没有成员，说明这个服务器上还没有身份。
-  Future<bool> loadProfile() async {
+  /// 同时打开的设置首页和子页面都要读取，正在读取时共用同一次请求。
+  Future<bool> loadProfile() =>
+      _loading ??= _loadProfile().whenComplete(() => _loading = null);
+
+  Future<bool>? _loading;
+
+  Future<bool> _loadProfile() async {
     try {
       await ref.read(identityControllerProvider.notifier).restore();
       return true;

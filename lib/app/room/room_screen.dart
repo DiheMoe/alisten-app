@@ -210,7 +210,7 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
     void copyTitle(String title) => copySongTitle(toasts, title);
     // 面板在根导航器上，换到另一个房间时它仍开着，这个页面却可能已被换下。
     final router = GoRouter.of(context);
-    void openAccount() => router.go('/settings');
+    void openAccount() => router.go('/settings/account');
     void saveToPlaylist(BuildContext context, Track track, String title) =>
         unawaited(
           showSaveToPlaylistSheet(
