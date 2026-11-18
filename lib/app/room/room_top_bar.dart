@@ -93,9 +93,10 @@ class _RoomTopBarState extends State<RoomTopBar> {
               Popover(
                 open: _menuOpen,
                 onClose: _closeMenu,
-                childAnchor: Alignment.bottomRight,
+                // 菜单的右上角对着按钮的右上角，盖住按钮展开。
+                childAnchor: Alignment.topRight,
                 contentAnchor: Alignment.topRight,
-                offset: const Offset(0, AlistenSpacing.xxs),
+                pours: true,
                 // 菜单与最长的一项同宽，各项整行可点。
                 content: IntrinsicWidth(
                   child: Column(

@@ -94,7 +94,6 @@ abstract final class AlistenTint {
 }
 
 abstract final class AlistenDurations {
-  static const press = Duration(milliseconds: 120);
   static const short = Duration(milliseconds: 200);
   static const medium = Duration(milliseconds: 300);
   static const layout = Duration(milliseconds: 400);

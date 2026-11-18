@@ -8,15 +8,16 @@ import 'package:flutter/material.dart';
 
 final class ActionMenuEntry {
   const ActionMenuEntry({
-    required this.icon,
     required this.label,
     required this.onSelected,
+    this.icon,
     this.danger = false,
     this.enabled = true,
     this.checked,
   });
 
-  final IconData icon;
+  /// 为 null 时这一项只有文字，比如从几个数里选一个。
+  final IconData? icon;
   final String label;
   final VoidCallback onSelected;
   final bool danger;
@@ -80,9 +81,10 @@ class _ActionMenuButtonState extends State<ActionMenuButton> {
     return Popover(
       open: _open,
       onClose: _close,
-      childAnchor: Alignment(_rightward ? -1 : 1, _upward ? -1 : 1),
+      // 菜单的角对着按钮的同一个角，盖住按钮展开：按钮自己变成菜单。
+      childAnchor: Alignment(_rightward ? -1 : 1, _upward ? 1 : -1),
       contentAnchor: Alignment(_rightward ? -1 : 1, _upward ? 1 : -1),
-      offset: Offset(0, _upward ? -AlistenSpacing.xxs : AlistenSpacing.xxs),
+      pours: true,
       // 菜单与最长的一项同宽，各项整行可点。
       content: IntrinsicWidth(
         child: Column(
@@ -146,9 +148,12 @@ class _MenuItem extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(entry.icon, size: AlistenSizes.iconSm, color: ink),
-              const SizedBox(width: AlistenSpacing.sm),
-              Flexible(
+              if (entry.icon case final icon?) ...[
+                Icon(icon, size: AlistenSizes.iconSm, color: ink),
+                const SizedBox(width: AlistenSpacing.sm),
+              ],
+              // 菜单与最长的一项同宽，勾在每一行的末端对齐。
+              Expanded(
                 child: Text(
                   entry.label,
                   style: AlistenTypography.bodyStrong.copyWith(color: ink),
