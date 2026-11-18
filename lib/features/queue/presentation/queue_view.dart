@@ -109,12 +109,14 @@ class QueueView extends ConsumerWidget {
   Future<void> _remove(
     BuildContext context,
     QueueController queue,
-    QueueEntry entry,
-  ) async {
+    QueueEntry entry, {
+    bool next = false,
+  }) async {
+    final title = entry.meta.title;
     final confirmed = await showConfirmSheet(
       context,
       title: '移除这首歌？',
-      message: '《${entry.meta.title}》会从等待的歌里移除。',
+      message: next ? '《$title》会被移除，不会再播放。' : '《$title》会从等待的歌里移除。',
       confirmLabel: '移除',
       confirmIcon: AlistenIcons.trash,
     );
@@ -164,6 +166,8 @@ class QueueView extends ConsumerWidget {
               if (!started(entry)) entry,
           ]
         : snapshot.items;
+    bool removable(QueueEntry entry) =>
+        connected && !busy.entries.contains(entry.id);
     return RepaintBoundary(
       child: EdgeFade(
         top: _topFade,
@@ -230,7 +234,15 @@ class QueueView extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _LikeCount(likes: pending.likes),
-                        _menu(pending),
+                        _menu(
+                          pending,
+                          removable: true,
+                          onRemove: removable(pending)
+                              ? () => unawaited(
+                                  _remove(context, queue, pending, next: true),
+                                )
+                              : null,
+                        ),
                       ],
                     ),
                   ),
@@ -497,7 +509,7 @@ class _EntryMenu extends StatelessWidget {
   final ValueChanged<String> onCopyTitle;
   final SaveTrackCallback? onSaveToPlaylist;
 
-  /// 只有等待中的歌可以移除；[onRemove] 为 null 时这一项暂不可用（如未连接）。
+  /// 下一首和等待中的歌可以移除；[onRemove] 为 null 时这一项暂不可用（如未连接）。
   final bool removable;
   final VoidCallback? onRemove;
 

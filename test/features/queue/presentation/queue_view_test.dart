@@ -355,7 +355,8 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('only a waiting entry can be liked or removed', (tester) async {
+  testWidgets('only a waiting entry can be liked; the next one can be removed '
+      'too', (tester) async {
     final semantics = tester.ensureSemantics();
     await _pumpQueue(
       tester,
@@ -368,8 +369,27 @@ void main() {
 
     expect(find.bySemanticsLabel(RegExp('^点赞')), findsOneWidget);
     expect(await _removable(tester, 'a'), isNull);
-    expect(await _removable(tester, 'b'), isNull);
+    expect(await _removable(tester, 'b'), isTrue);
     expect(await _removable(tester, 'c'), isTrue);
+    semantics.dispose();
+  });
+
+  testWidgets('removing the next song asks first, says it will not play, and '
+      'is sent only once confirmed', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final room = await _pumpQueue(tester, _snapshot(pending: _entry('b')));
+
+    await tester.tap(find.bySemanticsLabel('《歌b》的更多操作'));
+    await _settle(tester);
+    await tester.tap(find.text('移除'));
+    await _settle(tester);
+    expect(find.text('移除这首歌？'), findsOneWidget);
+    expect(find.text('《歌b》会被移除，不会再播放。'), findsOneWidget);
+    await tester.tap(find.widgetWithText(PillButton, '移除'));
+    await _settle(tester);
+
+    expect(room.sent, 1);
+    expect(room.reported.single.success, '已移除');
     semantics.dispose();
   });
 
