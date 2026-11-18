@@ -301,9 +301,7 @@ final class MyPlaylistsController extends Notifier<MyPlaylistsState> {
     } on Object catch (error) {
       if (_isCurrent(scope)) {
         state = state.copyWith(
-          error: error is ApiException
-              ? (error.rateLimited ? rateLimitedText(error) : error.message)
-              : identityUnreadableText,
+          error: error is ApiException ? error.message : identityUnreadableText,
         );
       }
       return;

@@ -125,7 +125,7 @@ final class PairingCodeController extends Notifier<PairingCodeState> {
     CredentialStore credentials,
     String? token,
   ) async {
-    if (error.rateLimited) return rateLimitedText(error);
+    if (error.rateLimited) return error.message;
     switch (error.code) {
       // 只有账号能生成配对码：本机以为是账号，其实已经是游客。
       case 'FORBIDDEN':

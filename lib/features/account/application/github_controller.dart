@@ -66,7 +66,7 @@ final class GithubController extends Notifier<GithubIntent?> {
     try {
       await api.unbindGithub(currentPassword: currentPassword);
     } on ApiException catch (error) {
-      if (error.rateLimited) return MutationNotSent(rateLimitedText(error));
+      if (error.rateLimited) return MutationNotSent(error.message);
       if (error.answerLost) {
         refreshIdentity(identity);
         return const MutationUnknown();
@@ -281,7 +281,7 @@ final class GithubController extends Notifier<GithubIntent?> {
     CredentialStore credentials,
     String? token,
   ) async {
-    if (error.rateLimited) return MutationNotSent(rateLimitedText(error));
+    if (error.rateLimited) return MutationNotSent(error.message);
     // 还没有打开浏览器，可以直接再点一次。
     if (error.answerLost) return MutationNotSent(error.message);
     switch (error.code) {
@@ -312,7 +312,7 @@ final class GithubController extends Notifier<GithubIntent?> {
     ApiException error,
     IdentityController identity,
   ) {
-    if (error.rateLimited) return MutationNotSent(rateLimitedText(error));
+    if (error.rateLimited) return MutationNotSent(error.message);
     if (error.answerLost) {
       // 登录已有账号的回复丢了时游客 token 可能已经失效，之后按被动下线处理。
       refreshIdentity(identity);

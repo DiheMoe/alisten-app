@@ -124,7 +124,7 @@ final class ApiTransport {
     final body = response.data ?? '';
     if (status != endpoint.successStatus) {
       throw status == 429
-          ? _rateLimited(response.headers)
+          ? _rateLimited(response.headers, body)
           : _decodeError(status, body);
     }
     if (status == 204) {
@@ -161,18 +161,36 @@ final class ApiTransport {
 
   // 429 无论正文是什么都表示请求被限流、未执行：协议的 `RATE_LIMITED` 就是
   // 429，而代理限流时（生产环境的 Traefik 对 `/api/admin/` 限流）返回纯文本。
-  ApiException _rateLimited(Headers headers) {
+  // Alisten 的说明写着是谁的额度、还要等多久，原样显示，不解析；代理的回复
+  // 只能按 Retry-After 说要等多久。
+  ApiException _rateLimited(Headers headers, String body) {
     final seconds = int.tryParse(
       headers['retry-after']?.firstOrNull?.trim() ?? '',
     );
     return ApiException(
       code: protocol.ErrorCode.rateLimited.wireValue,
-      message: '请求太频繁，请稍后再试。',
+      message:
+          _serverMessage(body) ??
+          (seconds == null || seconds <= 0
+              ? '请求太频繁，请稍后再试。'
+              : '请求太频繁，请 $seconds 秒后再试'),
       status: 429,
       retryAfter: seconds == null || seconds < 0
           ? null
           : Duration(seconds: seconds),
     );
+  }
+
+  static String? _serverMessage(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      final error = decoded is Map<String, Object?> ? decoded['error'] : null;
+      if (error is! Map<String, Object?>) return null;
+      final message = protocol.ErrorInfo.fromJson(error).message.trim();
+      return message.isEmpty ? null : message;
+    } on FormatException {
+      return null;
+    }
   }
 
   ApiException _unreachable(int status) {

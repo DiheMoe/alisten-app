@@ -329,7 +329,7 @@ void main() {
       final close = await openWith([heard('a')]);
       api.removeMyListenError = const ApiException(
         code: 'RATE_LIMITED',
-        message: '请求太频繁，请稍后再试。',
+        message: '请求太频繁，请 30 秒后再试',
         status: 429,
         retryAfter: Duration(seconds: 30),
       );

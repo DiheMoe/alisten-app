@@ -78,18 +78,19 @@ void main() {
     expect(page.read().playlist?.items, hasLength(1));
   });
 
-  test('a rate limited read shows the wait', () async {
+  test('a rate limited read shows the wait the error tells', () async {
     server.failNext(
       'shared',
       apiError(
         'RATE_LIMITED',
+        message: '请求太频繁，请 30 秒后再试',
         status: 429,
         retryAfter: const Duration(seconds: 30),
       ),
     );
     final (_, page) = await open();
 
-    expect(page.read().error, contains('30'));
+    expect(page.read().error, '请求太频繁，请 30 秒后再试');
   });
 
   group('after a server switch', () {

@@ -151,7 +151,7 @@ final class HistoryController extends Notifier<HistoryState> {
           // 替换身份会让会话代号变化，列表随之清空并重新读取。
           await identity.recoverFromRefusal(credentials, token);
         } else {
-          _fail(generation, rateLimitedText(error));
+          _fail(generation, error.message);
         }
       } on Object catch (error) {
         AppLog.error(
@@ -221,7 +221,7 @@ final class HistoryController extends Notifier<HistoryState> {
       if (error.code == LocalErrorCodes.noToken) {
         return MutationNotSent(error.message);
       }
-      return MutationFailed(error.code, rateLimitedText(error));
+      return MutationFailed(error.code, error.message);
     } on Object catch (error) {
       AppLog.error(
         _logSource,

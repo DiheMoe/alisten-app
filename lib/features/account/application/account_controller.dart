@@ -214,7 +214,7 @@ final class AccountController {
     try {
       account = await api.register(username: username, password: password);
     } on ApiException catch (error) {
-      if (error.rateLimited) return MutationNotSent(rateLimitedText(error));
+      if (error.rateLimited) return MutationNotSent(error.message);
       if (error.answerLost) {
         refreshIdentity(_identity);
         return const MutationUnknown();
@@ -256,7 +256,7 @@ final class AccountController {
           .changeSession(() => _identity.signOut((api) => api.logout()));
       return const MutationSucceeded(null);
     } on ApiException catch (error) {
-      if (error.rateLimited) return MutationNotSent(rateLimitedText(error));
+      if (error.rateLimited) return MutationNotSent(error.message);
       return MutationFailed(error.code, logoutFailedText);
     } on Object catch (error) {
       AppLog.error(
@@ -285,7 +285,7 @@ final class AccountController {
       await api.changePassword(currentPassword: current, newPassword: next);
       return const MutationSucceeded(null);
     } on ApiException catch (error) {
-      if (error.rateLimited) return MutationNotSent(rateLimitedText(error));
+      if (error.rateLimited) return MutationNotSent(error.message);
       if (error.answerLost) return const MutationUnknown();
       return switch (error.code) {
         _invalidCredentials => const MutationFailed(
@@ -336,7 +336,7 @@ final class AccountController {
   }
 
   MutationResult<Account> _signInFailure(ApiException error) {
-    if (error.rateLimited) return MutationNotSent(rateLimitedText(error));
+    if (error.rateLimited) return MutationNotSent(error.message);
     if (error.answerLost) {
       refreshIdentity(_identity);
       return const MutationUnknown();
@@ -355,7 +355,7 @@ final class AccountController {
 
   // 兑换被拒时 adoptSession 已在身份队列里替换了游客，这里不再替换。
   MutationResult<Account> _pairingFailure(ApiException error) {
-    if (error.rateLimited) return MutationNotSent(rateLimitedText(error));
+    if (error.rateLimited) return MutationNotSent(error.message);
     if (error.answerLost) {
       refreshIdentity(_identity);
       return const MutationUnknown();

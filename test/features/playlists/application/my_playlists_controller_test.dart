@@ -170,7 +170,7 @@ void main() {
         (
           apiError(
             'RATE_LIMITED',
-            message: '请求太频繁，请稍后再试。',
+            message: '请求太频繁，请 3 秒后再试',
             status: 429,
             retryAfter: const Duration(seconds: 3),
           ),
@@ -556,7 +556,7 @@ void main() {
         'create',
         apiError(
           'RATE_LIMITED',
-          message: '请求太频繁，请稍后再试。',
+          message: '请求太频繁，请 3 秒后再试',
           status: 429,
           retryAfter: const Duration(seconds: 3),
         ),
@@ -580,7 +580,7 @@ void main() {
         'listMine',
         apiError(
           'RATE_LIMITED',
-          message: '请求太频繁，请稍后再试。',
+          message: '请求太频繁，请 3 秒后再试',
           status: 429,
           retryAfter: const Duration(seconds: 3),
         ),
@@ -905,7 +905,7 @@ void main() {
         (
           apiError(
             'RATE_LIMITED',
-            message: '请求太频繁，请稍后再试。',
+            message: '请求太频繁，请 3 秒后再试',
             status: 429,
             retryAfter: const Duration(seconds: 3),
           ),

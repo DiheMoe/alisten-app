@@ -129,7 +129,7 @@ final class PlaylistRequests {
   }
 
   static String? _notSent(ApiException error) {
-    if (error.rateLimited) return rateLimitedText(error);
+    if (error.rateLimited) return error.message;
     if (error.code == LocalErrorCodes.noToken) return error.message;
     return null;
   }

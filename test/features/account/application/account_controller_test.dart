@@ -153,7 +153,7 @@ void main() {
       await open();
       api.loginError = const ApiException(
         code: 'RATE_LIMITED',
-        message: '请求太频繁，请稍后再试。',
+        message: '请求太频繁，请 30 秒后再试',
         status: 429,
         retryAfter: Duration(seconds: 30),
       );
@@ -481,7 +481,7 @@ void main() {
       await open();
       api.redeemError = const ApiException(
         code: 'RATE_LIMITED',
-        message: '请求太频繁，请稍后再试。',
+        message: '请求太频繁，请 10 秒后再试',
         status: 429,
         retryAfter: Duration(seconds: 10),
       );
@@ -792,7 +792,7 @@ void main() {
       await open();
       api.registerError = const ApiException(
         code: 'RATE_LIMITED',
-        message: '请求太频繁，请稍后再试。',
+        message: '请求太频繁，请 10 秒后再试',
         status: 429,
         retryAfter: Duration(seconds: 10),
       );

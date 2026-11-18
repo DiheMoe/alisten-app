@@ -227,9 +227,12 @@ void main() {
   );
 
   group('a request turned away for coming too often', () {
-    Matcher rateLimited({Duration? retryAfter}) => isA<ApiException>()
+    Matcher rateLimited({
+      Duration? retryAfter,
+      String message = '请求太频繁，请稍后再试。',
+    }) => isA<ApiException>()
         .having((error) => error.code, 'code', 'RATE_LIMITED')
-        .having((error) => error.message, 'message', '请求太频繁，请稍后再试。')
+        .having((error) => error.message, 'message', message)
         .having((error) => error.status, 'status', 429)
         .having((error) => error.rateLimited, 'rateLimited', isTrue)
         .having((error) => error.answerLost, 'answerLost', isFalse)
@@ -253,20 +256,38 @@ void main() {
           pathParameters: {'id': 'r1'},
           token: 'admin-token',
         ),
-        throwsA(rateLimited(retryAfter: const Duration(seconds: 3))),
+        throwsA(
+          rateLimited(
+            retryAfter: const Duration(seconds: 3),
+            message: '请求太频繁，请 3 秒后再试',
+          ),
+        ),
       );
     });
 
-    test(
-      'by Alisten with a protocol error was not carried out either',
-      () async {
-        adapter.respond(429, {
-          'error': {'code': 'RATE_LIMITED', 'message': '搜索过于频繁，请稍后再试。'},
-        });
+    test('by Alisten was not carried out either, and is told in the words '
+        'of the server, which say how long to wait', () async {
+      adapter.respondRaw(
+        429,
+        jsonEncode({
+          'error': {'code': 'RATE_LIMITED', 'message': '这个房间的点歌额度用完了，12 秒后再试。'},
+        }),
+        null,
+        headers: {
+          'retry-after': ['12'],
+        },
+      );
 
-        await expectLater(api.listRooms(), throwsA(rateLimited()));
-      },
-    );
+      await expectLater(
+        api.listRooms(),
+        throwsA(
+          rateLimited(
+            retryAfter: const Duration(seconds: 12),
+            message: '这个房间的点歌额度用完了，12 秒后再试。',
+          ),
+        ),
+      );
+    });
 
     test('with a wait that is not a number of seconds says no wait', () async {
       for (final value in ['Wed, 21 Oct 2026 07:28:00 GMT', '-1', 'soon']) {

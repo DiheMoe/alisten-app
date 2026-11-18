@@ -192,7 +192,7 @@ final class SettingsController extends Notifier<SettingsState> {
       if (error.code == LocalErrorCodes.noToken) {
         return MutationNotSent(error.message);
       }
-      return MutationFailed(error.code, rateLimitedText(error));
+      return MutationFailed(error.code, error.message);
     } on Object catch (error) {
       AppLog.error(
         _logSource,

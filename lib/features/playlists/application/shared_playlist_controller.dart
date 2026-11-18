@@ -71,9 +71,7 @@ final class SharedPlaylistController extends Notifier<SharedPlaylistState> {
     } on ApiException catch (error) {
       next = error.code == _notFound
           ? const SharedPlaylistState(expired: true)
-          : SharedPlaylistState(
-              error: error.rateLimited ? rateLimitedText(error) : error.message,
-            );
+          : SharedPlaylistState(error: error.message);
     } on Object catch (error) {
       AppLog.warn(
         'playlists',
