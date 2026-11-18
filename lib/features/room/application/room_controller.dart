@@ -44,6 +44,9 @@ const _notConnected = '还没有连上房间，操作未发送。';
 const _enterFailed = '无法进入房间，请检查网络后重试。';
 const _leftRoom = '已离开房间，操作没有在当前房间生效。';
 const _outdatedMessage = '客户端协议版本过旧，请升级 Alisten。';
+const _fullMessage = '房间已满，暂时进不去。';
+const _roomFull = 'ROOM_FULL';
+const _tooManyConnections = 'TOO_MANY_CONNECTIONS';
 const _logSource = 'room';
 const _replaced = RoomJoinFailed(
   RoomFailure.unavailable,
@@ -82,6 +85,12 @@ final class RoomController extends Notifier<RoomState> {
   PlaybackIdentity? _ended;
   // 因连不上服务端而未能恢复上次房间的尝试编号，此后进出过房间即失效。
   int? _unrestored;
+  // 服务端拒绝握手时先发来 ROOM_FULL 的错误，再以 4403 断开，所以先记下错误里
+  // 的文案，等连接停下时再用。
+  String? _fullReason;
+  // 连接太多时连接会隔一会儿自动重连，每次都会再收到这个错误，所以连上之前只
+  // 提示一次。
+  bool _crowdReported = false;
 
   int? get serverNow => _transport?.clock.serverNow();
 
@@ -299,6 +308,12 @@ final class RoomController extends Notifier<RoomState> {
     }
   }
 
+  void clearConnectionNotice() {
+    if (state.connectionNotice != null) {
+      state = state.copyWith(connectionNotice: null);
+    }
+  }
+
   /// 已打开的连接立即探测；等待重连的连接立即重连，但每次断线只允许一次，网络
   /// 恢复或回到前台后才再次允许，其余按退避等待。不同步房间，也不重启连接。
   Future<void> checkConnection() async {
@@ -435,6 +450,7 @@ final class RoomController extends Notifier<RoomState> {
   bool get _retryable =>
       _reentering ||
       state.failure == RoomFailure.authorization ||
+      state.failure == RoomFailure.full ||
       state.failure == RoomFailure.unavailable;
 
   bool _names(String ref) {
@@ -457,6 +473,8 @@ final class RoomController extends Notifier<RoomState> {
     final sameRoom = listing != null && _isActive(listing.id);
     _generation++;
     _reentering = false;
+    _fullReason = null;
+    _crowdReported = false;
     _ref = target;
     _listing = listing;
     _server = server;
@@ -569,6 +587,9 @@ final class RoomController extends Notifier<RoomState> {
 
   void _onEvent(RoomTransportEvent event, int generation) {
     if (generation != _generation) return;
+    if (event is RoomHelloReceived || event is RoomStopped) {
+      _crowdReported = false;
+    }
     switch (event) {
       case RoomConnectionChanged(:final status, :final retryIn):
         state = state.copyWith(
@@ -595,6 +616,13 @@ final class RoomController extends Notifier<RoomState> {
         unawaited(_saveLastRoom(roomId));
       case RoomEventReceived(event: final roomEvent):
         _receive(roomEvent);
+      case RoomErrorReceived(code: _roomFull, :final message):
+        _fullReason = message;
+      case RoomErrorReceived(code: _tooManyConnections, :final message):
+        if (!_crowdReported) {
+          _crowdReported = true;
+          state = state.copyWith(connectionNotice: message);
+        }
       case RoomErrorReceived(:final code):
         // 握手被拒后紧接着会停止或重连，原因由它们报告；其余错误事件只回应本
         // 客户端从不发送的帧。
@@ -632,12 +660,16 @@ final class RoomController extends Notifier<RoomState> {
     if (code == 4401) unawaited(_verifyIdentity());
     final failure = switch (code) {
       4401 => RoomFailure.authorization,
+      4403 => RoomFailure.full,
       4404 => RoomFailure.notFound,
       4426 => RoomFailure.outdated,
       _ => RoomFailure.unavailable,
     };
+    final fullReason = _fullReason;
+    _fullReason = null;
     _stopWith(failure, switch (failure) {
       RoomFailure.authorization => '房间票据已失效，请重新验证后进入。',
+      RoomFailure.full => fullReason ?? _fullMessage,
       RoomFailure.notFound => '房间不存在或已经关闭。',
       RoomFailure.outdated => _outdatedMessage,
       RoomFailure.unavailable => '与房间的连接已经停止。',

@@ -16,6 +16,7 @@ class RoomTopBar extends StatefulWidget {
   const RoomTopBar({
     required this.name,
     required this.onlineCount,
+    required this.capacity,
     required this.status,
     required this.nextRetryAt,
     required this.onCollapse,
@@ -28,6 +29,7 @@ class RoomTopBar extends StatefulWidget {
 
   final String name;
   final int onlineCount;
+  final int capacity;
   final RoomConnectionStatus status;
   final DateTime? nextRetryAt;
   final VoidCallback onCollapse;
@@ -72,7 +74,7 @@ class _RoomTopBarState extends State<RoomTopBar> {
               onPressed: widget.onCollapse,
             ),
             title: widget.name,
-            subtitle: '${widget.onlineCount} 人在线',
+            subtitle: '${widget.onlineCount} / ${widget.capacity} 人在线',
             subtitleLeading: Container(
               width: _onlineDot,
               height: _onlineDot,

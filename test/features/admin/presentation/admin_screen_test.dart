@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/features/admin/index.dart';
+import 'package:alisten/features/admin/presentation/ephemeral_rooms_group.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
@@ -432,5 +433,44 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('1 首 · 占用 1.0 MiB'), findsOneWidget);
     expect(find.text('读取失败'), findsNothing);
+  });
+
+  testWidgets('the rooms section shows the capacity of new ephemeral rooms, '
+      'and saves a new one', (tester) async {
+    api.ephemeralRoomCapacity = 16;
+    await open(tester);
+    await submit(tester);
+    await tester.tap(find.text('房间'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('临时房间'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    final field = _field('最多人数');
+    final save = find.descendant(
+      of: find.byType(EphemeralRoomsGroup),
+      matching: find.text('保存'),
+    );
+
+    expect(tester.widget<EditableText>(field).controller.text, '16');
+    expect(find.text('只影响之后新建的临时房间，已经建好的保持原来的人数。'), findsOneWidget);
+
+    await tester.enterText(field, '200');
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(find.text('最多人数要在 2 到 128 之间'), findsOneWidget);
+    expect(api.savedEphemeralRoomCapacities, isEmpty);
+
+    await tester.enterText(field, '24');
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+
+    expect(api.savedEphemeralRoomCapacities, [24]);
+    expect(notices, [(ToastKind.success, '临时房间最多人数已保存')]);
+    expect(tester.widget<EditableText>(field).controller.text, '24');
   });
 }

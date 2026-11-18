@@ -112,6 +112,7 @@ void _emitRoom(FakeRoomTransportFactory rooms) {
         name: '一起听',
         description: '',
         kind: RoomKind.ephemeral,
+        capacity: 16,
       ),
     ),
   );

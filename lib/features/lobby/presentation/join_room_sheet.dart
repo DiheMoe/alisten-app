@@ -249,8 +249,10 @@ class _RoomSummary extends StatelessWidget {
                   children: [
                     _Fact(
                       icon: AlistenIcons.users,
-                      label: '${room.onlineCount} 人在线',
+                      label: '${room.onlineCount} / ${room.capacity} 人在线',
                     ),
+                    if (room.full)
+                      const _Fact(icon: AlistenIcons.users, label: '已满员'),
                     if (room.hasPassword)
                       const _Fact(
                         icon: AlistenIcons.lockSimpleFill,

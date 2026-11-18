@@ -40,7 +40,10 @@ final class _Room {
 
   FakeRoomTransport get transport => rooms.last;
 
-  Future<void> open({List<Member> members = const [_me, _xiaoming]}) async {
+  Future<void> open({
+    List<Member> members = const [_me, _xiaoming],
+    int capacity = 16,
+  }) async {
     tester.view
       ..physicalSize = const Size(360, 780) * 3
       ..devicePixelRatio = 3;
@@ -63,6 +66,13 @@ final class _Room {
       testRoomSnapshot().copyWith(
         term: 1,
         seq: 1,
+        room: RoomInfo(
+          id: 'room-id',
+          name: '房间',
+          description: '描述',
+          kind: RoomKind.ephemeral,
+          capacity: capacity,
+        ),
         members: members,
         onlineCount: members.length,
       ),
@@ -345,11 +355,12 @@ void main() {
         for (var index = 1; index < 30; index++)
           Member(id: 'm$index', name: '成员$index', avatarHash: ''),
       ],
+      capacity: 64,
     );
     await room.showChat();
     final strip = tester.getRect(find.bySemanticsLabel(RegExp('查看房间成员')));
 
-    await tester.tap(find.text('31 人在线'));
+    await tester.tap(find.text('31 / 64 人在线'));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
@@ -358,7 +369,7 @@ void main() {
     expect(tester.getRect(panel).top, greaterThanOrEqualTo(strip.bottom));
     expect(tester.getRect(panel).top, lessThan(strip.bottom + 16));
     expect(
-      find.descendant(of: panel, matching: find.text('31 人在线')),
+      find.descendant(of: panel, matching: find.text('31 / 64 人在线')),
       findsOneWidget,
     );
     expect(

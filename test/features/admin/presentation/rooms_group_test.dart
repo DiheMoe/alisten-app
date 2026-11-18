@@ -4,6 +4,7 @@ import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/admin/presentation/admin_time.dart';
+import 'package:alisten/features/admin/presentation/rooms_group.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
@@ -45,6 +46,9 @@ Finder _field(String label) => find.descendant(
   of: find.widgetWithText(AlistenTextField, label),
   matching: find.byType(EditableText),
 );
+
+// 临时房间的分组里也有一个“最多人数”，房间表单在它上面打开。
+final _formCapacity = _field('最多人数').last;
 
 void main() {
   late FakeAdminApi api;
@@ -153,7 +157,7 @@ void main() {
   }
 
   Future<void> closeSheet(WidgetTester tester) async {
-    await tester.tapAt(const Offset(20, 40));
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
   }
 
@@ -167,16 +171,17 @@ void main() {
 
     expect(find.text('大厅'), findsOneWidget);
     expect(find.text('hall'), findsOneWidget);
-    expect(find.text('在线 3 人'), findsOneWidget);
+    expect(find.text('在线 3 / 16 人'), findsOneWidget);
     expect(find.text('小厅'), findsOneWidget);
     expect(find.text('r2'), findsOneWidget);
-    expect(find.text('在线 0 人'), findsOneWidget);
+    expect(find.text('在线 0 / 16 人'), findsOneWidget);
     expect(find.text('有密码'), findsOneWidget);
     expect(find.text('新建常驻房间'), findsOneWidget);
   });
 
+  // 同一页的临时房间分组里也有输入框。
   Finder search() => find.descendant(
-    of: find.byType(AlistenTextField),
+    of: find.byType(RoomsGroup),
     matching: find.byType(EditableText),
   );
 
@@ -340,6 +345,50 @@ void main() {
       expect(_field('密码（可选）'), findsNothing);
       expect(find.text('小厅'), findsOneWidget);
       expect(find.text('small'), findsOneWidget);
+    });
+
+    testWidgets('a new room starts from the capacity the server gives and '
+        'sends the one typed', (tester) async {
+      api.defaultCapacity = 32;
+      await open(tester);
+
+      await tap(tester, find.text('新建常驻房间'));
+      String capacity() =>
+          tester.widget<EditableText>(_formCapacity).controller.text;
+      expect(capacity(), '32');
+      expect(find.text('2 到 128 人，同一个人开几台设备只算一人'), findsOneWidget);
+      await tester.enterText(_field('房间名称'), '小厅');
+      await tester.enterText(_formCapacity, '200');
+      expect(capacity(), '200');
+      await tester.pump();
+      expect(find.text('最多人数要在 2 到 128 之间'), findsOneWidget);
+      await tap(tester, _save);
+      expect(api.createdDrafts, isEmpty);
+      expect(find.text('最多人数要在 2 到 128 之间'), findsOneWidget);
+
+      await tester.enterText(_formCapacity, '24');
+      await tap(tester, _save);
+
+      expect(api.createdDrafts.single.capacity, 24);
+      expect(find.text('在线 0 / 24 人'), findsOneWidget);
+    });
+
+    testWidgets('a capacity changed says it applies at once and lets nobody '
+        'go', (tester) async {
+      await open(tester);
+      await act(tester, '编辑');
+
+      expect(tester.widget<EditableText>(_formCapacity).controller.text, '16');
+      expect(
+        find.text('改了立即生效。调低时不会让已经在房间里的人断开，新来的人要等人数降下来才进得来。'),
+        findsOneWidget,
+      );
+      await tester.enterText(_formCapacity, '8');
+      await tap(tester, _save);
+
+      expect(api.updates.single.patch.capacity, 8);
+      expect(api.updates.single.patch.name, isNull);
+      expect(find.text('在线 3 / 8 人'), findsOneWidget);
     });
 
     testWidgets('a change sends only what changed and the list follows', (

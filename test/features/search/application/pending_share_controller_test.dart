@@ -115,7 +115,13 @@ final class _Harness {
       testRoomSnapshot().copyWith(
         term: 1,
         seq: 1,
-        room: RoomInfo(id: id, name: ref, description: '', kind: kind),
+        room: RoomInfo(
+          id: id,
+          name: ref,
+          description: '',
+          kind: kind,
+          capacity: 16,
+        ),
       ),
     );
   }

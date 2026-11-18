@@ -1,4 +1,5 @@
 import 'package:alisten/domain/member/member.dart';
+import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/domain/track/track.dart';
 
 final class RoomDraft {
@@ -7,17 +8,27 @@ final class RoomDraft {
     required this.description,
     this.slug,
     this.password,
+    this.capacity,
   });
 
   final String name;
   final String description;
   final String? slug;
   final String? password;
+
+  /// 为 null 时服务端用 [AdminRoomList.defaultCapacity]。
+  final int? capacity;
 }
 
 /// 为 null 的字段保持不变。
 final class RoomPatch {
-  const RoomPatch({this.name, this.description, this.slug, this.password});
+  const RoomPatch({
+    this.name,
+    this.description,
+    this.slug,
+    this.password,
+    this.capacity,
+  });
 
   final String? name;
   final String? description;
@@ -28,8 +39,21 @@ final class RoomPatch {
   /// `''` 表示取消密码。
   final String? password;
 
+  final int? capacity;
+
   bool get isEmpty =>
-      name == null && description == null && slug == null && password == null;
+      name == null &&
+      description == null &&
+      slug == null &&
+      password == null &&
+      capacity == null;
+}
+
+final class AdminRoomList {
+  const AdminRoomList({required this.rooms, required this.defaultCapacity});
+
+  final List<RoomListing> rooms;
+  final int defaultCapacity;
 }
 
 final class ApiKeyStatus {

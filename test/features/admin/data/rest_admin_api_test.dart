@@ -43,18 +43,21 @@ void main() {
           'kind': 'persistent',
           'hasPassword': true,
           'onlineCount': 4,
+          'capacity': 64,
         },
       ],
+      'defaultCapacity': 32,
     });
 
-    final rooms = await api.listRooms('t');
+    final list = await api.listRooms('t');
 
     final request = adapter.requests.single;
     expect(request.method, 'GET');
     expect(request.path, '/api/admin/rooms');
     expect(request.uri.toString(), 'https://example.com:8443/api/admin/rooms');
     expect(request.authorization, 'Bearer t');
-    final room = rooms.single;
+    expect(list.defaultCapacity, 32);
+    final room = list.rooms.single;
     expect(room.id, 'room-id');
     expect(room.slug, 'listen');
     expect(room.name, '一起听');
@@ -62,6 +65,7 @@ void main() {
     expect(room.kind, RoomKind.persistent);
     expect(room.hasPassword, isTrue);
     expect(room.onlineCount, 4);
+    expect(room.capacity, 64);
   });
 
   test('the brand name is saved with the admin token, and the saved name is '
@@ -84,6 +88,7 @@ void main() {
       'brandName': '大猫听歌房',
       'registrationOpen': true,
       'githubLogin': false,
+      'ephemeralRoomCapacity': 16,
     });
 
     final name = await api.getBrandName();
@@ -106,6 +111,7 @@ void main() {
         'brandName': 'Alisten',
         'registrationOpen': false,
         'githubLogin': false,
+        'ephemeralRoomCapacity': 16,
       });
       expect(await api.getRegistrationOpen(), isFalse);
       expect(adapter.requests.last.authorization, isNull);
@@ -158,14 +164,19 @@ void main() {
 
     final id = await api.createRoom(
       't',
-      const RoomDraft(name: '大厅', description: '', slug: 'hall'),
+      const RoomDraft(name: '大厅', description: '', slug: 'hall', capacity: 32),
     );
 
     final request = adapter.requests.single;
     expect(request.method, 'POST');
     expect(request.path, '/api/admin/rooms');
     expect(request.authorization, 'Bearer t');
-    expect(request.jsonBody, {'description': '', 'name': '大厅', 'slug': 'hall'});
+    expect(request.jsonBody, {
+      'capacity': 32,
+      'description': '',
+      'name': '大厅',
+      'slug': 'hall',
+    });
     expect(id, 'r1');
   });
 
@@ -194,6 +205,35 @@ void main() {
     expect(request.path, '/api/admin/rooms/r1');
     expect(request.authorization, 'Bearer t');
     expect(request.jsonBody, {'slug': ''});
+  });
+
+  test('a new capacity is sent on its own', () async {
+    adapter.respondRaw(204, '', null);
+
+    await api.updateRoom('t', 'r1', const RoomPatch(capacity: 8));
+
+    expect(adapter.requests.single.jsonBody, {'capacity': 8});
+  });
+
+  test('the capacity of new ephemeral rooms is read publicly and set with '
+      'the admin token', () async {
+    adapter.respond(200, {
+      'brandName': 'Alisten',
+      'registrationOpen': false,
+      'githubLogin': false,
+      'ephemeralRoomCapacity': 16,
+    });
+    expect(await api.getEphemeralRoomCapacity(), 16);
+    expect(adapter.requests.last.authorization, isNull);
+
+    adapter.respondRaw(204, '', null);
+    await api.setEphemeralRoomCapacity('t', 24);
+
+    final request = adapter.requests.last;
+    expect(request.method, 'PUT');
+    expect(request.path, '/api/admin/ephemeral-room-capacity');
+    expect(request.authorization, 'Bearer t');
+    expect(request.jsonBody, {'capacity': 24});
   });
 
   test('a room is deleted by its id', () async {
@@ -746,6 +786,9 @@ void main() {
           api.createRoom('t', const RoomDraft(name: '大厅', description: '')),
       'room change': () =>
           api.updateRoom('t', 'r1', const RoomPatch(name: 'B')),
+      'ephemeral room capacity': () => api.getEphemeralRoomCapacity(),
+      'ephemeral room capacity saved': () =>
+          api.setEphemeralRoomCapacity('t', 16),
       'room deletion': () => api.deleteRoom('t', 'r1'),
       'key status': () => api.getApiKeyStatus('t', 'r1'),
       'key reset': () => api.resetApiKey('t', 'r1'),

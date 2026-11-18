@@ -14,6 +14,7 @@ bool shouldStopReconnecting(int code) {
   return const {
     WsCloseCodes.invalidArgument,
     WsCloseCodes.unauthorized,
+    WsCloseCodes.roomFull,
     WsCloseCodes.notFound,
     WsCloseCodes.clientOutdated,
   }.contains(code);

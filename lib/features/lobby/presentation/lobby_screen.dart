@@ -683,7 +683,7 @@ class _RoomRow extends StatelessWidget {
                     children: [
                       _Badge(
                         ink: online ? colors.success : colors.onGlassMuted,
-                        label: '${room.onlineCount} 人在线',
+                        label: '${room.onlineCount} / ${room.capacity} 人在线',
                         leading: Container(
                           width: AlistenSpacing.xs,
                           height: AlistenSpacing.xs,
@@ -698,6 +698,16 @@ class _RoomRow extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (room.full)
+                        _Badge(
+                          ink: colors.warning,
+                          label: '满员',
+                          leading: Icon(
+                            AlistenIcons.users,
+                            size: AlistenSizes.inlineIcon,
+                            color: colors.warning,
+                          ),
+                        ),
                       if (room.hasPassword)
                         _Badge(
                           ink: colors.onGlassMuted,

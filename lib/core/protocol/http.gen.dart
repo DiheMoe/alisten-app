@@ -626,6 +626,16 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
+  static const adminSetEphemeralRoomCapacity = RestEndpoint(
+    name: 'adminSetEphemeralRoomCapacity',
+    method: 'PUT',
+    path: '/api/admin/ephemeral-room-capacity',
+    auth: HttpAuth.admin,
+    successStatus: 204,
+    hasLocation: false,
+    pathParameters: <String>[],
+  );
+
   static const adminGetAccount = RestEndpoint(
     name: 'adminGetAccount',
     method: 'GET',
@@ -849,6 +859,7 @@ abstract final class RestEndpoints {
     adminUpdateSite,
     adminOpenRegistration,
     adminCloseRegistration,
+    adminSetEphemeralRoomCapacity,
     adminGetAccount,
     adminResetAccountPassword,
     listMyListens,

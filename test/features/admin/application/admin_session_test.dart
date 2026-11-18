@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/domain/mutation/mutation_result.dart';
-import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleState;
@@ -39,7 +38,7 @@ void main() {
 
   AdminSession session() => container.read(adminSessionProvider.notifier);
   AdminSessionState state() => container.read(adminSessionProvider);
-  Future<List<RoomListing>> listRooms() =>
+  Future<AdminRoomList> listRooms() =>
       session().run((api, token) => api.listRooms(token));
 
   setUp(() async {
@@ -146,7 +145,7 @@ void main() {
       'server no longer accepts', () async {
     await session().signIn('t-1');
 
-    expect(await listRooms(), [same(api.rooms.single)]);
+    expect((await listRooms()).rooms, [same(api.rooms.single)]);
     expect(api.tokens, ['t-1', 't-1']);
 
     api.listRoomsError = const ApiException(
@@ -702,7 +701,7 @@ void main() {
       await session().signIn('t-1');
       api.listRoomsGate = Completer();
       var rereads = 0;
-      final pending = session().change<List<RoomListing>>(
+      final pending = session().change<AdminRoomList>(
         (api, token) => api.listRooms(token),
         unexpected: 'test change ended unexpectedly',
         reread: (_) async => rereads++,
@@ -712,7 +711,7 @@ void main() {
       session().end();
       api.listRoomsGate!.complete();
 
-      expect(await pending, isA<MutationUnknown<List<RoomListing>>>());
+      expect(await pending, isA<MutationUnknown<AdminRoomList>>());
       expect(rereads, 0);
     });
   });

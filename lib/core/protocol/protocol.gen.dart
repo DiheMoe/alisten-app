@@ -5,7 +5,7 @@ import 'package:alisten/core/protocol/protocol_runtime.dart';
 export 'package:alisten/core/protocol/protocol_runtime.dart'
     show ProtocolMismatchException, WsEvent, WsRequest, WsResponse;
 
-const protocolVersion = '10a70c0dce07a9a7';
+const protocolVersion = 'b1900696599ef398';
 
 class APIKey {
   const APIKey({required this.key});
@@ -189,6 +189,8 @@ enum ErrorCode {
   providerError('PROVIDER_ERROR'),
   unavailable('UNAVAILABLE'),
   clientOutdated('CLIENT_OUTDATED'),
+  roomFull('ROOM_FULL'),
+  tooManyConnections('TOO_MANY_CONNECTIONS'),
   internal('INTERNAL');
 
   const ErrorCode(this.wireValue);
@@ -815,6 +817,7 @@ enum QRLoginStatus {
 
 class RoomInfo {
   const RoomInfo({
+    required this.capacity,
     required this.description,
     required this.id,
     required this.kind,
@@ -823,6 +826,10 @@ class RoomInfo {
 
   factory RoomInfo.fromJson(Map<String, Object?> json) {
     return RoomInfo(
+      capacity: readInt(
+        requiredField(json, 'capacity', 'RoomInfo'),
+        'RoomInfo.capacity',
+      ),
       description: readString(
         requiredField(json, 'description', 'RoomInfo'),
         'RoomInfo.description',
@@ -836,12 +843,14 @@ class RoomInfo {
     );
   }
 
+  final int capacity;
   final String description;
   final String id;
   final RoomKind kind;
   final String name;
 
   Map<String, Object?> toJson() => <String, Object?>{
+    'capacity': capacity,
     'description': description,
     'id': id,
     'kind': kind.toJson(),
@@ -865,6 +874,7 @@ enum RoomKind {
 
 class RoomListing {
   const RoomListing({
+    required this.capacity,
     required this.description,
     required this.hasPassword,
     required this.id,
@@ -876,6 +886,10 @@ class RoomListing {
 
   factory RoomListing.fromJson(Map<String, Object?> json) {
     return RoomListing(
+      capacity: readInt(
+        requiredField(json, 'capacity', 'RoomListing'),
+        'RoomListing.capacity',
+      ),
       description: readString(
         requiredField(json, 'description', 'RoomListing'),
         'RoomListing.description',
@@ -904,6 +918,7 @@ class RoomListing {
     );
   }
 
+  final int capacity;
   final String description;
   final bool hasPassword;
   final String id;
@@ -913,6 +928,7 @@ class RoomListing {
   final String? slug;
 
   Map<String, Object?> toJson() => <String, Object?>{
+    'capacity': capacity,
     'description': description,
     'hasPassword': hasPassword,
     'id': id,
@@ -1994,10 +2010,18 @@ class SettingsUpdated {
 }
 
 class RoomUpdated {
-  const RoomUpdated({required this.description, required this.name});
+  const RoomUpdated({
+    required this.capacity,
+    required this.description,
+    required this.name,
+  });
 
   factory RoomUpdated.fromJson(Map<String, Object?> json) {
     return RoomUpdated(
+      capacity: readInt(
+        requiredField(json, 'capacity', 'RoomUpdated'),
+        'RoomUpdated.capacity',
+      ),
       description: readString(
         requiredField(json, 'description', 'RoomUpdated'),
         'RoomUpdated.description',
@@ -2009,10 +2033,12 @@ class RoomUpdated {
     );
   }
 
+  final int capacity;
   final String description;
   final String name;
 
   Map<String, Object?> toJson() => <String, Object?>{
+    'capacity': capacity,
     'description': description,
     'name': name,
   };
@@ -2960,6 +2986,7 @@ class CreateTicketResponse {
 class GetSiteResponse {
   const GetSiteResponse({
     required this.brandName,
+    required this.ephemeralRoomCapacity,
     required this.githubLogin,
     required this.registrationOpen,
   });
@@ -2969,6 +2996,10 @@ class GetSiteResponse {
       brandName: readString(
         requiredField(json, 'brandName', 'GetSiteResponse'),
         'GetSiteResponse.brandName',
+      ),
+      ephemeralRoomCapacity: readInt(
+        requiredField(json, 'ephemeralRoomCapacity', 'GetSiteResponse'),
+        'GetSiteResponse.ephemeralRoomCapacity',
       ),
       githubLogin: readBool(
         requiredField(json, 'githubLogin', 'GetSiteResponse'),
@@ -2982,21 +3013,30 @@ class GetSiteResponse {
   }
 
   final String brandName;
+  final int ephemeralRoomCapacity;
   final bool githubLogin;
   final bool registrationOpen;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'brandName': brandName,
+    'ephemeralRoomCapacity': ephemeralRoomCapacity,
     'githubLogin': githubLogin,
     'registrationOpen': registrationOpen,
   };
 }
 
 class AdminListRoomsResponse {
-  const AdminListRoomsResponse({required this.items});
+  const AdminListRoomsResponse({
+    required this.defaultCapacity,
+    required this.items,
+  });
 
   factory AdminListRoomsResponse.fromJson(Map<String, Object?> json) {
     return AdminListRoomsResponse(
+      defaultCapacity: readInt(
+        requiredField(json, 'defaultCapacity', 'AdminListRoomsResponse'),
+        'AdminListRoomsResponse.defaultCapacity',
+      ),
       items:
           readList(
                 requiredField(json, 'items', 'AdminListRoomsResponse'),
@@ -3011,15 +3051,18 @@ class AdminListRoomsResponse {
     );
   }
 
+  final int defaultCapacity;
   final List<RoomListing> items;
 
   Map<String, Object?> toJson() => <String, Object?>{
+    'defaultCapacity': defaultCapacity,
     'items': items.map((item) => item.toJson()).toList(growable: false),
   };
 }
 
 class AdminCreateRoomRequest {
   const AdminCreateRoomRequest({
+    this.capacity,
     required this.description,
     required this.name,
     this.password,
@@ -3028,6 +3071,14 @@ class AdminCreateRoomRequest {
 
   factory AdminCreateRoomRequest.fromJson(Map<String, Object?> json) {
     return AdminCreateRoomRequest(
+      capacity: switch (optionalField(
+        json,
+        'capacity',
+        'AdminCreateRoomRequest',
+      )) {
+        null => null,
+        final value => readInt(value, 'AdminCreateRoomRequest.capacity'),
+      },
       description: readString(
         requiredField(json, 'description', 'AdminCreateRoomRequest'),
         'AdminCreateRoomRequest.description',
@@ -3051,12 +3102,14 @@ class AdminCreateRoomRequest {
     );
   }
 
+  final int? capacity;
   final String description;
   final String name;
   final String? password;
   final String? slug;
 
   Map<String, Object?> toJson() => <String, Object?>{
+    'capacity': ?capacity,
     'description': description,
     'name': name,
     'password': ?password,
@@ -3083,6 +3136,7 @@ class AdminCreateRoomResponse {
 
 class AdminUpdateRoomRequest {
   const AdminUpdateRoomRequest({
+    this.capacity,
     this.description,
     this.name,
     this.password,
@@ -3091,6 +3145,14 @@ class AdminUpdateRoomRequest {
 
   factory AdminUpdateRoomRequest.fromJson(Map<String, Object?> json) {
     return AdminUpdateRoomRequest(
+      capacity: switch (optionalField(
+        json,
+        'capacity',
+        'AdminUpdateRoomRequest',
+      )) {
+        null => null,
+        final value => readInt(value, 'AdminUpdateRoomRequest.capacity'),
+      },
       description: switch (optionalField(
         json,
         'description',
@@ -3118,12 +3180,14 @@ class AdminUpdateRoomRequest {
     );
   }
 
+  final int? capacity;
   final String? description;
   final String? name;
   final String? password;
   final String? slug;
 
   Map<String, Object?> toJson() => <String, Object?>{
+    'capacity': ?capacity,
     'description': ?description,
     'name': ?name,
     'password': ?password,
@@ -3679,6 +3743,25 @@ class AdminOpenRegistrationRequest {
   Map<String, Object?> toJson() => <String, Object?>{};
 }
 
+class AdminSetEphemeralRoomCapacityRequest {
+  const AdminSetEphemeralRoomCapacityRequest({required this.capacity});
+
+  factory AdminSetEphemeralRoomCapacityRequest.fromJson(
+    Map<String, Object?> json,
+  ) {
+    return AdminSetEphemeralRoomCapacityRequest(
+      capacity: readInt(
+        requiredField(json, 'capacity', 'AdminSetEphemeralRoomCapacityRequest'),
+        'AdminSetEphemeralRoomCapacityRequest.capacity',
+      ),
+    );
+  }
+
+  final int capacity;
+
+  Map<String, Object?> toJson() => <String, Object?>{'capacity': capacity};
+}
+
 class AdminResetAccountPasswordRequest {
   const AdminResetAccountPasswordRequest();
 
@@ -4116,6 +4199,7 @@ abstract final class WsCloseCodes {
   static const serviceRestart = 1012;
   static const unavailable = 1013;
   static const unauthorized = 4401;
+  static const roomFull = 4403;
   static const notFound = 4404;
   static const handshakeTimeout = 4408;
   static const clientOutdated = 4426;

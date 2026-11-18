@@ -23,6 +23,7 @@ final class AdminRoomsState {
   const AdminRoomsState({
     this.rooms = const [],
     this.loaded = false,
+    this.defaultCapacity,
     this.loading = false,
     this.error,
   });
@@ -31,8 +32,22 @@ final class AdminRoomsState {
 
   /// 读到过一次列表（包括空列表）。
   final bool loaded;
+
+  /// 新建房间的表单从它开始，读到房间列表之前为 null。默认值由服务端给出，
+  /// 不在 App 里另存一份。
+  final int? defaultCapacity;
   final bool loading;
   final String? error;
+
+  AdminRoomsState _with({bool loading = false, String? error}) {
+    return AdminRoomsState(
+      rooms: rooms,
+      loaded: loaded,
+      defaultCapacity: defaultCapacity,
+      loading: loading,
+      error: error,
+    );
+  }
 }
 
 final adminRoomsControllerProvider =
@@ -49,37 +64,25 @@ final class AdminRoomsController extends Notifier<AdminRoomsState> {
   Future<void> load() async {
     final attempt = ++_loads;
     bool latest() => ref.mounted && attempt == _loads;
-    state = AdminRoomsState(
-      rooms: state.rooms,
-      loaded: state.loaded,
-      loading: true,
-    );
+    state = state._with(loading: true);
     try {
-      final rooms = await ref
+      final list = await ref
           .read(adminSessionProvider.notifier)
           .run((api, token) => api.listRooms(token));
-      if (latest()) state = AdminRoomsState(rooms: rooms, loaded: true);
-    } on AdminSessionEnded {
-      if (latest()) {
-        state = AdminRoomsState(rooms: state.rooms, loaded: state.loaded);
-      }
-    } on ApiException catch (error) {
       if (latest()) {
         state = AdminRoomsState(
-          rooms: state.rooms,
-          loaded: state.loaded,
-          error: error.message,
+          rooms: list.rooms,
+          loaded: true,
+          defaultCapacity: list.defaultCapacity,
         );
       }
+    } on AdminSessionEnded {
+      if (latest()) state = state._with();
+    } on ApiException catch (error) {
+      if (latest()) state = state._with(error: error.message);
     } on Object catch (error) {
       AppLog.warn('admin', 'rooms not loaded', type: '${error.runtimeType}');
-      if (latest()) {
-        state = AdminRoomsState(
-          rooms: state.rooms,
-          loaded: state.loaded,
-          error: _notLoadedText,
-        );
-      }
+      if (latest()) state = state._with(error: _notLoadedText);
     }
   }
 

@@ -562,7 +562,10 @@ int _helloCloseCode(String? code) {
     protocol.ErrorCode.notFound => protocol.WsCloseCodes.notFound,
     protocol.ErrorCode.clientOutdated => protocol.WsCloseCodes.clientOutdated,
     protocol.ErrorCode.internal => protocol.WsCloseCodes.internal,
-    protocol.ErrorCode.unavailable => protocol.WsCloseCodes.unavailable,
+    protocol.ErrorCode.roomFull => protocol.WsCloseCodes.roomFull,
+    // 多半是网络断开后旧连接还没清掉，服务端会在 30 秒内清掉，所以照常重连。
+    protocol.ErrorCode.unavailable ||
+    protocol.ErrorCode.tooManyConnections => protocol.WsCloseCodes.unavailable,
     _ => _abnormalClosure,
   };
 }

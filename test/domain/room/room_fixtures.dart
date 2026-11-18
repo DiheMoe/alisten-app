@@ -53,6 +53,7 @@ RoomSnapshot testRoomSnapshot({int term = 1, int seq = 1}) {
       name: '房间',
       description: '描述',
       kind: RoomKind.ephemeral,
+      capacity: 16,
     ),
     playMode: RoomPlayMode.sequential,
     nowPlaying: testNowPlaying,

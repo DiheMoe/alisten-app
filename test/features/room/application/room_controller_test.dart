@@ -590,6 +590,76 @@ void main() {
     expect(await controller.openRoom('listen'), isA<RoomJoined>());
   });
 
+  group('a full room', () {
+    const full = RoomErrorReceived(code: 'ROOM_FULL', message: '房间已满，最多 16 人。');
+
+    test('stops with the reason the server gave, keeps the ticket and the '
+        'room, and lets the room be entered again', () async {
+      credentials.tickets['room-id'] = 'saved-ticket';
+      await controller.openRoom('listen');
+
+      factory.last
+        ..emit(full)
+        ..disconnect(code: 4403);
+      await pumpEventQueue();
+
+      expect(controller.state.status, RoomConnectionStatus.stopped);
+      expect(controller.state.failure, RoomFailure.full);
+      expect(controller.state.errorMessage, '房间已满，最多 16 人。');
+      expect(credentials.tickets['room-id'], 'saved-ticket');
+
+      expect(await controller.openRoom('listen'), isA<RoomJoined>());
+      factory.last.emitHello();
+      await pumpEventQueue();
+
+      expect(factory.transports, hasLength(2));
+      expect(controller.state.failure, isNull);
+      expect(controller.state.snapshot, isNotNull);
+    });
+
+    test('without a reason from the server says the room is full, not the '
+        'reason given last time', () async {
+      credentials.tickets['room-id'] = 'saved-ticket';
+      await controller.openRoom('listen');
+      factory.last
+        ..emit(full)
+        ..disconnect(code: 4403);
+      await pumpEventQueue();
+
+      await controller.openRoom('listen');
+      factory.last.disconnect(code: 4403);
+      await pumpEventQueue();
+
+      expect(controller.state.failure, RoomFailure.full);
+      expect(controller.state.errorMessage, '房间已满，暂时进不去。');
+    });
+  });
+
+  test('too many connections are reported once while reconnecting, and again '
+      'only after getting in', () async {
+    const crowded = RoomErrorReceived(
+      code: 'TOO_MANY_CONNECTIONS',
+      message: '你在这个房间已经开了 4 个连接。',
+    );
+    credentials.tickets['room-id'] = 'saved-ticket';
+    await controller.openRoom('listen');
+
+    factory.last.emit(crowded);
+    await pumpEventQueue();
+    expect(controller.state.connectionNotice, '你在这个房间已经开了 4 个连接。');
+    controller.clearConnectionNotice();
+    factory.last.emit(crowded);
+    await pumpEventQueue();
+    expect(controller.state.connectionNotice, isNull);
+    expect(controller.state.failure, isNull);
+
+    factory.last.emitHello();
+    await pumpEventQueue();
+    factory.last.emit(crowded);
+    await pumpEventQueue();
+    expect(controller.state.connectionNotice, '你在这个房间已经开了 4 个连接。');
+  });
+
   test('a room that no longer exists is forgotten', () async {
     credentials.tickets['room-id'] = 'saved-ticket';
     await controller.openRoom('listen');

@@ -345,6 +345,7 @@ Map<String, Object?> _snapshotJson() {
       'name': '房间',
       'description': '描述',
       'kind': 'ephemeral',
+      'capacity': 16,
     },
     'playMode': 'random',
     'nowPlaying': {

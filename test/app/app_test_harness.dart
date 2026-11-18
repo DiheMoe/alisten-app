@@ -276,6 +276,7 @@ Future<EnteredRoom> enterRoom(
         name: '一起听',
         description: '',
         kind: RoomKind.ephemeral,
+        capacity: 16,
       ),
       nowPlaying: nowPlaying,
     ),

@@ -8,6 +8,7 @@ export 'application/admin_session.dart';
 export 'application/admin_sign_in_controller.dart';
 export 'application/admin_site_controller.dart';
 export 'application/api_key_controller.dart';
+export 'application/ephemeral_room_capacity_controller.dart';
 export 'application/github_app_controller.dart';
 export 'application/image_gallery.dart';
 export 'application/media_link_opener.dart';

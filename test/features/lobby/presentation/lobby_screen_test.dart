@@ -8,6 +8,7 @@ import 'package:alisten/core/api/credential_store.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/domain/server/site_capabilities.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/lobby/index.dart';
 import 'package:alisten/features/lobby/presentation/join_room_sheet.dart';
@@ -236,6 +237,40 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('a full room says so in the list and in its sheet, and can '
+      'still be tried, since the count may be out of date', (tester) async {
+    final api = FakeAlistenApi()
+      ..rooms = [
+        roomListing(
+          id: 'full',
+          slug: 'full',
+          name: '满员房间',
+          hasPassword: true,
+          onlineCount: 16,
+        ),
+        roomListing(id: 'open', slug: 'open', name: '空房间', onlineCount: 15),
+      ];
+    final lobby = await _Lobby.open(tester, api: api);
+
+    expect(find.text('16 / 16 人在线'), findsOneWidget);
+    expect(find.text('15 / 16 人在线'), findsOneWidget);
+    expect(find.text('满员'), findsOneWidget);
+
+    await tester.tap(find.text('满员房间'));
+    await tester.pumpAndSettle();
+    Finder inSheet(Finder finder) =>
+        find.descendant(of: _joinSheet, matching: finder);
+    expect(inSheet(find.text('16 / 16 人在线')), findsOneWidget);
+    expect(inSheet(find.text('已满员')), findsOneWidget);
+
+    await tester.enterText(_field('房间密码'), 'secret');
+    await tester.pump();
+    await tester.tap(find.text('进入房间'));
+    await lobby.settle();
+    await tester.pumpAndSettle();
+    expect(lobby.opened, ['full']);
+  });
+
   testWidgets('a room that needs a password says so, and its sheet asks for '
       'the password alone, naming the room by its listing', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -269,7 +304,7 @@ void main() {
         find.descendant(of: _joinSheet, matching: finder);
     expect(inSheet(find.text('私人房间')), findsOneWidget);
     expect(inSheet(find.text('来这里，听见好音乐。')), findsOneWidget);
-    expect(inSheet(find.text('2 人在线')), findsOneWidget);
+    expect(inSheet(find.text('2 / 16 人在线')), findsOneWidget);
     expect(inSheet(find.text('需要密码')), findsOneWidget);
     expect(inSheet(find.byType(EditableText)), findsOneWidget);
     expect(inSheet(_field('房间密码')), findsOneWidget);
@@ -404,6 +439,35 @@ void main() {
     expect(lobby.opened, ['listen']);
     expect(api.createTicketCalls, 0, reason: 'the held ticket is used');
     expect(lobby.rooms.tickets, ['held-ticket']);
+  });
+
+  testWidgets('the room creation sheet says how many people a new room '
+      'holds once the site tells it', (tester) async {
+    final api = FakeAlistenApi()
+      ..site = const SiteCapabilities(
+        registrationOpen: true,
+        githubLogin: false,
+        ephemeralRoomCapacity: 24,
+      );
+    await _Lobby.open(tester, api: api);
+
+    await tester.tap(find.bySemanticsLabel('创建房间'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('房间最多 24 人。'), findsOneWidget);
+  });
+
+  testWidgets('the room creation sheet names no capacity it could not read', (
+    tester,
+  ) async {
+    final api = FakeAlistenApi()..getSiteError = Exception('offline');
+    await _Lobby.open(tester, api: api);
+
+    await tester.tap(find.bySemanticsLabel('创建房间'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('创建并进入'), findsOneWidget);
+    expect(find.textContaining('房间最多'), findsNothing);
   });
 
   testWidgets('the room creation sheet stays while its room is created, '

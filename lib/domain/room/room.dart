@@ -15,12 +15,16 @@ final class RoomInfo {
     required this.name,
     required this.description,
     required this.kind,
+    required this.capacity,
   });
 
   final String id;
   final String name;
   final String description;
   final RoomKind kind;
+
+  /// 最多能进的人数，按成员去重计算。
+  final int capacity;
 }
 
 final class RoomListing {
@@ -32,6 +36,7 @@ final class RoomListing {
     required this.kind,
     required this.hasPassword,
     required this.onlineCount,
+    required this.capacity,
   });
 
   final String id;
@@ -41,6 +46,10 @@ final class RoomListing {
   final RoomKind kind;
   final bool hasPassword;
   final int onlineCount;
+  final int capacity;
+
+  /// 列表里的人数可能已经过时，满员时仍然让人尝试进入，由服务端判断。
+  bool get full => onlineCount >= capacity;
 }
 
 final class QueueEntry {
@@ -239,10 +248,12 @@ final class RoomUpdatedEvent extends RoomEvent {
     required super.seq,
     required this.name,
     required this.description,
+    required this.capacity,
   });
 
   final String name;
   final String description;
+  final int capacity;
 }
 
 final class ChatMessageEvent extends RoomEvent {

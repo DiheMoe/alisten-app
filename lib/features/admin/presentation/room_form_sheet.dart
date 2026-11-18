@@ -24,15 +24,17 @@ const _everyoneVerifiesAgainText = '房间里的所有人都需要重新验证�
 const _youDisconnectTooText = '你也会断开，需要重新输入密码。';
 const _unknownText = '结果未知，请查看列表确认后再决定是否重试。';
 
-/// [room] 为 null 时新建常驻房间。
+/// [room] 为 null 时新建常驻房间，人数上限从 [capacity] 开始。
 Future<void> showRoomFormSheet(
   BuildContext context, {
   required void Function(ToastKind kind, String text) onNotice,
+  required int capacity,
   RoomListing? room,
 }) {
   return showSheetPanel<void>(
     context,
-    builder: (_) => RoomFormSheet(room: room, onNotice: onNotice),
+    builder: (_) =>
+        RoomFormSheet(room: room, capacity: capacity, onNotice: onNotice),
   );
 }
 
@@ -41,9 +43,15 @@ enum _PasswordMode { keep, set, remove }
 // 提交期间面板不能关闭：结果要在这里说明，关掉再打开容易重复创建同一个房间。
 // 结果未知时关闭面板并重新读取列表，由用户看过列表再决定是否重试。
 class RoomFormSheet extends ConsumerStatefulWidget {
-  const RoomFormSheet({required this.onNotice, this.room, super.key});
+  const RoomFormSheet({
+    required this.onNotice,
+    required this.capacity,
+    this.room,
+    super.key,
+  });
 
   final RoomListing? room;
+  final int capacity;
   final void Function(ToastKind kind, String text) onNotice;
 
   @override
@@ -56,6 +64,7 @@ class _RoomFormSheetState extends ConsumerState<RoomFormSheet> {
     text: widget.room?.description,
   );
   late final _slug = TextEditingController(text: widget.room?.slug);
+  late final _capacity = TextEditingController(text: '${widget.capacity}');
   final _password = TextEditingController();
   _PasswordMode _passwordMode = _PasswordMode.keep;
   bool _submitting = false;
@@ -66,6 +75,7 @@ class _RoomFormSheetState extends ConsumerState<RoomFormSheet> {
     _name.dispose();
     _description.dispose();
     _slug.dispose();
+    _capacity.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -94,6 +104,7 @@ class _RoomFormSheetState extends ConsumerState<RoomFormSheet> {
       description: _description.text,
       slug: _slug.text,
       password: _passwordChoice,
+      capacity: _capacity.text,
     );
     final rooms = ref.read(adminRoomsControllerProvider.notifier);
     final room = widget.room;
@@ -135,8 +146,10 @@ class _RoomFormSheetState extends ConsumerState<RoomFormSheet> {
     final muted = AlistenTypography.secondary.copyWith(
       color: colors.onGlassMuted,
     );
-    // 别名的问题已显示在别名输入框下方，不再重复显示。
-    final shownProblem = problem == roomSlugProblem(_slug.text)
+    // 别名和人数的问题已显示在各自的输入框下方，不再重复显示。
+    final shownProblem =
+        problem == roomSlugProblem(_slug.text) ||
+            problem == roomCapacityProblem(_capacity.text)
         ? null
         : problem;
     return PopScope(
@@ -191,6 +204,33 @@ class _RoomFormSheetState extends ConsumerState<RoomFormSheet> {
                 slug.isEmpty
                     ? '不填别名时，邀请链接使用房间 ID'
                     : '邀请链接：${config.inviteLinkFor(slug)}',
+                style: muted,
+              );
+            },
+          ),
+          const SizedBox(height: AlistenSpacing.md),
+          AlistenTextField(
+            controller: _capacity,
+            label: '最多人数',
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter('$roomCapacityMax'.length),
+            ],
+            textInputAction: TextInputAction.next,
+            onChanged: _edited,
+          ),
+          const SizedBox(height: AlistenSpacing.xs),
+          ListenableBuilder(
+            listenable: _capacity,
+            builder: (context, _) {
+              if (roomCapacityProblem(_capacity.text) case final problem?) {
+                return InlineMessage(text: problem);
+              }
+              return Text(
+                room == null
+                    ? '$roomCapacityMin 到 $roomCapacityMax 人，同一个人开几台设备只算一人'
+                    : '改了立即生效。调低时不会让已经在房间里的人断开，新来的人要等人数降下来才进得来。',
                 style: muted,
               );
             },

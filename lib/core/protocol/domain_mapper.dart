@@ -71,6 +71,7 @@ RoomListing toDomainRoomListing(protocol.RoomListing room) {
     kind: toDomainRoomKind(room.kind),
     hasPassword: room.hasPassword,
     onlineCount: room.onlineCount,
+    capacity: room.capacity,
   );
 }
 
@@ -171,6 +172,7 @@ RoomSnapshot toDomainSnapshot(protocol.RoomSnapshot snapshot) {
       name: snapshot.room.name,
       description: snapshot.room.description,
       kind: toDomainRoomKind(snapshot.room.kind),
+      capacity: snapshot.room.capacity,
     ),
     playMode: toDomainPlayMode(snapshot.playMode),
     nowPlaying: snapshot.nowPlaying == null
@@ -258,6 +260,7 @@ RoomUpdatedEvent _roomUpdated(int term, int seq, Map<String, Object?> data) {
     seq: seq,
     name: event.name,
     description: event.description,
+    capacity: event.capacity,
   );
 }
 

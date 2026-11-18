@@ -36,6 +36,7 @@ typedef _RoomView = ({
   String? slug,
   String name,
   int onlineCount,
+  int capacity,
   NowPlaying? nowPlaying,
   RoomConnectionStatus status,
   DateTime? nextRetryAt,
@@ -51,6 +52,7 @@ _RoomView? _viewOf(RoomState room) {
     slug: room.roomSlug,
     name: snapshot.room.name,
     onlineCount: snapshot.onlineCount,
+    capacity: snapshot.room.capacity,
     nowPlaying: snapshot.nowPlaying,
     status: room.status,
     nextRetryAt: room.nextRetryAt,
@@ -235,6 +237,7 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
     final topBar = RoomTopBar(
       name: room.name,
       onlineCount: room.onlineCount,
+      capacity: room.capacity,
       status: room.status,
       nextRetryAt: room.nextRetryAt,
       onCollapse: () => context.go('/'),

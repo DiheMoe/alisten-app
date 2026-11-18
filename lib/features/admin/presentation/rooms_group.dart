@@ -76,7 +76,12 @@ class _RoomsGroupState extends ConsumerState<RoomsGroup> {
       case RoomAction.apiKey:
         await showApiKeySheet(context, room: room, onNotice: widget.onNotice);
       case RoomAction.edit:
-        await showRoomFormSheet(context, room: room, onNotice: widget.onNotice);
+        await showRoomFormSheet(
+          context,
+          room: room,
+          capacity: room.capacity,
+          onNotice: widget.onNotice,
+        );
       case RoomAction.delete:
         await _delete(room);
     }
@@ -116,6 +121,7 @@ class _RoomsGroupState extends ConsumerState<RoomsGroup> {
     final rooms = ref.watch(adminRoomsControllerProvider);
     final error = rooms.error;
     final deleting = _deleting;
+    final defaultCapacity = rooms.defaultCapacity;
     final muted = AlistenTypography.secondary.copyWith(
       color: colors.onGlassMuted,
     );
@@ -213,9 +219,14 @@ class _RoomsGroupState extends ConsumerState<RoomsGroup> {
                 icon: AlistenIcons.plusBold,
                 style: PillButtonStyle.secondary,
                 expand: true,
-                onPressed: deleting == null
+                // 新建房间的人数上限从服务端给的默认值开始，读到列表之前不能新建。
+                onPressed: deleting == null && defaultCapacity != null
                     ? () => unawaited(
-                        showRoomFormSheet(context, onNotice: widget.onNotice),
+                        showRoomFormSheet(
+                          context,
+                          capacity: defaultCapacity,
+                          onNotice: widget.onNotice,
+                        ),
                       )
                     : null,
               ),
@@ -282,7 +293,10 @@ class _RoomRow extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: AlistenSpacing.sm),
-                        Text('在线 ${room.onlineCount} 人', style: muted),
+                        Text(
+                          '在线 ${room.onlineCount} / ${room.capacity} 人',
+                          style: muted,
+                        ),
                       ],
                     ),
                   ],

@@ -7,8 +7,10 @@ import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/admin/index.dart';
 
 /// 各 `…Gate` 不为 null 时，对应调用记录之后等它完成才回复。变更成功时像服务端
-/// 一样更新 [rooms]、[apiKeyStatus]、[youtubeCookie] 和 [githubApp]。[createdDrafts]、
-/// [updates]、[deletedRoomIds]、[savedCookies] 和 [savedGithubApps] 也记录失败的调用。
+/// 一样更新 [rooms]、[ephemeralRoomCapacity]、[apiKeyStatus]、[youtubeCookie] 和
+/// [githubApp]。[createdDrafts]、[updates]、[deletedRoomIds]、
+/// [savedEphemeralRoomCapacities]、[savedCookies] 和 [savedGithubApps] 也记录失败的
+/// 调用。
 final class FakeAdminApi implements AdminApi {
   final List<String> tokens = [];
   List<StoredTrack> media = [];
@@ -22,6 +24,7 @@ final class FakeAdminApi implements AdminApi {
   void Function()? onRemoveMedia;
   final List<List<String>> removals = [];
   List<RoomListing> rooms = [];
+  int defaultCapacity = 64;
   Object? listRoomsError;
   Completer<void>? listRoomsGate;
   int listRoomsCalls = 0;
@@ -38,6 +41,13 @@ final class FakeAdminApi implements AdminApi {
   Object? setRegistrationError;
   Completer<void>? setRegistrationGate;
   final List<bool> registrationCalls = [];
+
+  int ephemeralRoomCapacity = 16;
+  Object? getEphemeralRoomCapacityError;
+  int getEphemeralRoomCapacityCalls = 0;
+  final List<int> savedEphemeralRoomCapacities = [];
+  Object? setEphemeralRoomCapacityError;
+  Completer<void>? setEphemeralRoomCapacityGate;
 
   final Map<String, AdminAccountView> accounts = {};
   final List<String> resetUsernames = [];
@@ -121,12 +131,12 @@ final class FakeAdminApi implements AdminApi {
   int deleteGithubAppCalls = 0;
 
   @override
-  Future<List<RoomListing>> listRooms(String token) async {
+  Future<AdminRoomList> listRooms(String token) async {
     listRoomsCalls++;
     tokens.add(token);
     await listRoomsGate?.future;
     if (listRoomsError case final error?) return Future.error(error);
-    return rooms;
+    return AdminRoomList(rooms: rooms, defaultCapacity: defaultCapacity);
   }
 
   @override
@@ -155,6 +165,26 @@ final class FakeAdminApi implements AdminApi {
     await setRegistrationGate?.future;
     if (setRegistrationError case final error?) return Future.error(error);
     registrationOpen = open;
+  }
+
+  @override
+  Future<int> getEphemeralRoomCapacity() async {
+    getEphemeralRoomCapacityCalls++;
+    if (getEphemeralRoomCapacityError case final error?) {
+      return Future.error(error);
+    }
+    return ephemeralRoomCapacity;
+  }
+
+  @override
+  Future<void> setEphemeralRoomCapacity(String token, int capacity) async {
+    tokens.add(token);
+    savedEphemeralRoomCapacities.add(capacity);
+    await setEphemeralRoomCapacityGate?.future;
+    if (setEphemeralRoomCapacityError case final error?) {
+      return Future.error(error);
+    }
+    ephemeralRoomCapacity = capacity;
   }
 
   @override
@@ -201,6 +231,7 @@ final class FakeAdminApi implements AdminApi {
         name: draft.name,
         description: draft.description,
         kind: RoomKind.persistent,
+        capacity: draft.capacity ?? defaultCapacity,
         hasPassword: draft.password != null,
         onlineCount: 0,
       ),
@@ -228,6 +259,7 @@ final class FakeAdminApi implements AdminApi {
             name: patch.name ?? room.name,
             description: patch.description ?? room.description,
             kind: room.kind,
+            capacity: patch.capacity ?? room.capacity,
             hasPassword: switch (patch.password) {
               null => room.hasPassword,
               final password => password.isNotEmpty,

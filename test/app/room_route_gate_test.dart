@@ -71,6 +71,7 @@ _openedRoom(WidgetTester tester, {FakeReleaseSource? releases}) async {
         name: '一起听',
         description: '',
         kind: RoomKind.ephemeral,
+        capacity: 16,
       ),
     ),
   );
@@ -113,6 +114,7 @@ void main() {
           name: '一起听',
           description: '',
           kind: RoomKind.ephemeral,
+          capacity: 16,
         ),
       ),
     );
@@ -194,6 +196,35 @@ void main() {
     expect(rooms.roomIds.last, _otherId);
     expect(container.read(roomControllerProvider).activeRoomId, _otherId);
     expect(rooms.transports.first.stopCalls, 1);
+  });
+
+  testWidgets('a full room shows the reason the server gave and is entered '
+      'again only when asked, with the ticket it has', (tester) async {
+    final (:api, :rooms, :container, :go) = await _openedRoom(tester);
+    await go('/r/listen');
+    final transports = rooms.transports.length;
+    rooms.last
+      ..emit(
+        const RoomErrorReceived(code: 'ROOM_FULL', message: '房间已满，最多 16 人。'),
+      )
+      ..disconnect(code: 4403);
+    await tester.pump();
+    expect(find.text('房间已满'), findsOneWidget);
+    expect(find.text('房间已满，最多 16 人。'), findsOneWidget);
+    expect(find.text('返回大厅'), findsOneWidget);
+    await tester.pump(const Duration(minutes: 1));
+    expect(rooms.transports, hasLength(transports));
+    final tickets = api.createTicketCalls;
+
+    await tester.tap(find.text('重新进入'));
+    await tester.pump();
+    await tester.runAsync(pumpEventQueue);
+    await tester.pump();
+
+    expect(api.createTicketCalls, tickets);
+    expect(rooms.transports, hasLength(transports + 1));
+    expect(container.read(roomControllerProvider).failure, isNull);
+    expect(find.text('正在连接房间'), findsOneWidget);
   });
 
   testWidgets('"返回大厅" of a room that stopped leaves it, and the page '

@@ -278,7 +278,7 @@ void main() {
         http.RestEndpoints.values.where(
           (endpoint) => endpoint.auth == http.HttpAuth.admin,
         ),
-        hasLength(28),
+        hasLength(29),
       );
       expect(http.RestEndpoints.adminListRooms.path, '/api/admin/rooms');
       expect(http.RestEndpoints.roomSync.name, 'roomSync');
@@ -388,6 +388,7 @@ void main() {
         name: 'Room',
         description: '',
         kind: domain_room.RoomKind.ephemeral,
+        capacity: 16,
       ),
       playMode: domain_room.RoomPlayMode.sequential,
       nowPlaying: nowPlaying,
@@ -449,6 +450,7 @@ Map<String, Object?> _roomListingPayload() {
     'kind': 'ephemeral',
     'hasPassword': false,
     'onlineCount': 3,
+    'capacity': 16,
   };
 }
 

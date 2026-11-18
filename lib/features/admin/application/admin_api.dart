@@ -1,10 +1,9 @@
-import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/admin/application/admin_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 只经 `AdminSession.run` 调用，由会话保证 token 只发给它所属的服务器。
 abstract interface class AdminApi {
-  Future<List<RoomListing>> listRooms(String token);
+  Future<AdminRoomList> listRooms(String token);
 
   Future<String> getBrandName();
 
@@ -15,6 +14,11 @@ abstract interface class AdminApi {
   Future<void> openRegistration(String token);
 
   Future<void> closeRegistration(String token);
+
+  Future<int> getEphemeralRoomCapacity();
+
+  /// 只影响之后新建的临时房间。
+  Future<void> setEphemeralRoomCapacity(String token, int capacity);
 
   Future<AdminAccountView> findAccount(String token, String username);
 

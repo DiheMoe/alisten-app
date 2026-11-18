@@ -93,7 +93,13 @@ final class _App {
         testRoomSnapshot().copyWith(
           term: 1,
           seq: 1,
-          room: RoomInfo(id: _roomId, name: '一起听', description: '', kind: kind),
+          room: RoomInfo(
+            id: _roomId,
+            name: '一起听',
+            description: '',
+            kind: kind,
+            capacity: 16,
+          ),
         ),
       );
     await settle();

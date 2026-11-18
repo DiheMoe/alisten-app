@@ -68,6 +68,7 @@ void main() {
             'name': '房间',
             'description': '',
             'kind': 'ephemeral',
+            'capacity': 16,
           },
           'playMode': 'sequential',
           'nowPlaying': null,
@@ -87,4 +88,53 @@ void main() {
       expect(snapshot.next, expected);
     }
   });
+
+  test(
+    'room capacities are read from listings, snapshots and room updates',
+    () {
+      final listing = toDomainRoomListing(
+        protocol.RoomListing.fromJson({
+          'id': 'room-id',
+          'slug': null,
+          'name': '房间',
+          'description': '',
+          'kind': 'persistent',
+          'hasPassword': false,
+          'onlineCount': 3,
+          'capacity': 64,
+        }),
+      );
+      final snapshot = toDomainSnapshot(
+        protocol.RoomSnapshot.fromJson({
+          'term': 1,
+          'seq': 2,
+          'room': {
+            'id': 'room-id',
+            'name': '房间',
+            'description': '',
+            'kind': 'ephemeral',
+            'capacity': 16,
+          },
+          'playMode': 'sequential',
+          'nowPlaying': null,
+          'pending': null,
+          'next': null,
+          'items': <Object?>[],
+          'members': {'sessions': <Object?>[], 'onlineCount': 0},
+        }),
+      );
+      final updated = toDomainEvent(protocol.RoomEventTypes.roomUpdated, 1, 3, {
+        'name': '新名字',
+        'description': '新介绍',
+        'capacity': 8,
+      });
+
+      expect(listing.capacity, 64);
+      expect(snapshot.room.capacity, 16);
+      expect(
+        updated,
+        isA<RoomUpdatedEvent>().having((e) => e.capacity, 'capacity', 8),
+      );
+    },
+  );
 }

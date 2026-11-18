@@ -18,6 +18,7 @@ void main() {
       String description = 'd',
       String slug = 'hall',
       PasswordChoice password = const KeepPassword(),
+      String capacity = '16',
     }) => roomPatch(
       original,
       RoomForm(
@@ -25,6 +26,7 @@ void main() {
         description: description,
         slug: slug,
         password: password,
+        capacity: capacity,
       ),
     );
 
@@ -35,6 +37,7 @@ void main() {
       expect(patch.name, isNull);
       expect(patch.slug, isNull);
       expect(patch.password, isNull);
+      expect(patch.capacity, isNull);
       expect(patch.isEmpty, isFalse);
       expect(
         const protocol.AdminUpdateRoomRequest(description: 'd2').toJson(),
@@ -65,6 +68,12 @@ void main() {
       expect(patchOf(password: const KeepPassword()).password, isNull);
     });
 
+    test('a capacity is sent only when it changed', () {
+      expect(original.capacity, 16);
+      expect(patchOf(capacity: '8').capacity, 8);
+      expect(patchOf(capacity: ' 16 ').isEmpty, isTrue);
+    });
+
     test('the same room changes nothing', () {
       expect(patchOf().isEmpty, isTrue);
     });
@@ -84,6 +93,7 @@ void main() {
           description: 'd',
           slug: 'hall',
           password: RemovePassword(),
+          capacity: '16',
         ),
       );
 
@@ -94,8 +104,10 @@ void main() {
     test('a room without an alias compares against an empty alias', () {
       final unnamed = roomListing(name: 'A', description: 'd', slug: null);
 
-      RoomPatch patch(String slug) =>
-          roomPatch(unnamed, RoomForm(name: 'A', description: 'd', slug: slug));
+      RoomPatch patch(String slug) => roomPatch(
+        unnamed,
+        RoomForm(name: 'A', description: 'd', slug: slug, capacity: '16'),
+      );
 
       expect(patch('').isEmpty, isTrue);
       expect(patch('hall').slug, 'hall');
@@ -108,11 +120,13 @@ void main() {
       String description = '',
       String slug = '',
       PasswordChoice password = const KeepPassword(),
+      String capacity = '64',
     }) => RoomForm(
       name: name,
       description: description,
       slug: slug,
       password: password,
+      capacity: capacity,
     );
 
     test('says what is wrong with it', () {
@@ -122,6 +136,13 @@ void main() {
       expect(roomFormProblem(form(slug: 'Hall')), '别名只能用小写字母、数字和连字符，最多 32 个');
       expect(roomFormProblem(form(slug: 'a' * 33)), '别名只能用小写字母、数字和连字符，最多 32 个');
       expect(roomFormProblem(form(password: const SetPassword(''))), '请输入新密码');
+      for (final capacity in ['', '1', '129', '16.5', '十六']) {
+        expect(
+          roomFormProblem(form(capacity: capacity)),
+          '最多人数要在 2 到 128 之间',
+          reason: capacity,
+        );
+      }
     });
 
     test('within the limits has nothing wrong', () {
@@ -138,6 +159,8 @@ void main() {
         isNull,
       );
       expect(roomFormProblem(form(slug: 'a' * 32)), isNull);
+      expect(roomFormProblem(form(capacity: '2')), isNull);
+      expect(roomFormProblem(form(capacity: '128')), isNull);
       expect(roomFormProblem(form(password: const RemovePassword())), isNull);
     });
 
@@ -173,6 +196,7 @@ void main() {
       expect(draft.description, '');
       expect(draft.slug, isNull);
       expect(draft.password, 'p');
+      expect(draft.capacity, 64);
     });
 
     test('a new room keeps the blanks around its description, which count '

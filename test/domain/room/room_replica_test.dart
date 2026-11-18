@@ -37,6 +37,27 @@ void main() {
     expect(replica.state.seq, 2);
   });
 
+  test('a room update renames the room and changes its capacity', () {
+    final replica = RoomReplica(testRoomSnapshot());
+
+    final result = replica.receive(
+      const RoomUpdatedEvent(
+        term: 1,
+        seq: 2,
+        name: '新名字',
+        description: '新介绍',
+        capacity: 8,
+      ),
+    );
+
+    expect(result.changed, isTrue);
+    expect(replica.state.room.id, 'room-id');
+    expect(replica.state.room.kind, RoomKind.ephemeral);
+    expect(replica.state.room.name, '新名字');
+    expect(replica.state.room.description, '新介绍');
+    expect(replica.state.room.capacity, 8);
+  });
+
   test('a queue update sets the next track, a switch keeps it until the '
       'queue update that follows', () {
     const next = NextTrack(

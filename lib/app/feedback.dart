@@ -68,6 +68,20 @@ void listenForNotices(WidgetRef ref) {
     },
     fireImmediately: true,
   );
+  ref.listenManual(
+    roomControllerProvider.select((room) => room.connectionNotice),
+    (_, notice) {
+      if (notice == null) return;
+      toasts.show(ToastKind.warning, notice);
+      // 监听器可能在构建期间触发，此时不能修改状态。
+      unawaited(
+        Future.microtask(() {
+          if (!ref.context.mounted) return;
+          ref.read(roomControllerProvider.notifier).clearConnectionNotice();
+        }),
+      );
+    },
+  );
   ref.listenManual(chatControllerProvider, (previous, next) {
     final notice = next.failureNotice;
     if (notice != null && next.failureNoticeId != previous?.failureNoticeId) {

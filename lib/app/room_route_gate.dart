@@ -303,6 +303,7 @@ final class _Refusal extends ConsumerWidget {
     final (icon, title) = switch (failure) {
       RoomFailure.authorization => (AlistenIcons.lockSimpleFill, '需要验证才能进入'),
       RoomFailure.notFound => (AlistenIcons.magnifyingGlassMinus, '找不到这个房间'),
+      RoomFailure.full => (AlistenIcons.users, '房间已满'),
       RoomFailure.outdated => (AlistenIcons.arrowCircleDown, '需要更新 Alisten'),
       RoomFailure.unavailable => (AlistenIcons.cloudSlash, '暂时进不了房间'),
     };
@@ -325,7 +326,8 @@ final class _Refusal extends ConsumerWidget {
           showJoinRoomSheet(context, ref, roomRef: roomRef, room: listing),
         ),
       ),
-      RoomFailure.unavailable => enterAgain,
+      // 房间已满时服务端要求客户端不要自动重连，由用户决定什么时候再试。
+      RoomFailure.full || RoomFailure.unavailable => enterAgain,
       RoomFailure.outdated => PillButton(
         label: '检查更新',
         icon: AlistenIcons.arrowCircleDown,

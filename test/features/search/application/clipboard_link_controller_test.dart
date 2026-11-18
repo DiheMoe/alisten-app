@@ -56,6 +56,7 @@ void main() {
           name: 'listen',
           description: '',
           kind: kind,
+          capacity: 16,
         ),
       ),
     );

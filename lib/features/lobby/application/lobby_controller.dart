@@ -161,6 +161,7 @@ base class LobbyController extends Notifier<LobbyState> {
             name: room.name,
             description: room.description,
             kind: room.kind,
+            capacity: room.capacity,
             hasPassword: room.hasPassword,
             onlineCount: count,
           )

@@ -144,6 +144,7 @@ final class RoomReplica {
           name: event.name,
           description: event.description,
           kind: _state.room.kind,
+          capacity: event.capacity,
         ),
       ),
       ChatMessageEvent() ||

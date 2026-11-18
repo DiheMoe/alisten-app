@@ -292,7 +292,7 @@ void main() {
       await apiOfA.getMe();
       http.respond(201, {'ticket': 'ticket-of-A'});
       await joinRoom(await apiOfA.createTicket('room-1'));
-      http.respond(200, {'items': <Object?>[]});
+      http.respond(200, {'items': <Object?>[], 'defaultCapacity': 64});
       expect(await session.signIn('admin-token-of-A'), isA<AdminSignedIn>());
       http.respondRaw(204, '', null);
       await session.run((api, t) => api.setYoutubeCookie(t, 'cookie-of-A'));

@@ -4,7 +4,6 @@ import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/core/protocol/domain_mapper.dart';
 import 'package:alisten/core/protocol/http.gen.dart' as http;
 import 'package:alisten/core/protocol/protocol.gen.dart' as protocol;
-import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/admin/application/admin_api.dart';
 import 'package:alisten/features/admin/application/admin_models.dart';
 
@@ -19,14 +18,19 @@ final class RestAdminApi implements AdminApi {
   final ApiTransport _transport;
 
   @override
-  Future<List<RoomListing>> listRooms(String token) {
+  Future<AdminRoomList> listRooms(String token) {
     return _request(
       http.RestEndpoints.adminListRooms,
       token: token,
-      decode: (json) =>
-          protocol.AdminListRoomsResponse.fromJson(json).items
+      decode: (json) {
+        final response = protocol.AdminListRoomsResponse.fromJson(json);
+        return AdminRoomList(
+          rooms: response.items
               .map(toDomainRoomListing)
               .toList(growable: false),
+          defaultCapacity: response.defaultCapacity,
+        );
+      },
     );
   }
 
@@ -76,6 +80,25 @@ final class RestAdminApi implements AdminApi {
   }
 
   @override
+  Future<int> getEphemeralRoomCapacity() {
+    return _request(
+      http.RestEndpoints.getSite,
+      decode: (json) =>
+          protocol.GetSiteResponse.fromJson(json).ephemeralRoomCapacity,
+    );
+  }
+
+  @override
+  Future<void> setEphemeralRoomCapacity(String token, int capacity) async {
+    await _transport.execute(
+      http.RestEndpoints.adminSetEphemeralRoomCapacity,
+      token: token,
+      body: protocol.AdminSetEphemeralRoomCapacityRequest(capacity: capacity)
+          .toJson(),
+    );
+  }
+
+  @override
   Future<String> createRoom(String token, RoomDraft draft) {
     return _request(
       http.RestEndpoints.adminCreateRoom,
@@ -85,6 +108,7 @@ final class RestAdminApi implements AdminApi {
         description: draft.description,
         slug: draft.slug,
         password: draft.password,
+        capacity: draft.capacity,
       ).toJson(),
       decode: (json) => protocol.AdminCreateRoomResponse.fromJson(json).id,
     );
@@ -101,6 +125,7 @@ final class RestAdminApi implements AdminApi {
         description: patch.description,
         slug: patch.slug,
         password: patch.password,
+        capacity: patch.capacity,
       ).toJson(),
     );
   }

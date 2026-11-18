@@ -578,6 +578,7 @@ void main() {
       'brandName': 'Alisten',
       'registrationOpen': false,
       'githubLogin': true,
+      'ephemeralRoomCapacity': 16,
     });
 
     final site = await api.getSite();
@@ -585,6 +586,7 @@ void main() {
     expect(adapter.requests.single.authorization, isNull);
     expect(site.registrationOpen, isFalse);
     expect(site.githubLogin, isTrue);
+    expect(site.ephemeralRoomCapacity, 16);
   });
 
   group('pairing', () {
@@ -898,6 +900,7 @@ Map<String, Object?> _roomListingJson() {
     'kind': 'ephemeral',
     'hasPassword': true,
     'onlineCount': 7,
+    'capacity': 16,
   };
 }
 

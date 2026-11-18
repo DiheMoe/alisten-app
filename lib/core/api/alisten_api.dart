@@ -389,6 +389,7 @@ final class RestAlistenApi implements AlistenApi {
         return SiteCapabilities(
           registrationOpen: response.registrationOpen,
           githubLogin: response.githubLogin,
+          ephemeralRoomCapacity: response.ephemeralRoomCapacity,
         );
       },
     );

@@ -2,7 +2,7 @@ import 'package:alisten/core/realtime/room_transport.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/room/room.dart';
 
-enum RoomFailure { authorization, notFound, outdated, unavailable }
+enum RoomFailure { authorization, notFound, full, outdated, unavailable }
 
 sealed class RoomJoin {
   const RoomJoin();
@@ -40,6 +40,7 @@ final class RoomState {
     this.notices = const [],
     this.liveUpdate = false,
     this.mayReconnectNow = true,
+    this.connectionNotice,
   });
 
   final RoomConnectionStatus status;
@@ -65,6 +66,9 @@ final class RoomState {
   /// 快照最近一次变化是否来自实时房间事件，而非握手回复或同步。
   final bool liveUpdate;
 
+  /// 连接没有停止、只是暂时进不去时要告诉用户的话，显示后由界面清除。
+  final String? connectionNotice;
+
   RoomState copyWith({
     RoomConnectionStatus? status,
     Object? nextRetryAt = _unchanged,
@@ -77,6 +81,7 @@ final class RoomState {
     List<RoomEvent>? notices,
     bool? liveUpdate,
     bool? mayReconnectNow,
+    Object? connectionNotice = _unchanged,
   }) {
     return RoomState(
       status: status ?? this.status,
@@ -103,6 +108,9 @@ final class RoomState {
       notices: notices ?? this.notices,
       liveUpdate: liveUpdate ?? this.liveUpdate,
       mayReconnectNow: mayReconnectNow ?? this.mayReconnectNow,
+      connectionNotice: identical(connectionNotice, _unchanged)
+          ? this.connectionNotice
+          : connectionNotice as String?,
     );
   }
 
@@ -120,7 +128,8 @@ final class RoomState {
         other.errorMessage == errorMessage &&
         identical(other.notices, notices) &&
         other.liveUpdate == liveUpdate &&
-        other.mayReconnectNow == mayReconnectNow;
+        other.mayReconnectNow == mayReconnectNow &&
+        other.connectionNotice == connectionNotice;
   }
 
   @override
@@ -137,6 +146,7 @@ final class RoomState {
     identityHashCode(notices),
     liveUpdate,
     mayReconnectNow,
+    connectionNotice,
   );
 }
 

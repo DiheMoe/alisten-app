@@ -1,4 +1,5 @@
 import 'package:alisten/app/feedback.dart';
+import 'package:alisten/core/realtime/room_transport.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
@@ -11,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../features/lobby/lobby_test_doubles.dart';
+import '../features/room/room_test_doubles.dart';
 import 'app_test_harness.dart';
 
 const _outcomes = <({String name, IconData icon, String text})>[
@@ -152,5 +154,36 @@ void main() {
       ToastKind.warning,
     );
     expect(container.read(identityControllerProvider).notice, isNull);
+  });
+
+  testWidgets('too many connections are told once as a warning while the room '
+      'keeps reconnecting', (tester) async {
+    const crowded = RoomErrorReceived(
+      code: 'TOO_MANY_CONNECTIONS',
+      message: '你在这个房间已经开了 4 个连接。',
+    );
+    final rooms = FakeRoomTransportFactory();
+    await pumpAlistenApp(
+      tester,
+      api: FakeAlistenApi()..rooms = [roomListing()],
+      credentials: FakeCredentialStore()..tickets['room-id'] = 'saved-ticket',
+      rooms: rooms,
+    );
+    final container = appContainer(tester);
+    await container.read(roomControllerProvider.notifier).openRoom('listen');
+
+    rooms.last.emit(crowded);
+    await _settle(tester);
+
+    expect(find.text('你在这个房间已经开了 4 个连接。'), findsOneWidget);
+    final toasts = container.read(toastControllerProvider);
+    expect(toasts.current?.kind, ToastKind.warning);
+    expect(container.read(roomControllerProvider).connectionNotice, isNull);
+    expect(container.read(roomControllerProvider).failure, isNull);
+    await _dismiss(tester, toasts);
+
+    rooms.last.emit(crowded);
+    await _settle(tester);
+    expect(find.text('你在这个房间已经开了 4 个连接。'), findsNothing);
   });
 }

@@ -291,6 +291,7 @@ void main() {
   test('hello error responses map to their close codes', () {
     final cases = [
       ('UNAUTHORIZED', 4401),
+      ('ROOM_FULL', 4403),
       ('NOT_FOUND', 4404),
       ('CLIENT_OUTDATED', 4426),
       ('FUTURE_CODE', 4426),
@@ -316,30 +317,35 @@ void main() {
             events.whereType<RoomErrorReceived>().single.message,
             allOf(contains('协议不兼容'), isNot(contains('结果未知'))),
           );
+        } else {
+          final error = events.whereType<RoomErrorReceived>().single;
+          expect((error.code, error.message), (code, '拒绝'));
         }
         unawaited(subscription.cancel());
         unawaited(fake.transport.stop());
       });
     }
-    fakeAsync((async) {
-      final fake = _FakeTransport();
-      fake.start(async);
-      final channel = fake.channels.single;
+    for (final code in ['INTERNAL', 'TOO_MANY_CONNECTIONS']) {
+      fakeAsync((async) {
+        final fake = _FakeTransport();
+        final events = <RoomTransportEvent>[];
+        final subscription = fake.transport.events.listen(events.add);
+        fake.start(async);
+        final channel = fake.channels.single;
 
-      channel.receive(
-        _errorResponse(
-          _lastRequestId(channel, 'hello'),
-          'hello',
-          'INTERNAL',
-          '内部错误',
-        ),
-      );
-      async.flushMicrotasks();
-      async.elapse(const Duration(seconds: 3));
+        channel.receive(
+          _errorResponse(_lastRequestId(channel, 'hello'), 'hello', code, '稍后'),
+        );
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 3));
 
-      expect(fake.channels, hasLength(2));
-      unawaited(fake.transport.stop());
-    });
+        expect(fake.channels, hasLength(2), reason: code);
+        expect(events.whereType<RoomStopped>(), isEmpty, reason: code);
+        expect(events.whereType<RoomErrorReceived>().single.code, code);
+        unawaited(subscription.cancel());
+        unawaited(fake.transport.stop());
+      });
+    }
   });
 
   test('a hello without a response for ten seconds reconnects', () {
@@ -541,7 +547,7 @@ void main() {
   test(
     'unrecoverable close codes stop and recoverable service codes reconnect',
     () {
-      for (final code in [1008, 4401, 4404, 4426]) {
+      for (final code in [1008, 4401, 4403, 4404, 4426]) {
         fakeAsync((async) {
           final fake = _FakeTransport()..start(async, open: true);
           final events = <RoomTransportEvent>[];
@@ -844,6 +850,7 @@ Map<String, Object?> _snapshotData() {
       'name': '房间',
       'description': '描述',
       'kind': 'ephemeral',
+      'capacity': 16,
     },
     'playMode': 'sequential',
     'nowPlaying': {

@@ -338,6 +338,7 @@ Map<String, Object?> _snapshotJson(RoomSnapshot snapshot) {
       'name': snapshot.room.name,
       'description': snapshot.room.description,
       'kind': snapshot.room.kind.name,
+      'capacity': snapshot.room.capacity,
     },
     'playMode': snapshot.playMode.name,
     'nowPlaying': nowPlaying == null

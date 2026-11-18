@@ -358,6 +358,7 @@ final class FakeAlistenApi implements AlistenApi {
       name: '新房间',
       description: '',
       kind: RoomKind.ephemeral,
+      capacity: 16,
       hasPassword: false,
       onlineCount: 0,
     );
@@ -528,6 +529,7 @@ RoomListing roomListing({
   String description = '每晚八点',
   bool hasPassword = false,
   int onlineCount = 3,
+  int capacity = 16,
 }) {
   return RoomListing(
     id: id,
@@ -535,6 +537,7 @@ RoomListing roomListing({
     name: name,
     description: description,
     kind: RoomKind.ephemeral,
+    capacity: capacity,
     hasPassword: hasPassword,
     onlineCount: onlineCount,
   );

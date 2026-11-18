@@ -23,7 +23,12 @@ const _unauthorized = ApiException(
   status: 401,
 );
 
-const _form = RoomForm(name: ' 大厅 ', description: '', slug: 'hall');
+const _form = RoomForm(
+  name: ' 大厅 ',
+  description: '',
+  slug: 'hall',
+  capacity: '16',
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +67,23 @@ void main() {
     expect(state().loading, isFalse);
     expect(state().error, isNull);
     expect(api.tokens.last, 't-1');
+  });
+
+  test('the capacity new rooms start from comes with the rooms and stays '
+      'when a later read fails', () async {
+    expect(state().defaultCapacity, isNull);
+    api.defaultCapacity = 32;
+
+    await controller().load();
+    api.listRoomsError = const ApiException(
+      code: 'INTERNAL',
+      message: '服务器出错了',
+      status: 500,
+    );
+    await controller().load();
+
+    expect(state().defaultCapacity, 32);
+    expect(state().error, '服务器出错了');
   });
 
   test('rooms that cannot be read say why and keep what was read', () async {
@@ -108,6 +130,7 @@ void main() {
     );
     expect(api.createdDrafts.single.name, '大厅');
     expect(api.createdDrafts.single.slug, 'hall');
+    expect(api.createdDrafts.single.capacity, 16);
     expect(api.tokens.last, 't-1');
     expect(api.listRoomsCalls, listed + 1);
     expect(state().rooms.map((room) => room.id), ['r1', 'r-new']);
@@ -117,7 +140,7 @@ void main() {
     final listed = api.listRoomsCalls;
 
     final result = await controller().create(
-      const RoomForm(name: '大厅', description: '', slug: 'Hall'),
+      const RoomForm(name: '大厅', description: '', slug: 'Hall', capacity: '16'),
     );
 
     expect(
@@ -183,7 +206,7 @@ void main() {
 
     final result = await controller().update(
       hall,
-      const RoomForm(name: '小厅', description: '', slug: 'hall'),
+      const RoomForm(name: '小厅', description: '', slug: 'hall', capacity: '16'),
     );
     await pumpEventQueue();
 
@@ -204,6 +227,7 @@ void main() {
         description: '每晚八点',
         slug: '',
         password: RemovePassword(),
+        capacity: '16',
       ),
     );
     await pumpEventQueue();
@@ -218,13 +242,34 @@ void main() {
     expect(state().rooms.single.slug, isNull);
   });
 
+  test(
+    'a new capacity is sent and shown once the rooms are read again',
+    () async {
+      final result = await controller().update(
+        hall,
+        const RoomForm(
+          name: '大厅',
+          description: '',
+          slug: 'hall',
+          capacity: '8',
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(result, isA<MutationSucceeded<void>>());
+      expect(api.updates.single.patch.capacity, 8);
+      expect(api.updates.single.patch.name, isNull);
+      expect(state().rooms.single.capacity, 8);
+    },
+  );
+
   test('a change that changes nothing is not sent', () async {
     final listed = api.listRoomsCalls;
     final tokens = api.tokens.length;
 
     final result = await controller().update(
       hall,
-      const RoomForm(name: '大厅', description: '', slug: 'hall'),
+      const RoomForm(name: '大厅', description: '', slug: 'hall', capacity: '16'),
     );
 
     expect(
@@ -248,6 +293,7 @@ void main() {
         description: '',
         slug: 'hall',
         password: SetPassword(''),
+        capacity: '16',
       ),
     );
 
@@ -345,6 +391,7 @@ void main() {
           description: '',
           slug: 'hall',
           password: SetPassword('p'),
+          capacity: '16',
         ),
       );
       final deleted = await controller().delete('r1');
@@ -377,7 +424,12 @@ void main() {
       await controller().create(_form),
       await controller().update(
         hall,
-        const RoomForm(name: '小厅', description: '', slug: 'hall'),
+        const RoomForm(
+          name: '小厅',
+          description: '',
+          slug: 'hall',
+          capacity: '16',
+        ),
       ),
       await controller().delete('r1'),
     ];
@@ -421,11 +473,21 @@ void main() {
       ..updateRoomError = invalid;
 
     final created = await controller().create(
-      const RoomForm(name: '大\u0000厅', description: '', slug: ''),
+      const RoomForm(
+        name: '大\u0000厅',
+        description: '',
+        slug: '',
+        capacity: '16',
+      ),
     );
     final updated = await controller().update(
       hall,
-      const RoomForm(name: '小\u0000厅', description: '', slug: 'hall'),
+      const RoomForm(
+        name: '小\u0000厅',
+        description: '',
+        slug: 'hall',
+        capacity: '16',
+      ),
     );
 
     for (final result in [created, updated]) {

@@ -144,6 +144,7 @@ void main() {
                   name: '一起听',
                   description: '',
                   kind: room,
+                  capacity: 16,
                 ),
               ),
             ),

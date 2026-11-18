@@ -63,6 +63,7 @@ _openedRoom(
         name: '一起听',
         description: '',
         kind: RoomKind.ephemeral,
+        capacity: 16,
       ),
     ),
   );
@@ -165,6 +166,7 @@ void main() {
           name: '一起听',
           description: '',
           kind: RoomKind.ephemeral,
+          capacity: 16,
         ),
       ),
     );

@@ -707,6 +707,9 @@ class _MemberStripState extends ConsumerState<_MemberStrip> {
     final online = ref.watch(
       roomControllerProvider.select((room) => room.snapshot?.onlineCount ?? 0),
     );
+    final capacity = ref.watch(
+      roomControllerProvider.select((room) => room.snapshot?.room.capacity),
+    );
     final members = [
       for (final (:member, sessions: _) in membersOf(sessions ?? const []))
         member,
@@ -740,7 +743,7 @@ class _MemberStripState extends ConsumerState<_MemberStrip> {
               ],
               Expanded(
                 child: Text(
-                  '$online 人在线',
+                  _onlineText(online, capacity),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AlistenTypography.weighted(
@@ -886,6 +889,9 @@ class _MembersPanelState extends ConsumerState<_MembersPanel> {
     final online = ref.watch(
       roomControllerProvider.select((room) => room.snapshot?.onlineCount ?? 0),
     );
+    final capacity = ref.watch(
+      roomControllerProvider.select((room) => room.snapshot?.room.capacity),
+    );
     final self = ref.watch(
       roomControllerProvider.select((room) => room.member?.id),
     );
@@ -934,7 +940,7 @@ class _MembersPanelState extends ConsumerState<_MembersPanel> {
                 AlistenSpacing.xs,
               ),
               trailing: Text(
-                '$online 人在线',
+                _onlineText(online, capacity),
                 style: AlistenTypography.secondary.copyWith(
                   color: colors.onGlassMuted,
                 ),
@@ -1657,4 +1663,8 @@ class _DeliveryMark extends ConsumerWidget {
       ChatDelivery.sent || null => const SizedBox.shrink(),
     };
   }
+}
+
+String _onlineText(int online, int? capacity) {
+  return capacity == null ? '$online 人在线' : '$online / $capacity 人在线';
 }

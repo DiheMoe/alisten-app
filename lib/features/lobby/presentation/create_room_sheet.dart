@@ -1,4 +1,5 @@
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/lobby/application/lobby_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
@@ -74,6 +75,10 @@ class _CreateRoomSheetState extends ConsumerState<CreateRoomSheet> {
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     final error = _error;
+    final capacity = ref
+        .watch(siteCapabilitiesProvider)
+        .value
+        ?.ephemeralRoomCapacity;
     return PopScope(
       canPop: !_submitting,
       child: Column(
@@ -119,6 +124,15 @@ class _CreateRoomSheetState extends ConsumerState<CreateRoomSheet> {
             textInputAction: TextInputAction.go,
             onSubmitted: (_) => _submit(),
           ),
+          if (capacity != null) ...[
+            const SizedBox(height: AlistenSpacing.xs),
+            Text(
+              '房间最多 $capacity 人。',
+              style: AlistenTypography.secondary.copyWith(
+                color: colors.onGlassMuted,
+              ),
+            ),
+          ],
           if (error != null) ...[
             const SizedBox(height: AlistenSpacing.md),
             InlineMessage(

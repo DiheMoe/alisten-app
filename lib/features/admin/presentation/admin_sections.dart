@@ -1,5 +1,6 @@
 import 'package:alisten/features/admin/application/admin_session.dart';
 import 'package:alisten/features/admin/presentation/accounts_group.dart';
+import 'package:alisten/features/admin/presentation/ephemeral_rooms_group.dart';
 import 'package:alisten/features/admin/presentation/github_app_group.dart';
 import 'package:alisten/features/admin/presentation/media_page.dart';
 import 'package:alisten/features/admin/presentation/registration_group.dart';
@@ -92,6 +93,11 @@ Widget adminSectionScreen(
         title: section.title,
         children: [
           SettingsGroup(
+            title: '临时房间',
+            children: [EphemeralRoomsGroup(onNotice: onNotice)],
+          ),
+          SettingsGroup(
+            title: '常驻房间',
             children: [RoomsGroup(onNotice: onNotice, onOpenRoom: onOpenRoom)],
           ),
         ],
