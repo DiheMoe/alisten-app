@@ -27,9 +27,10 @@ String generateProtocol(Map<String, Object?> idl) => _Generator(idl).protocol();
 
 String generateHttp(Map<String, Object?> idl) => _Generator(idl).http();
 
-// 复现后端 protocolVersion 的编码：Go 以 UseNumber 解码 IDL，再用
-// SetEscapeHTML(false) 的 json.Encoder 编码；map 的键按码点排序，与 Go 的
-// UTF-8 字节序相同。
+// 复现后端 protocolVersion 的编码：Go 以 UseNumber 解码 IDL，去掉说明文字，
+// 再用 SetEscapeHTML(false) 的 json.Encoder 编码；map 的键按码点排序，与 Go 的
+// UTF-8 字节序相同。说明文字是值为字符串的 description 键；名叫 description
+// 的属性（比如房间介绍）值是它的定义，要保留。
 void _writeCanonical(StringBuffer out, Object? value, String where) {
   switch (value) {
     case null || bool() || int():
@@ -44,7 +45,10 @@ void _writeCanonical(StringBuffer out, Object? value, String where) {
       }
       out.write(']');
     case Map<String, Object?>():
-      final keys = value.keys.toList()..sort(_compareCodePoints);
+      final keys = [
+        for (final MapEntry(:key, value: field) in value.entries)
+          if (key != 'description' || field is! String) key,
+      ]..sort(_compareCodePoints);
       out.write('{');
       for (var index = 0; index < keys.length; index++) {
         if (index > 0) out.write(',');

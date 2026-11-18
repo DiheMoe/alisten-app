@@ -30,15 +30,15 @@ void main() {
     test('canonicalizes strings and key order exactly like Go', () {
       // 期望值是 Go 的 protocolVersion（设置了 SetEscapeHTML(false) 的
       // json.Encoder）对同一文档的计算结果，该文档的规范形式是
-      // {"$defs":{"Note":{"description":"<&> \"q\" \\ \b\f\n\r\t\u0001<DEL> é",
-      // "minLength":1,"type":"string"}},"title":"line paragraph end",
+      // {"$defs":{"Note":{"minLength":1,"type":"string",
+      // "x-note":"<&> \"q\" \\ \b\f\n\r\t\u0001<DEL> é"}},"title":"line paragraph end",
       // "x-order":{"a":4,"b":3,"！":2,"😀":1}}.
       final idl = <String, Object?>{
         'title': 'line paragraph end',
         r'$defs': <String, Object?>{
           'Note': <String, Object?>{
             'type': 'string',
-            'description': '<&> "q" \\ \b\f\n\r\t\u0001\u007f é',
+            'x-note': '<&> "q" \\ \b\f\n\r\t\u0001\u007f é',
             'minLength': 1,
           },
         },
@@ -50,8 +50,36 @@ void main() {
         },
       };
 
-      expect(protocolVersionFor(idl), 'd11fa9da357c80a1');
+      expect(protocolVersionFor(idl), '7b884d8fb1de6a56');
     });
+
+    test(
+      'leaves out description text but keeps a property named description',
+      () {
+        // 期望值同样由 Go 的 protocolVersion 算出：只改说明文字不改变版本。
+        Map<String, Object?> room(String? text) => <String, Object?>{
+          r'$defs': <String, Object?>{
+            'Room': <String, Object?>{
+              'type': 'object',
+              'description': ?text,
+              'properties': <String, Object?>{
+                'description': <String, Object?>{
+                  'type': 'string',
+                  if (text != null) 'description': '$text的介绍',
+                },
+              },
+              'x-examples': <Object?>[
+                <String, Object?>{if (text != null) 'description': '示例'},
+              ],
+            },
+          },
+        };
+
+        expect(protocolVersionFor(room('房间')), 'ef66b7f85bd760f0');
+        expect(protocolVersionFor(room('另一种说法')), 'ef66b7f85bd760f0');
+        expect(protocolVersionFor(room(null)), 'ef66b7f85bd760f0');
+      },
+    );
 
     test('rejects numbers that Go would keep in a different spelling', () {
       for (final number in <Object>[1.5, 1.0, 1e21]) {
@@ -400,7 +428,7 @@ void main() {
       }
     });
 
-    test('real IDL names all 28 admin endpoints', () {
+    test('real IDL names all 29 admin endpoints', () {
       final output = generateHttp(_backendIdl());
 
       for (final name in <String>[
@@ -430,12 +458,13 @@ void main() {
         'adminUpdateSite',
         'adminOpenRegistration',
         'adminCloseRegistration',
+        'adminSetEphemeralRoomCapacity',
         'adminGetAccount',
         'adminResetAccountPassword',
       ]) {
         expect(output, contains('static const $name = RestEndpoint('));
       }
-      expect(RegExp('auth: HttpAuth.admin,').allMatches(output).length, 28);
+      expect(RegExp('auth: HttpAuth.admin,').allMatches(output).length, 29);
     }, skip: _backendSkip);
 
     test('real IDL asks for an account on playlists and pairing codes', () {
