@@ -13,6 +13,7 @@ Future<bool> showConfirmSheet(
   required String confirmLabel,
   String cancelLabel = '取消',
   IconData? confirmIcon,
+  bool danger = false,
   bool untilClosed = false,
   Future<bool> Function()? onConfirm,
   String? busyLabel,
@@ -26,6 +27,7 @@ Future<bool> showConfirmSheet(
       confirmLabel: confirmLabel,
       cancelLabel: cancelLabel,
       confirmIcon: confirmIcon,
+      danger: danger,
       onConfirm: onConfirm,
       busyLabel: busyLabel,
     ),
@@ -40,6 +42,7 @@ class ConfirmSheet extends StatefulWidget {
     required this.confirmLabel,
     this.cancelLabel = '取消',
     this.confirmIcon,
+    this.danger = false,
     this.onConfirm,
     this.busyLabel,
     super.key,
@@ -50,6 +53,9 @@ class ConfirmSheet extends StatefulWidget {
   final String confirmLabel;
   final String cancelLabel;
   final IconData? confirmIcon;
+
+  /// 不能撤回的操作：确认按钮用危险色的文字，不用品牌色填充。
+  final bool danger;
 
   /// 确认后面板保持打开直到它完成，并以它的结果关闭；等待期间确认按钮显示
   /// [busyLabel] 且不可再按，取消仍然可用。
@@ -100,6 +106,10 @@ class _ConfirmSheetState extends State<ConfirmSheet> {
               ? widget.busyLabel ?? widget.confirmLabel
               : widget.confirmLabel,
           icon: widget.confirmIcon,
+          style: widget.danger
+              ? PillButtonStyle.secondary
+              : PillButtonStyle.primary,
+          danger: widget.danger,
           busy: _busy,
           large: true,
           expand: true,

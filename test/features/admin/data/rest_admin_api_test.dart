@@ -5,6 +5,7 @@ import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/admin/data/rest_admin_api.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:dio/dio.dart';
@@ -585,6 +586,90 @@ void main() {
     expect(adapter.requests.last.method, 'POST');
     expect(adapter.requests.last.path, '/api/admin/accounts/mao/password');
     expect(password, 'new-secret-password');
+  });
+
+  test('stored media is listed with the admin token, the page, order and '
+      'query in the body, and read as stored tracks', () async {
+    adapter.respond(200, {
+      'items': [
+        {
+          'key': 'a' * 64,
+          'source': 'bilibili',
+          'link': 'https://www.bilibili.com/video/BV1',
+          'title': '夜曲',
+          'artist': '',
+          'coverUrl': '',
+          'size': 3145728,
+          'storedAtMs': 1700000000000,
+          'lastPlayedAtMs': null,
+        },
+      ],
+      'total': 51,
+      'totalBytes': 9000000,
+      'page': 2,
+      'pageSize': 50,
+    });
+
+    final page = await api.listMedia(
+      't',
+      page: 2,
+      order: MediaOrder.idle,
+      query: '夜',
+    );
+
+    final request = adapter.requests.single;
+    expect(request.method, 'POST');
+    expect(request.path, '/api/admin/media/queries');
+    expect(request.authorization, 'Bearer t');
+    expect(request.jsonBody, {'page': 2, 'q': '夜', 'sort': 'idle'});
+    expect(page.total, 51);
+    expect(page.totalBytes, 9000000);
+    expect(page.page, 2);
+    expect(page.pageSize, 50);
+    final track = page.items.single;
+    expect(track.key, 'a' * 64);
+    expect(track.source, TrackSource.bilibili);
+    expect(track.artist, '');
+    expect(track.coverUrl, isNull);
+    expect(track.bytes, 3145728);
+    expect(track.lastPlayedAtMs, isNull);
+  });
+
+  test('an empty query is left out of the body', () async {
+    adapter.respond(200, {
+      'items': <Object?>[],
+      'total': 0,
+      'totalBytes': 0,
+      'page': 1,
+      'pageSize': 50,
+    });
+
+    await api.listMedia('t', page: 1, order: MediaOrder.stored, query: '');
+
+    expect(adapter.requests.single.jsonBody, {'page': 1, 'sort': 'stored'});
+  });
+
+  test('stored media is removed by key, and the answer tells which were '
+      'deleted and which are playing in a room', () async {
+    adapter.respond(200, {
+      'deleted': ['a' * 64],
+      'inUse': ['b' * 64],
+    });
+
+    final removal = await api.removeMedia('t', ['a' * 64, 'b' * 64]);
+
+    final request = adapter.requests.single;
+    expect(request.method, 'POST');
+    expect(request.path, '/api/admin/media/removals');
+    expect(request.authorization, 'Bearer t');
+    expect(request.jsonBody, {
+      'media': [
+        {'key': 'a' * 64},
+        {'key': 'b' * 64},
+      ],
+    });
+    expect(removal.deleted, ['a' * 64]);
+    expect(removal.inUse, ['b' * 64]);
   });
 
   test('without a token nothing is sent', () async {

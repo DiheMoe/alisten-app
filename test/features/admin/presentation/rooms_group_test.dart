@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:alisten/core/api/api_error.dart';
+import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/admin/presentation/admin_time.dart';
 import 'package:alisten/features/room/index.dart';
@@ -108,10 +109,20 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
-          home: AdminScreen(
-            onNotice: (kind, text) => notices.add((kind, text)),
-            onExit: () {},
-            onOpenRoom: opened.add,
+          home: Builder(
+            builder: (context) => AdminScreen(
+              onExit: () {},
+              onOpenSection: (section) => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => adminSectionScreen(
+                    section,
+                    onNotice: (kind, text) => notices.add((kind, text)),
+                    onOpenRoom: opened.add,
+                    onEnded: () {},
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -121,11 +132,7 @@ void main() {
     await tester.enterText(_field('管理 token'), 't-1');
     await tester.tap(find.text('进入后台'));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('常驻房间'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.tap(find.text('房间'));
     await tester.pumpAndSettle();
   }
 
@@ -158,7 +165,6 @@ void main() {
     ];
     await open(tester);
 
-    expect(find.text('常驻房间'), findsOneWidget);
     expect(find.text('大厅'), findsOneWidget);
     expect(find.text('hall'), findsOneWidget);
     expect(find.text('在线 3 人'), findsOneWidget);
@@ -167,6 +173,42 @@ void main() {
     expect(find.text('在线 0 人'), findsOneWidget);
     expect(find.text('有密码'), findsOneWidget);
     expect(find.text('新建常驻房间'), findsOneWidget);
+  });
+
+  Finder search() => find.descendant(
+    of: find.byType(AlistenTextField),
+    matching: find.byType(EditableText),
+  );
+
+  RoomListing roomNamed(String name, {required String? slug}) =>
+      roomListing(id: 'id-$name', name: name, slug: slug);
+
+  testWidgets('the search keeps rooms whose name or short link matches, '
+      'whatever the case', (tester) async {
+    api.rooms = [
+      roomNamed('一起听', slug: 'listen'),
+      roomNamed('Jazz Night', slug: 'jazz'),
+      roomNamed('周末', slug: null),
+    ];
+    await open(tester);
+    await tester.enterText(search(), 'JAZ');
+    await tester.pump();
+    expect(find.text('Jazz Night'), findsOneWidget);
+    expect(find.text('一起听'), findsNothing);
+    await tester.enterText(search(), 'listen');
+    await tester.pump();
+    expect(find.text('一起听'), findsOneWidget);
+  });
+
+  testWidgets('a search with no match offers to clear it', (tester) async {
+    api.rooms = [roomNamed('一起听', slug: 'listen')];
+    await open(tester);
+    await tester.enterText(search(), '没有这个');
+    await tester.pump();
+    expect(find.text('没有找到房间'), findsOneWidget);
+    await tester.tap(find.text('清除搜索'));
+    await tester.pump();
+    expect(find.text('一起听'), findsOneWidget);
   });
 
   testWidgets('the rooms page draws nothing while left alone', (tester) async {

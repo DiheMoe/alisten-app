@@ -86,10 +86,20 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
-          home: AdminScreen(
-            onNotice: (kind, text) => notices.add((kind, text)),
-            onExit: () {},
-            onOpenRoom: (_) {},
+          home: Builder(
+            builder: (context) => AdminScreen(
+              onExit: () {},
+              onOpenSection: (section) => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => adminSectionScreen(
+                    section,
+                    onNotice: (kind, text) => notices.add((kind, text)),
+                    onOpenRoom: (_) {},
+                    onEnded: () {},
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -98,6 +108,8 @@ void main() {
     addTearDown(() => tester.pumpWidget(const SizedBox()));
     await tester.enterText(_field('管理 token'), 't-1');
     await tester.tap(find.text('进入后台'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('音源'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('音源账号'),

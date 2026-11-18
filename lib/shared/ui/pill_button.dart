@@ -23,8 +23,10 @@ class PillButton extends StatelessWidget {
     this.large = false,
     this.expand = false,
     this.expanded,
+    this.danger = false,
+    this.iconAfter = false,
     super.key,
-  });
+  }) : assert(!danger || style != PillButtonStyle.primary, '危险色的文字放在品牌色填充上看不清');
 
   final String label;
   final VoidCallback? onPressed;
@@ -35,6 +37,12 @@ class PillButton extends StatelessWidget {
   final bool expand;
 
   final bool? expanded;
+
+  /// 删除这类不能撤回的操作：文字和图标用危险色。不能与 primary 同用。
+  final bool danger;
+
+  /// 为 true 时图标在文字之后，比如“下一页 ›”。
+  final bool iconAfter;
 
   /// 按标签只占一行计算。
   static double heightOf(BuildContext context, {bool large = false}) {
@@ -53,9 +61,13 @@ class PillButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     final primary = style == PillButtonStyle.primary;
-    final ink = primary ? colors.onBrand : colors.onGlass;
+    final ink = primary
+        ? colors.onBrand
+        : danger
+        ? colors.danger
+        : colors.onGlass;
     final iconSize = large ? AlistenSizes.icon : AlistenSizes.iconSm;
-    final leading = busy
+    final glyph = busy
         ? Semantics(
             value: busySemanticValue,
             child: BusyIndicator(size: iconSize * 0.8, color: ink),
@@ -97,8 +109,8 @@ class PillButton extends StatelessWidget {
               mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (leading != null) ...[
-                  leading,
+                if (glyph != null && !iconAfter) ...[
+                  glyph,
                   const SizedBox(width: AlistenSpacing.xs),
                 ],
                 Flexible(
@@ -111,6 +123,10 @@ class PillButton extends StatelessWidget {
                     ).copyWith(color: ink),
                   ),
                 ),
+                if (glyph != null && iconAfter) ...[
+                  const SizedBox(width: AlistenSpacing.xs),
+                  glyph,
+                ],
               ],
             ),
           ),

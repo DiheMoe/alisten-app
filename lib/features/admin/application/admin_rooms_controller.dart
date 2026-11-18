@@ -22,11 +22,15 @@ const _notLoadedText = '没能读取常驻房间，请稍后重试。';
 final class AdminRoomsState {
   const AdminRoomsState({
     this.rooms = const [],
+    this.loaded = false,
     this.loading = false,
     this.error,
   });
 
   final List<RoomListing> rooms;
+
+  /// 读到过一次列表（包括空列表）。
+  final bool loaded;
   final bool loading;
   final String? error;
 }
@@ -45,22 +49,36 @@ final class AdminRoomsController extends Notifier<AdminRoomsState> {
   Future<void> load() async {
     final attempt = ++_loads;
     bool latest() => ref.mounted && attempt == _loads;
-    state = AdminRoomsState(rooms: state.rooms, loading: true);
+    state = AdminRoomsState(
+      rooms: state.rooms,
+      loaded: state.loaded,
+      loading: true,
+    );
     try {
       final rooms = await ref
           .read(adminSessionProvider.notifier)
           .run((api, token) => api.listRooms(token));
-      if (latest()) state = AdminRoomsState(rooms: rooms);
+      if (latest()) state = AdminRoomsState(rooms: rooms, loaded: true);
     } on AdminSessionEnded {
-      if (latest()) state = AdminRoomsState(rooms: state.rooms);
+      if (latest()) {
+        state = AdminRoomsState(rooms: state.rooms, loaded: state.loaded);
+      }
     } on ApiException catch (error) {
       if (latest()) {
-        state = AdminRoomsState(rooms: state.rooms, error: error.message);
+        state = AdminRoomsState(
+          rooms: state.rooms,
+          loaded: state.loaded,
+          error: error.message,
+        );
       }
     } on Object catch (error) {
       AppLog.warn('admin', 'rooms not loaded', type: '${error.runtimeType}');
       if (latest()) {
-        state = AdminRoomsState(rooms: state.rooms, error: _notLoadedText);
+        state = AdminRoomsState(
+          rooms: state.rooms,
+          loaded: state.loaded,
+          error: _notLoadedText,
+        );
       }
     }
   }

@@ -365,6 +365,65 @@ final class RestAdminApi implements AdminApi {
     );
   }
 
+  @override
+  Future<MediaPage> listMedia(
+    String token, {
+    required int page,
+    required MediaOrder order,
+    required String query,
+  }) {
+    return _request(
+      http.RestEndpoints.adminListMedia,
+      token: token,
+      body: protocol.AdminListMediaRequest(
+        page: page,
+        q: query.isEmpty ? null : query,
+        sort: switch (order) {
+          MediaOrder.stored => protocol.MediaSort.stored,
+          MediaOrder.idle => protocol.MediaSort.idle,
+          MediaOrder.size => protocol.MediaSort.size,
+        },
+      ).toJson(),
+      decode: (json) {
+        final response = protocol.AdminListMediaResponse.fromJson(json);
+        return MediaPage(
+          items: response.items.map(_storedTrack).toList(growable: false),
+          total: response.total,
+          totalBytes: response.totalBytes,
+          page: response.page,
+          pageSize: response.pageSize,
+        );
+      },
+    );
+  }
+
+  @override
+  Future<MediaRemoval> removeMedia(String token, List<String> keys) {
+    return _request(
+      http.RestEndpoints.adminRemoveMedia,
+      token: token,
+      body: protocol.AdminRemoveMediaRequest(
+        media: [for (final key in keys) protocol.StoredMediaRef(key: key)],
+      ).toJson(),
+      decode: (json) {
+        final response = protocol.AdminRemoveMediaResponse.fromJson(json);
+        return MediaRemoval(deleted: response.deleted, inUse: response.inUse);
+      },
+    );
+  }
+
+  static StoredTrack _storedTrack(protocol.StoredMedia media) => StoredTrack(
+    key: media.key,
+    source: toDomainSource(media.source),
+    link: media.link,
+    title: media.title,
+    artist: media.artist,
+    coverUrl: media.coverUrl.isEmpty ? null : media.coverUrl,
+    bytes: media.size,
+    storedAtMs: media.storedAtMs,
+    lastPlayedAtMs: media.lastPlayedAtMs,
+  );
+
   static SourceAccountStatus _accountStatus(
     bool saved,
     protocol.SourceAccount? account,

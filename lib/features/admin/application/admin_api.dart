@@ -67,6 +67,18 @@ abstract interface class AdminApi {
   });
 
   Future<void> deleteGithubApp(String token);
+
+  /// [page] 从 1 开始；每页条数由服务端决定（现在是 50），见 [MediaPage.pageSize]。
+  /// [query] 为空时不按歌名过滤。
+  Future<MediaPage> listMedia(
+    String token, {
+    required int page,
+    required MediaOrder order,
+    required String query,
+  });
+
+  /// [keys] 一次 1 到 50 个。正在房间里播放的不删，列在 [MediaRemoval.inUse]。
+  Future<MediaRemoval> removeMedia(String token, List<String> keys);
 }
 
 final adminApiProvider = Provider<AdminApi>((ref) {

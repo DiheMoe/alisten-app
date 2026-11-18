@@ -11,7 +11,9 @@ import 'package:alisten/features/admin/presentation/room_form_sheet.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
+import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
+import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
@@ -38,6 +40,7 @@ class RoomsGroup extends ConsumerStatefulWidget {
 }
 
 class _RoomsGroupState extends ConsumerState<RoomsGroup> {
+  final _search = TextEditingController();
   String? _deleting;
 
   AdminRoomsController get _rooms =>
@@ -51,6 +54,12 @@ class _RoomsGroupState extends ConsumerState<RoomsGroup> {
         if (mounted) await _rooms.load();
       }),
     );
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
   Future<void> _open(RoomListing room) async {
@@ -110,10 +119,37 @@ class _RoomsGroupState extends ConsumerState<RoomsGroup> {
     final muted = AlistenTypography.secondary.copyWith(
       color: colors.onGlassMuted,
     );
+    final needle = _search.text.trim().toLowerCase();
+    final shown = needle.isEmpty
+        ? rooms.rooms
+        : rooms.rooms
+              .where(
+                (room) =>
+                    room.name.toLowerCase().contains(needle) ||
+                    (room.slug ?? '').toLowerCase().contains(needle),
+              )
+              .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final (index, room) in rooms.rooms.indexed) ...[
+        if (rooms.rooms.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AlistenSpacing.md,
+              AlistenSpacing.md,
+              AlistenSpacing.md,
+              0,
+            ),
+            child: AlistenTextField(
+              controller: _search,
+              pill: true,
+              icon: AlistenIcons.magnifyingGlass,
+              hint: '搜索名称或短链接',
+              onChanged: (_) => setState(() {}),
+              onClear: () => setState(_search.clear),
+            ),
+          ),
+        for (final (index, room) in shown.indexed) ...[
           if (index > 0)
             Padding(
               padding: const EdgeInsetsDirectional.only(
@@ -144,6 +180,17 @@ class _RoomsGroupState extends ConsumerState<RoomsGroup> {
                     onPressed: rooms.loading
                         ? null
                         : () => unawaited(_rooms.load()),
+                  ),
+                ),
+                const SizedBox(height: AlistenSpacing.sm),
+              ] else if (needle.isNotEmpty && shown.isEmpty) ...[
+                EmptyState(
+                  icon: AlistenIcons.magnifyingGlass,
+                  title: '没有找到房间',
+                  action: PillButton(
+                    label: '清除搜索',
+                    style: PillButtonStyle.secondary,
+                    onPressed: () => setState(_search.clear),
                   ),
                 ),
                 const SizedBox(height: AlistenSpacing.sm),

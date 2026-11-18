@@ -82,6 +82,26 @@ void main() {
     expect(find.text('第二页'), findsOneWidget);
   });
 
+  testWidgets('a destructive confirmation draws its button in the danger '
+      'colour', (tester) async {
+    final page = await pumpPages(tester);
+    unawaited(
+      showConfirmSheet(
+        page,
+        title: '删除 1 首歌曲？',
+        message: '将释放 1.0 MiB，删除后不能恢复。',
+        confirmLabel: '删除',
+        danger: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final confirm = tester.widget<PillButton>(
+      find.widgetWithText(PillButton, '删除'),
+    );
+    expect(confirm.danger, isTrue);
+    expect(confirm.style, isNot(PillButtonStyle.primary));
+  });
+
   testWidgets('a check ending under another page closes the sheet with '
       'its result, leaving the page', (tester) async {
     final page = await pumpPages(tester);

@@ -387,17 +387,17 @@ void main() {
       expect(find.text('进入后台'), findsOneWidget);
 
       await signIn(tester);
-      await tester.scrollUntilVisible(
-        find.text('YouTube Cookie'),
-        300,
-        scrollable: find.byType(Scrollable).first,
-      );
-      // 验证 token 和后台首页各读一次常驻房间列表，滚动时被回收的分组还会再读；
-      // 各音源账号、YouTube Cookie 和 GitHub 登录状态各读一次，都带这个 token。
+      // 验证 token 和后台首页各读一次常驻房间列表；首页读各音源账号和 GitHub 登录
+      // 状态各一次，YouTube Cookie 在音源页里读，都带这个 token。
       expect(admin.listRoomsCalls, greaterThanOrEqualTo(2));
       expect(admin.sourceAccountCalls, unorderedEquals(LoginSource.values));
-      expect(admin.getYoutubeCookieCalls, 1);
       expect(admin.getGithubAppCalls, 1);
+      await tester.tap(find.text('音源'));
+      await tester.pumpAndSettle();
+      expect(router.state.uri.path, '/settings/admin/sources');
+      // 首页留在子页面下面，会话和首页都没有因为进入子页面而结束。
+      expect(find.byType(AdminScreen, skipOffstage: false), findsOneWidget);
+      expect(admin.getYoutubeCookieCalls, 1);
       expect(admin.tokens, isNotEmpty);
       expect(admin.tokens, everyElement('t-1'));
       expect(active(tester), isTrue);
@@ -414,6 +414,72 @@ void main() {
       router.go('/settings/admin');
       await tester.pumpAndSettle();
       expect(find.text('进入后台'), findsOneWidget);
+    });
+
+    testWidgets('an admin section opened without a session goes back to the '
+        'token page', (tester) async {
+      await pumpAlistenApp(tester);
+      final router = appContainer(tester).read(routerProvider);
+      router.go('/settings/admin/rooms');
+      await tester.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, '/settings/admin');
+      expect(find.text('进入后台'), findsOneWidget);
+    });
+
+    testWidgets('a session that ends on a section page goes back to the '
+        'token page', (tester) async {
+      var now = DateTime.utc(2026, 11, 2, 20);
+      var elapsed = Duration.zero;
+      await pumpAlistenApp(
+        tester,
+        overrides: [
+          adminNowProvider.overrideWithValue(() => now),
+          adminElapsedProvider.overrideWithValue(() => elapsed),
+        ],
+      );
+      final router = appContainer(tester).read(routerProvider);
+      router.go('/settings/admin');
+      await tester.pumpAndSettle();
+      await signIn(tester);
+      await tester.tap(find.text('房间'));
+      await tester.pumpAndSettle();
+      expect(router.state.uri.path, '/settings/admin/rooms');
+
+      final session = appContainer(tester).read(adminSessionProvider.notifier)
+        ..handleLifecycle(AppLifecycleState.paused);
+      now = now.add(const Duration(minutes: 6));
+      elapsed += const Duration(minutes: 6);
+      session.handleLifecycle(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(active(tester), isFalse);
+      expect(router.state.uri.path, '/settings/admin');
+      expect(find.text('进入后台'), findsOneWidget);
+      expect(find.text(adminAwayText), findsOneWidget);
+    });
+
+    testWidgets('opens the stored media from the home row and goes back to '
+        'the home', (tester) async {
+      await pumpAlistenApp(
+        tester,
+        admin: FakeAdminApi()..media = [storedTrack(1)],
+      );
+      final router = appContainer(tester).read(routerProvider);
+      router.go('/settings/admin');
+      await tester.pumpAndSettle();
+      await signIn(tester);
+      expect(find.text('1 首 · 占用 1.0 MiB'), findsOneWidget);
+
+      await tester.tap(find.text('媒体'));
+      await tester.pumpAndSettle();
+      expect(router.state.uri.path, '/settings/admin/media');
+      expect(find.text('歌曲 1'), findsOneWidget);
+
+      await systemBack();
+      await tester.pumpAndSettle();
+      expect(router.state.uri.path, '/settings/admin');
+      expect(find.text('退出后台'), findsOneWidget);
+      expect(active(tester), isTrue);
     });
 
     testWidgets('is left for the settings by its button or by going back, '
@@ -455,6 +521,8 @@ void main() {
       router.go('/settings/admin');
       await tester.pumpAndSettle();
       await signIn(tester);
+      await tester.tap(find.text('房间'));
+      await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(
         find.text('一起听'),
@@ -488,6 +556,8 @@ void main() {
       router.go('/settings/admin');
       await tester.pumpAndSettle();
       await signIn(tester);
+      await tester.tap(find.text('房间'));
+      await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(
         find.text('一起听'),
@@ -531,6 +601,8 @@ void main() {
       router.go('/settings/admin');
       await tester.pumpAndSettle();
       await signIn(tester);
+      await tester.tap(find.text('音源'));
+      await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(
         find.text('音源账号'),

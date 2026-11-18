@@ -13,7 +13,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../lobby/lobby_test_doubles.dart' show roomListing;
 import '../../server/server_test_doubles.dart';
 import '../admin_test_doubles.dart';
 
@@ -102,10 +101,20 @@ void main() {
                 .copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
-          home: AdminScreen(
-            onNotice: (kind, text) => notices.add((kind, text)),
-            onExit: () {},
-            onOpenRoom: (_) {},
+          home: Builder(
+            builder: (context) => AdminScreen(
+              onExit: () {},
+              onOpenSection: (section) => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => adminSectionScreen(
+                    section,
+                    onNotice: (kind, text) => notices.add((kind, text)),
+                    onOpenRoom: (_) {},
+                    onEnded: () {},
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -120,6 +129,8 @@ void main() {
       't-1',
     );
     await tester.tap(find.text('进入后台'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('音源'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('YouTube Cookie'),
@@ -427,12 +438,11 @@ void main() {
 
   testWidgets('a clear still says how it ended and reads the status again '
       'when the list is scrolled away meanwhile', (tester) async {
-    api
-      ..youtubeCookie = _saved
-      ..rooms = [
-        for (var i = 0; i < 40; i++) roomListing(id: 'r$i', name: '房间 $i'),
-      ];
+    api.youtubeCookie = _saved;
     await open(tester);
+    // 屏幕矮一些，音源页才比屏幕长，才有地方把 YouTube Cookie 分组滚出去。
+    tester.view.physicalSize = const Size(360, 260) * 3;
+    await tester.pumpAndSettle();
     final list = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(find.text('清除'), 300, scrollable: list);
     await tester.pumpAndSettle();
@@ -444,8 +454,19 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     final read = api.getYoutubeCookieCalls;
 
-    await tester.scrollUntilVisible(find.text('品牌名'), -300, scrollable: list);
+    await tester.drag(list, const Offset(0, 3000));
     await tester.pump(const Duration(seconds: 1));
+    // 卸载或只是被缓存区域持有都可以，但必须已经不在屏幕上。
+    final screen =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final cleared = find.text('清除', skipOffstage: false);
+    expect(
+      cleared.evaluate().isEmpty ||
+          tester.getTopLeft(cleared.first).dy > screen ||
+          tester.getBottomLeft(cleared.first).dy < 0,
+      isTrue,
+      reason: 'scrolled out of view',
+    );
     gate.complete();
     await tester.pumpAndSettle();
 

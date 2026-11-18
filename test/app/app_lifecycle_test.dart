@@ -206,12 +206,10 @@ void main() {
     await tester.pumpAndSettle();
     await container.read(adminSessionProvider.notifier).signIn('t-1');
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('音源账号'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
+    // 扫码登录在“音源”子页面里。
+    await tester.tap(find.text('音源'));
     await tester.pumpAndSettle();
+    expect(find.text('音源账号'), findsOneWidget);
     final signIn = find.text('扫码登录').first;
     await tester.ensureVisible(signIn);
     await tester.pumpAndSettle();
@@ -241,6 +239,9 @@ void main() {
     expect(admin.tokens, hasLength(tokens));
     expect(container.read(adminSessionProvider).active, isFalse);
     expect(find.text('等待扫码'), findsNothing);
+    // 从音源子页面回到令牌页。
+    expect(container.read(routerProvider).state.uri.path, '/settings/admin');
+    expect(find.text('音源账号'), findsNothing);
     expect(find.text('进入后台'), findsOneWidget);
   });
 
@@ -269,12 +270,10 @@ void main() {
     await tester.pumpAndSettle();
     await container.read(adminSessionProvider.notifier).signIn('t-1');
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('音源账号'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
+    // 扫码登录在“音源”子页面里。
+    await tester.tap(find.text('音源'));
     await tester.pumpAndSettle();
+    expect(find.text('音源账号'), findsOneWidget);
     final signIn = find.text('扫码登录').first;
     await tester.ensureVisible(signIn);
     await tester.pumpAndSettle();
@@ -310,6 +309,8 @@ void main() {
 
     expect(admin.tokens, hasLength(tokens));
     expect(find.text('等待扫码'), findsNothing);
+    expect(container.read(routerProvider).state.uri.path, '/settings/admin');
+    expect(find.text('音源账号'), findsNothing);
     expect(find.text('进入后台'), findsOneWidget);
     expect(find.text(adminAwayText), findsOneWidget);
     expect(

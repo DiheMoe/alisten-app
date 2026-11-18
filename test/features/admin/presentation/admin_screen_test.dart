@@ -69,16 +69,31 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
-          home: AdminScreen(
-            onNotice: (kind, text) => notices.add((kind, text)),
-            onExit: () => exits++,
-            onOpenRoom: (_) {},
+          home: Builder(
+            builder: (context) => AdminScreen(
+              onExit: () => exits++,
+              onOpenSection: (section) => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => adminSectionScreen(
+                    section,
+                    onNotice: (kind, text) => notices.add((kind, text)),
+                    onOpenRoom: (_) {},
+                    onEnded: () {},
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
     addTearDown(() => tester.pumpWidget(const SizedBox()));
+  }
+
+  Future<void> openSection(WidgetTester tester, String title) async {
+    await tester.tap(find.text(title));
+    await tester.pumpAndSettle();
   }
 
   Future<void> submit(WidgetTester tester, [String token = 't-1']) async {
@@ -318,6 +333,7 @@ void main() {
       'server list', (tester) async {
     await open(tester);
     await submit(tester);
+    await openSection(tester, '站点');
 
     expect(
       tester.widget<EditableText>(_field('品牌名')).controller.text,
@@ -325,13 +341,15 @@ void main() {
     );
 
     await tester.enterText(_field('品牌名'), ' 周末听歌会 ');
-    await tester.tap(find.text('保存'));
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 
     expect(api.updatedBrandName, '周末听歌会');
-    expect(notices, [(ToastKind.success, '品牌名已保存')]);
+    expect(find.text('✓ 已保存'), findsOneWidget);
+    expect(notices, isEmpty);
     expect(container.read(currentServerProvider).brandName, '周末听歌会');
     expect(tester.widget<EditableText>(_field('品牌名')).controller.text, '周末听歌会');
+    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('a brand name against the rule is explained and not sent', (
@@ -339,9 +357,10 @@ void main() {
   ) async {
     await open(tester);
     await submit(tester);
+    await openSection(tester, '站点');
 
     await tester.enterText(_field('品牌名'), '一二三四五六七八九十一二三四五六七八九十一');
-    await tester.tap(find.text('保存'));
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 
     expect(find.text(brandNameRuleText), findsOneWidget);
@@ -353,10 +372,11 @@ void main() {
       'page', (tester) async {
     await open(tester);
     await submit(tester);
+    await openSection(tester, '站点');
     api.updateBrandError = _unauthorized;
 
     await tester.enterText(_field('品牌名'), '周末听歌会');
-    await tester.tap(find.text('保存'));
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 
     expect(find.text('进入后台'), findsOneWidget);
@@ -364,19 +384,53 @@ void main() {
     expect(notices, isEmpty);
   });
 
-  testWidgets('a save that fails unexpectedly is reported as unknown and the '
-      'button is free again', (tester) async {
+  testWidgets('a save that fails unexpectedly is reported as unknown and '
+      'the name is read again', (tester) async {
     await open(tester);
     await submit(tester);
+    await openSection(tester, '站点');
     api.updateBrandError = StateError('boom');
 
     await tester.enterText(_field('品牌名'), '周末听歌会');
-    await tester.tap(find.text('保存'));
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(notices, [(ToastKind.warning, '结果未知，请确认品牌名后再决定是否重试。')]);
-    expect(_button(tester, '保存').busy, isFalse);
-    expect(_button(tester, '保存').onPressed, isNotNull);
+    expect(notices, [(ToastKind.warning, '没能确认是否保存，已重新读取')]);
+    expect(find.bySemanticsLabel('正在保存'), findsNothing);
+  });
+
+  testWidgets('a session that ends on a section page goes back to the token '
+      'page', (tester) async {
+    await open(tester);
+    await submit(tester);
+    await tester.tap(find.text('房间'));
+    await tester.pumpAndSettle();
+    await awayFor(tester, const Duration(minutes: 6));
+    await tester.pumpAndSettle();
+    expect(find.text('进入后台'), findsOneWidget);
+    expect(find.text(adminAwayText), findsOneWidget);
+  });
+
+  testWidgets('a media row that could not be read recovers once the media '
+      'page reads the library', (tester) async {
+    api.listMediaError = const ApiException(
+      code: 'UNAVAILABLE',
+      message: '服务暂时不可用',
+      status: 503,
+    );
+    await open(tester);
+    await submit(tester);
+    expect(find.text('读取失败'), findsOneWidget);
+
+    api
+      ..listMediaError = null
+      ..media = [storedTrack(1)];
+    await openSection(tester, '媒体');
+    expect(find.text('歌曲 1'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('1 首 · 占用 1.0 MiB'), findsOneWidget);
+    expect(find.text('读取失败'), findsNothing);
   });
 }

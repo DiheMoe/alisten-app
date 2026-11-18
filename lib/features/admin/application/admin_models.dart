@@ -1,4 +1,5 @@
 import 'package:alisten/domain/member/member.dart';
+import 'package:alisten/domain/track/track.dart';
 
 final class RoomDraft {
   const RoomDraft({
@@ -125,4 +126,61 @@ final class AdminAccountView {
 
   final Member member;
   final String username;
+}
+
+enum MediaOrder { stored, idle, size }
+
+final class StoredTrack {
+  const StoredTrack({
+    required this.key,
+    required this.source,
+    required this.link,
+    required this.title,
+    required this.artist,
+    required this.coverUrl,
+    required this.bytes,
+    required this.storedAtMs,
+    required this.lastPlayedAtMs,
+  });
+
+  final String key;
+  final TrackSource source;
+  final String link;
+  final String title;
+
+  /// 不知道歌手时为空字符串。
+  final String artist;
+
+  /// 没有封面时为 null。
+  final String? coverUrl;
+  final int bytes;
+  final int storedAtMs;
+
+  /// 从没播放过时为 null。
+  final int? lastPlayedAtMs;
+}
+
+final class MediaPage {
+  const MediaPage({
+    required this.items,
+    required this.total,
+    required this.totalBytes,
+    required this.page,
+    required this.pageSize,
+  });
+
+  final List<StoredTrack> items;
+  final int total;
+  final int totalBytes;
+  final int page;
+  final int pageSize;
+}
+
+final class MediaRemoval {
+  const MediaRemoval({required this.deleted, required this.inUse});
+
+  final List<String> deleted;
+
+  /// 正在房间里播放、没有删除的。
+  final List<String> inUse;
 }

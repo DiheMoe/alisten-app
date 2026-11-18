@@ -18,6 +18,7 @@ import 'package:alisten/features/account/data/web_auth_github_authorizer.dart';
 import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/data/dio_qr_image_loader.dart';
 import 'package:alisten/features/admin/data/gal_image_gallery.dart';
+import 'package:alisten/features/admin/data/platform_media_link_opener.dart';
 import 'package:alisten/features/admin/data/platform_sensitive_clipboard.dart';
 import 'package:alisten/features/admin/data/rest_admin_api.dart';
 import 'package:alisten/features/admin/index.dart';
@@ -294,6 +295,7 @@ List<Override> platformAdapters({
       (ref) => RestAdminApi(ref.watch(apiTransportProvider)),
     ),
     sensitiveClipboardProvider.overrideWithValue(PlatformSensitiveClipboard()),
+    mediaLinkOpenerProvider.overrideWithValue(PlatformMediaLinkOpener()),
     qrImageLoaderProvider.overrideWith((ref) {
       final dio = newThirdPartyDio();
       ref.onDispose(() => dio.close(force: true));

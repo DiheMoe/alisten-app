@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/admin/index.dart';
 
 /// 各 `…Gate` 不为 null 时，对应调用记录之后等它完成才回复。变更成功时像服务端
@@ -10,6 +11,16 @@ import 'package:alisten/features/admin/index.dart';
 /// [updates]、[deletedRoomIds]、[savedCookies] 和 [savedGithubApps] 也记录失败的调用。
 final class FakeAdminApi implements AdminApi {
   final List<String> tokens = [];
+  List<StoredTrack> media = [];
+  Object? listMediaError;
+  Completer<void>? listMediaGate;
+  final List<({int page, MediaOrder order, String query})> mediaQueries = [];
+  int mediaPageSize = 50;
+  Set<String> mediaInUse = {};
+  Object? removeMediaError;
+  Completer<void>? removeMediaGate;
+  void Function()? onRemoveMedia;
+  final List<List<String>> removals = [];
   List<RoomListing> rooms = [];
   Object? listRoomsError;
   Completer<void>? listRoomsGate;
@@ -25,6 +36,7 @@ final class FakeAdminApi implements AdminApi {
   bool registrationOpen = true;
   Object? getRegistrationError;
   Object? setRegistrationError;
+  Completer<void>? setRegistrationGate;
   final List<bool> registrationCalls = [];
 
   final Map<String, AdminAccountView> accounts = {};
@@ -140,6 +152,7 @@ final class FakeAdminApi implements AdminApi {
   Future<void> _setRegistration(String token, bool open) async {
     tokens.add(token);
     registrationCalls.add(open);
+    await setRegistrationGate?.future;
     if (setRegistrationError case final error?) return Future.error(error);
     registrationOpen = open;
   }
@@ -373,6 +386,65 @@ final class FakeAdminApi implements AdminApi {
       callbackUrl: githubApp.callbackUrl,
     );
   }
+
+  @override
+  Future<MediaPage> listMedia(
+    String token, {
+    required int page,
+    required MediaOrder order,
+    required String query,
+  }) async {
+    tokens.add(token);
+    mediaQueries.add((page: page, order: order, query: query));
+    await listMediaGate?.future;
+    if (listMediaError case final error?) return Future.error(error);
+    final needle = query.toLowerCase();
+    final found = [
+      for (final track in media)
+        if (track.title.toLowerCase().contains(needle)) track,
+    ];
+    found.sort(
+      (a, b) => switch (order) {
+        MediaOrder.stored => b.storedAtMs.compareTo(a.storedAtMs),
+        MediaOrder.idle => (a.lastPlayedAtMs ?? -1).compareTo(
+          b.lastPlayedAtMs ?? -1,
+        ),
+        MediaOrder.size => b.bytes.compareTo(a.bytes),
+      },
+    );
+    final start = (page - 1) * mediaPageSize;
+    return MediaPage(
+      items: found.skip(start).take(mediaPageSize).toList(),
+      total: found.length,
+      totalBytes: found.fold(0, (sum, track) => sum + track.bytes),
+      page: page,
+      pageSize: mediaPageSize,
+    );
+  }
+
+  @override
+  Future<MediaRemoval> removeMedia(String token, List<String> keys) async {
+    tokens.add(token);
+    removals.add(keys);
+    await removeMediaGate?.future;
+    onRemoveMedia?.call();
+    if (removeMediaError case final error?) return Future.error(error);
+    final deleted = [
+      for (final key in keys)
+        if (!mediaInUse.contains(key) && media.any((t) => t.key == key)) key,
+    ];
+    media = [
+      for (final track in media)
+        if (!deleted.contains(track.key)) track,
+    ];
+    return MediaRemoval(
+      deleted: deleted,
+      inUse: [
+        for (final key in keys)
+          if (mediaInUse.contains(key)) key,
+      ],
+    );
+  }
 }
 
 final class FakeQrCheck {
@@ -430,3 +502,23 @@ final class FakeSensitiveClipboard implements SensitiveClipboard {
     copied.add(text);
   }
 }
+
+/// 第 [n] 首：key 是 64 位十六进制，存储时间越大越新，[bytes] 默认 n MiB。
+StoredTrack storedTrack(
+  int n, {
+  String? title,
+  String artist = '歌手',
+  TrackSource source = TrackSource.netease,
+  int? bytes,
+  int? lastPlayedAtMs,
+}) => StoredTrack(
+  key: n.toRadixString(16).padLeft(64, '0'),
+  source: source,
+  link: 'https://music.example.com/$n',
+  title: title ?? '歌曲 $n',
+  artist: artist,
+  coverUrl: null,
+  bytes: bytes ?? n * 1024 * 1024,
+  storedAtMs: 1700000000000 + n * 1000,
+  lastPlayedAtMs: lastPlayedAtMs,
+);

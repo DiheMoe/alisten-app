@@ -31,7 +31,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-const _pages = {
+final _pages = {
   '/',
   '/history',
   '/playlists',
@@ -46,6 +46,7 @@ const _pages = {
   '/settings/about/licenses',
   '/settings/servers',
   '/settings/admin',
+  for (final section in AdminSection.values) '/settings/admin/${section.path}',
   '/settings/account/login',
   '/settings/account/register',
   '/settings/account/pair',
@@ -303,11 +304,34 @@ final routerProvider = Provider<GoRouter>((ref) {
                     },
                     pageBuilder: _page(
                       (context, state) => AdminScreen(
-                        onNotice: toasts.show,
                         onExit: () => context.go('/settings'),
-                        onOpenRoom: (roomRef) => context.go('/r/$roomRef'),
+                        onOpenSection: (section) =>
+                            context.go('/settings/admin/${section.path}'),
                       ),
                     ),
+                    routes: [
+                      for (final section in AdminSection.values)
+                        GoRoute(
+                          path: section.path,
+                          parentNavigatorKey: rootNavigator,
+                          pageBuilder: _page(
+                            (context, state) => adminSectionScreen(
+                              section,
+                              onNotice: toasts.show,
+                              onOpenRoom: (roomRef) =>
+                                  context.go('/r/$roomRef'),
+                              // 离开后台时会话随之结束，正在退出的子页面不能把位置拉回后台。
+                              onEnded: () {
+                                if (router.state.uri.path.startsWith(
+                                  '/settings/admin',
+                                )) {
+                                  router.go('/settings/admin');
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),

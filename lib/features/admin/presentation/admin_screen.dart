@@ -1,21 +1,19 @@
 import 'package:alisten/features/admin/application/admin_session.dart';
 import 'package:alisten/features/admin/presentation/admin_home.dart';
+import 'package:alisten/features/admin/presentation/admin_sections.dart';
 import 'package:alisten/features/admin/presentation/admin_token_page.dart';
-import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class AdminScreen extends ConsumerWidget {
   const AdminScreen({
-    required this.onNotice,
     required this.onExit,
-    required this.onOpenRoom,
+    required this.onOpenSection,
     super.key,
   });
 
-  final void Function(ToastKind kind, String text) onNotice;
   final VoidCallback onExit;
-  final void Function(String roomRef) onOpenRoom;
+  final void Function(AdminSection section) onOpenSection;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -37,10 +35,6 @@ class AdminScreen extends ConsumerWidget {
     );
     // 换 key 才能连同输入框的撤销历史一起丢弃已输入的 token。
     if (!active) return AdminTokenPage(key: ValueKey(epoch));
-    return AdminHome(
-      onNotice: onNotice,
-      onExit: onExit,
-      onOpenRoom: onOpenRoom,
-    );
+    return AdminHome(onExit: onExit, onOpenSection: onOpenSection);
   }
 }

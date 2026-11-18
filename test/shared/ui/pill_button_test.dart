@@ -68,6 +68,50 @@ void main() {
     );
   });
 
+  testWidgets('a destructive button draws its label and icon in the danger '
+      'colour; the icon can follow the label', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
+        home: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PillButton(
+                label: '删除',
+                icon: AlistenIcons.trash,
+                style: PillButtonStyle.secondary,
+                danger: true,
+                onPressed: null,
+              ),
+              PillButton(
+                label: '下一页',
+                icon: AlistenIcons.arrowRight,
+                style: PillButtonStyle.ghost,
+                iconAfter: true,
+                onPressed: null,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final colors = AlistenColors.of(tester.element(find.text('删除')));
+    expect(tester.widget<Text>(find.text('删除')).style!.color, colors.danger);
+    expect(
+      tester.widget<Icon>(find.byIcon(AlistenIcons.trash)).color,
+      colors.danger,
+    );
+    expect(
+      tester.getCenter(find.byIcon(AlistenIcons.arrowRight)).dx,
+      greaterThan(tester.getCenter(find.text('下一页')).dx),
+    );
+    expect(
+      tester.getCenter(find.byIcon(AlistenIcons.trash)).dx,
+      lessThan(tester.getCenter(find.text('删除')).dx),
+    );
+  });
+
   for (final scale in [1.0, 1.5, 2.0, 3.0]) {
     for (final large in [false, true]) {
       testWidgets('heightOf is the height of a one-line button at text scale '
