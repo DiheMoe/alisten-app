@@ -2,7 +2,11 @@ import 'dart:async';
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/theme/motion.dart';
+import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
+import 'package:alisten/shared/ui/tap_origin.dart';
+import 'package:alisten/shared/ui/zoom_frame.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -214,7 +218,7 @@ void main() {
   });
 
   testWidgets(
-    'a short sheet closes once dragged down 30 percent of its own height',
+    'a short sheet closes once a slow drag passes half its own height',
     (tester) async {
       await pumpPage(tester);
       unawaited(
@@ -236,22 +240,238 @@ void main() {
       );
       expect(tester.getSize(handle).height, greaterThanOrEqualTo(48));
 
-      // 慢速拖动，只让距离起作用；最初在触摸容差内的一段拖动不会移动面板。
+      // 慢速拖动，只让距离起作用。
       await tester.timedDrag(
         handle,
-        Offset(0, height * 0.2),
-        const Duration(seconds: 1),
+        Offset(0, height * 0.4),
+        const Duration(seconds: 2),
       );
       await tester.pumpAndSettle();
       expect(find.text('短弹层'), findsOneWidget);
 
       await tester.timedDrag(
         handle,
-        Offset(0, height * 0.3 + 2 * kTouchSlop),
-        const Duration(seconds: 1),
+        Offset(0, height * 0.5 + 2 * kTouchSlop),
+        const Duration(seconds: 2),
       );
       await tester.pumpAndSettle();
       expect(find.text('短弹层'), findsNothing);
     },
   );
+
+  group('the sheet moves on a spring and follows the finger', () {
+    Finder handle() => find.bySemanticsLabel(
+      const DefaultMaterialLocalizations().closeButtonLabel,
+    );
+    double top(WidgetTester tester) => tester.getTopLeft(find.text('面板内容')).dy;
+
+    Future<void> open(WidgetTester tester) async {
+      await pumpPage(tester);
+      unawaited(
+        showSheetPanel<void>(
+          pageContext,
+          builder: (_) => const SizedBox(height: 300, child: Text('面板内容')),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> drag(
+      WidgetTester tester,
+      double distance, {
+      double speed = 200,
+    }) async {
+      final gesture = await tester.startGesture(tester.getCenter(handle()));
+      const steps = 20;
+      for (var i = 0; i < steps; i++) {
+        await gesture.moveBy(Offset(0, distance / steps));
+        await tester.pump(
+          Duration(microseconds: (distance / steps / speed * 1e6).round()),
+        );
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('it rises most of the way in a tenth of a second and settles', (
+      tester,
+    ) async {
+      await pumpPage(tester);
+      unawaited(
+        showSheetPanel<void>(
+          pageContext,
+          builder: (_) => const SizedBox(height: 300, child: Text('面板内容')),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      final rising = top(tester);
+      await tester.pumpAndSettle();
+      final rest = top(tester);
+
+      expect(rising, greaterThan(rest));
+      expect(rising - rest, lessThan(780 * 0.5));
+    });
+
+    testWidgets('a drag moves it with the finger, one to one', (tester) async {
+      await open(tester);
+      final rest = top(tester);
+
+      final gesture = await tester.startGesture(tester.getCenter(handle()));
+      for (var i = 0; i < 10; i++) {
+        await gesture.moveBy(const Offset(0, 20));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      expect(top(tester), closeTo(rest + 200, 1));
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a short slow drag puts it back, a long drag closes it', (
+      tester,
+    ) async {
+      await open(tester);
+      final rest = top(tester);
+
+      await drag(tester, 120);
+      expect(find.text('面板内容'), findsOneWidget);
+      expect(top(tester), rest);
+
+      await drag(tester, 300);
+      expect(find.text('面板内容'), findsNothing);
+    });
+
+    testWidgets('a short flick closes it', (tester) async {
+      await open(tester);
+
+      await tester.fling(handle(), const Offset(0, 80), 2000);
+      await tester.pumpAndSettle();
+
+      expect(find.text('面板内容'), findsNothing);
+    });
+
+    testWidgets('dragged up it stretches a little and comes back', (
+      tester,
+    ) async {
+      await open(tester);
+      final rest = top(tester);
+
+      final gesture = await tester.startGesture(tester.getCenter(handle()));
+      for (var i = 0; i < 10; i++) {
+        await gesture.moveBy(const Offset(0, -30));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      // 拉了 300，橡皮筋只让它上移六十来像素。
+      expect(rest - top(tester), closeTo(rubberBand(300, 100), 1));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(top(tester), rest);
+    });
+  });
+
+  group('a sheet opened by a button', () {
+    const button = Key('button');
+
+    Future<void> pumpButton(
+      WidgetTester tester, {
+      required Alignment at,
+    }) async {
+      await pumpPage(tester);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.light)),
+          home: Builder(
+            builder: (context) => Align(
+              alignment: at,
+              child: Pressable(
+                key: button,
+                focusRadius: const BorderRadius.all(Radius.circular(14)),
+                onPressed: () => unawaited(
+                  showSheetPanel<void>(
+                    context,
+                    builder: (_) =>
+                        const SizedBox(height: 300, child: Text('面板内容')),
+                  ),
+                ),
+                child: const SizedBox(width: 120, height: 48),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    Rect card(WidgetTester tester) {
+      final frame = tester.renderObject<RenderZoomFrame>(
+        find.ancestor(
+          of: find.text('面板内容', skipOffstage: false),
+          matching: find.byType(ZoomFrame),
+        ),
+      );
+      return MatrixUtils.transformRect(frame.getTransformTo(null), frame.shape);
+    }
+
+    Future<void> pullDown(WidgetTester tester) async {
+      final handle = find.bySemanticsLabel(
+        const DefaultMaterialLocalizations().closeButtonLabel,
+      );
+      final gesture = await tester.startGesture(tester.getCenter(handle));
+      for (var i = 0; i < 10; i++) {
+        await gesture.moveBy(const Offset(0, 30));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pump();
+    }
+
+    tearDown(TapOrigin.reset);
+
+    testWidgets('in the lower half, the sheet grows out of it and a pull '
+        'down shrinks it back in', (tester) async {
+      await pumpButton(tester, at: const Alignment(0.6, 0.8));
+      final from = tester.getRect(find.byKey(button));
+
+      await tester.tap(find.byKey(button));
+      await tester.pump();
+      await tester.pump();
+      expect(card(tester), rectMoreOrLessEquals(from, epsilon: 1));
+      await tester.pumpAndSettle();
+      expect(card(tester).width, greaterThan(from.width));
+
+      await pullDown(tester);
+      await tester.pump(const Duration(milliseconds: 250));
+      final shrinking = card(tester);
+      expect(shrinking.width, lessThan(from.width * 3));
+      expect((shrinking.center - from.center).distance, lessThan(150));
+      await tester.pumpAndSettle();
+      expect(find.text('面板内容'), findsNothing);
+    });
+
+    testWidgets('in the upper half, the sheet still rises from the bottom and '
+        'a pull down drops it down, never up to the button', (tester) async {
+      await pumpButton(tester, at: const Alignment(0.6, -0.6));
+      const screenHeight = 2340 / 3;
+
+      await tester.tap(find.byKey(button));
+      await tester.pump();
+      await tester.pump();
+      expect(card(tester).top, greaterThanOrEqualTo(screenHeight - 1));
+      await tester.pumpAndSettle();
+      final rest = card(tester);
+
+      await pullDown(tester);
+      var lowest = rest.top;
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        if (find.text('面板内容').evaluate().isEmpty) break;
+        final now = card(tester).top;
+        expect(now, greaterThanOrEqualTo(lowest - 1));
+        lowest = now;
+      }
+      await tester.pumpAndSettle();
+      expect(find.text('面板内容'), findsNothing);
+    });
+  });
 }

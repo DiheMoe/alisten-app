@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:alisten/app/room/room_mode.dart';
+import 'package:alisten/shared/theme/motion.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:flutter/widgets.dart';
 
@@ -75,7 +76,7 @@ class RoomPagerState extends State<RoomPager> {
     final index = widget.pages.indexOf(mode);
     if (index < 0 || !_controller.hasClients || _restsOn(index)) return;
     _target = index;
-    final duration = AlistenDurations.of(context, AlistenDurations.medium);
+    final duration = AlistenDurations.of(context, AlistenMotion.modeGlide);
     // 时长为零的动画会触发断言。
     if (duration == Duration.zero) {
       _controller.jumpToPage(index);
@@ -85,7 +86,7 @@ class RoomPagerState extends State<RoomPager> {
       _controller.animateToPage(
         index,
         duration: duration,
-        curve: AlistenCurves.emphasized,
+        curve: AlistenMotion.modeGlideCurve,
       ),
     );
   }

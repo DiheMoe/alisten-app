@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:alisten/shared/theme/motion.dart';
 import 'package:alisten/app/router.dart';
 import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/index.dart';
@@ -9,6 +10,7 @@ import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/server/data/preferences_server_store.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/index.dart';
+import 'package:alisten/shared/ui/page_routes.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -37,7 +39,7 @@ void main() {
       ('/playlists', '/playlists/pl-1', MyPlaylistScreen),
       ('/', '/s/$shareIdA', SharedPlaylistScreen),
     ]) {
-      testWidgets('$to slides in from $from and slides back out', (
+      testWidgets('$to grows in over $from and shrinks back out', (
         tester,
       ) async {
         await pumpAlistenApp(tester);
@@ -69,9 +71,38 @@ void main() {
       });
     }
 
-    testWidgets('the whole lobby recedes under a page above the mini player', (
+    testWidgets('settings dragged away stay closed when the next page opens', (
       tester,
     ) async {
+      await pumpAlistenApp(tester);
+      final router = appContainer(tester).read(routerProvider);
+      router.go('/settings');
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      final width =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio;
+
+      final gesture = await tester.startGesture(Offset(width * 0.3, 400));
+      for (var i = 0; i < 20; i++) {
+        await gesture.moveBy(Offset(width * 0.03, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(router.state.uri.path, '/');
+
+      router.go('/history');
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(SettingsScreen, skipOffstage: false), findsNothing);
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('a page above the mini player leaves the lobby in place and '
+        'darkens it', (tester) async {
       await pumpAlistenApp(tester);
       final router = appContainer(tester).read(routerProvider);
       router.go('/settings');
@@ -85,8 +116,21 @@ void main() {
 
       expect(
         tester.getTopLeft(find.byType(SettingsScreen, skipOffstage: false)).dx,
-        lessThan(0),
+        0,
       );
+      final dims = tester.widgetList<ColoredBox>(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is ColoredBox &&
+              widget.color.r == 0 &&
+              widget.color.g == 0 &&
+              widget.color.b == 0 &&
+              widget.color.a > 0 &&
+              widget.color.a <= AlistenMotion.coveredDim + 1e-6,
+          skipOffstage: false,
+        ),
+      );
+      expect(dims, isNotEmpty);
     });
 
     testWidgets('every page is built by the app, not go_router\'s fallback', (
@@ -97,14 +141,14 @@ void main() {
 
       expect(
         ModalRoute.of(tester.element(find.byType(LobbyScreen))),
-        isA<MaterialRouteTransitionMixin<dynamic>>(),
+        isA<ZoomPageRoute<dynamic>>(),
       );
       router.go('/settings/licenses');
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
       expect(
         ModalRoute.of(tester.element(find.byType(LicensesScreen))),
-        isA<MaterialRouteTransitionMixin<dynamic>>(),
+        isA<ZoomPageRoute<dynamic>>(),
       );
     });
   });

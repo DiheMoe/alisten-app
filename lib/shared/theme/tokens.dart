@@ -83,10 +83,7 @@ abstract final class AlistenSizes {
   static const double sidePanelWidth = 400;
 }
 
-/// 按下反馈只用缩小和变淡，不用水波纹。
 abstract final class AlistenPress {
-  static const double scale = 0.96;
-  static const double opacity = 0.82;
   static const double disabledOpacity = 0.4;
 }
 
@@ -103,8 +100,6 @@ abstract final class AlistenDurations {
   static const layout = Duration(milliseconds: 400);
   static const track = Duration(milliseconds: 450);
   static const bounce = Duration(milliseconds: 420);
-  static const pageEnter = Duration(milliseconds: 350);
-  static const pageExit = Duration(milliseconds: 300);
   static const lyricState = Duration(milliseconds: 400);
   static const lyricBlur = Duration(milliseconds: 120);
   static const theme = Duration(milliseconds: 600);

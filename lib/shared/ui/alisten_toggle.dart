@@ -1,4 +1,5 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
+import 'package:alisten/shared/theme/motion.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/material.dart';
@@ -19,7 +20,7 @@ class AlistenToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     final onChanged = this.onChanged;
-    final duration = AlistenDurations.of(context, AlistenDurations.short);
+    final duration = AlistenDurations.of(context, AlistenMotion.toggle);
     final pill = BorderRadius.circular(AlistenRadii.pill);
     return Pressable(
       onPressed: onChanged == null ? null : () => onChanged(!value),
@@ -43,7 +44,7 @@ class AlistenToggle extends StatelessWidget {
             ),
             child: AnimatedAlign(
               duration: duration,
-              curve: AlistenCurves.bounce,
+              curve: AlistenMotion.toggleCurve,
               alignment: value
                   ? AlignmentDirectional.centerEnd
                   : AlignmentDirectional.centerStart,

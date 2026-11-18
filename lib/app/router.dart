@@ -24,6 +24,7 @@ import 'package:alisten/features/settings/index.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
+import 'package:alisten/shared/ui/page_routes.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
@@ -81,7 +82,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     errorBuilder: (context, state) => const _LostPage(),
     routes: [
       ShellRoute(
-        pageBuilder: (context, state, child) => MaterialPage(
+        pageBuilder: (context, state, child) => AlistenPage<void>(
           key: state.pageKey,
           child: MiniPlayerHost(location: state.uri, child: child),
         ),
@@ -375,8 +376,9 @@ final _roomPaths = {for (final mode in RoomMode.values) _roomPath(mode)};
 const _roomPageKey = ValueKey('room');
 
 Page<void> _roomPage(String roomRef, RoomMode mode) {
-  return MaterialPage(
+  return AlistenPage(
     key: _roomPageKey,
+    returnTo: roomZoomTag,
     child: RoomTheme(
       child: RoomRouteGate(
         roomRef: roomRef,
@@ -388,22 +390,14 @@ Page<void> _roomPage(String roomRef, RoomMode mode) {
 
 // 页面都由这里给出：go_router 按 material_ui 的 MaterialApp 判断应用类型，认不出
 // flutter/material 的 MaterialApp，只给 builder 的路由会退回没有转场的页面。
-//
-// [task] 页面从底部升起。Apple 平台除外：全屏对话框没有边缘滑动返回。
 GoRouterPageBuilder _page(GoRouterWidgetBuilder builder, {bool task = false}) {
-  return (context, state) {
-    final platform = Theme.of(context).platform;
-    return MaterialPage(
-      key: state.pageKey,
-      name: state.name ?? state.path,
-      restorationId: state.pageKey.value,
-      fullscreenDialog:
-          task &&
-          platform != TargetPlatform.iOS &&
-          platform != TargetPlatform.macOS,
-      child: Builder(builder: (context) => builder(context, state)),
-    );
-  };
+  return (context, state) => AlistenPage<void>(
+    key: state.pageKey,
+    name: state.name ?? state.path,
+    restorationId: state.pageKey.value,
+    task: task,
+    child: Builder(builder: (context) => builder(context, state)),
+  );
 }
 
 // 歌单 ID 由服务端给出，App 不假设它的格式。

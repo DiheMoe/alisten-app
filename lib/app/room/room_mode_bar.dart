@@ -237,7 +237,10 @@ class _Tab extends StatelessWidget {
           minHeight: AlistenSizes.minTouchTarget,
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: _tabPadding),
+          // 只显示图标时说明格子已经很窄，让出边距，图标居中就够了。
+          padding: content == _TabContent.icon
+              ? EdgeInsets.zero
+              : const EdgeInsets.symmetric(horizontal: _tabPadding),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

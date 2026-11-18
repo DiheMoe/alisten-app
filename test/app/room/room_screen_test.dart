@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:alisten/app/deep_link_controller.dart';
+import 'package:alisten/app/mini_player.dart';
 import 'package:alisten/app/room/room_mode_bar.dart';
 import 'package:alisten/app/room/room_screen.dart';
 import 'package:alisten/core/protocol/protocol.gen.dart' show RoomRequestTypes;
@@ -21,6 +22,7 @@ import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
+import 'package:alisten/shared/ui/zoom_frame.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -335,36 +337,29 @@ void main() {
     expect(tester.testTextInput.isVisible, isTrue);
   });
 
-  testWidgets('song search rises as a task, with a way to put it back down', (
-    tester,
-  ) async {
-    final (rooms: _, :router, :settle) = await _enterRoom(tester);
-    router.go('/r/listen/lyrics');
-    await settle();
+  testWidgets(
+    'song search rises as a task, with a way to put it back down',
+    (tester) async {
+      final (rooms: _, :router, :settle) = await _enterRoom(tester);
+      router.go('/r/listen/lyrics');
+      await settle();
 
-    await tester.tap(find.text('点歌'));
-    await settle();
+      await tester.tap(find.text('点歌'));
+      await settle();
 
-    final route = ModalRoute.of(tester.element(find.byType(SearchScreen)))!;
-    expect((route as PageRoute<void>).fullscreenDialog, isTrue);
-    expect(find.byIcon(AlistenIcons.caretDown), findsOneWidget);
-    expect(find.byIcon(AlistenIcons.arrowLeft), findsNothing);
-  });
-
-  testWidgets('on Apple platforms song search keeps the back swipe', (
-    tester,
-  ) async {
-    final (rooms: _, :router, :settle) = await _enterRoom(tester);
-    router.go('/r/listen/lyrics');
-    await settle();
-
-    await tester.tap(find.text('点歌'));
-    await settle();
-
-    final route = ModalRoute.of(tester.element(find.byType(SearchScreen)))!;
-    expect((route as PageRoute<void>).fullscreenDialog, isFalse);
-    expect(find.byIcon(AlistenIcons.arrowLeft), findsOneWidget);
-  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+      final route = ModalRoute.of(tester.element(find.byType(SearchScreen)))!;
+      expect((route as PageRoute<void>).fullscreenDialog, isTrue);
+      // 房间仍在任务页后面露出一条，它的顶栏也有收起按钮。
+      Finder inSearch(Finder finder) =>
+          find.descendant(of: find.byType(SearchScreen), matching: finder);
+      expect(inSearch(find.byIcon(AlistenIcons.caretDown)), findsOneWidget);
+      expect(inSearch(find.byIcon(AlistenIcons.arrowLeft)), findsNothing);
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
   testWidgets('a track that fails here says so, and a tap tries again', (
     tester,
@@ -1142,6 +1137,34 @@ void main() {
     expect(router.state.uri.path, leave == _Leave.player ? '/r/listen' : '/');
     semantics.dispose();
   }, variant: _leaving);
+
+  testWidgets('collapsed, the room shrinks into the mini player', (
+    tester,
+  ) async {
+    final (rooms: _, router: _, :settle) = await _enterRoom(tester);
+
+    await tester.tap(find.bySemanticsLabel('收起房间'));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final frame = tester.renderObject<RenderZoomFrame>(
+      find
+          .ancestor(
+            of: find.byType(RoomScreen, skipOffstage: false),
+            matching: find.byType(ZoomFrame),
+          )
+          .first,
+    );
+    final shape = MatrixUtils.transformRect(
+      frame.getTransformTo(null),
+      frame.shape,
+    );
+    final player = tester.getRect(find.byType(MiniPlayer));
+    expect((shape.center - player.center).distance, lessThan(150));
+    expect(shape.height, lessThan(player.height * 4));
+    await settle();
+  });
 
   testWidgets('a sideways drag in the focused chat input moves its cursor, '
       'keeps the keyboard and does not turn the page', (tester) async {

@@ -13,6 +13,7 @@ import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
+import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -129,19 +130,25 @@ class _MiniPlayerSlot extends ConsumerWidget {
       ),
       child: roomId == null
           ? const SizedBox(width: double.infinity)
-          : RoomTheme(
-              child: MiniPlayer(
-                roomId: roomId,
-                status: status,
-                failure: failure,
-                errorMessage: errorMessage,
-                roomName: roomName,
-                nowPlaying: nowPlaying,
+          : ZoomTarget(
+              tag: roomZoomTag,
+              child: RoomTheme(
+                child: MiniPlayer(
+                  roomId: roomId,
+                  status: status,
+                  failure: failure,
+                  errorMessage: errorMessage,
+                  roomName: roomName,
+                  nowPlaying: nowPlaying,
+                ),
               ),
             ),
     );
   }
 }
+
+/// 房间收起时缩回迷你播放条。
+const roomZoomTag = 'room';
 
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({
@@ -213,7 +220,10 @@ class MiniPlayer extends StatelessWidget {
     void open() => context.go('/r/$roomId');
     return GestureDetector(
       onVerticalDragEnd: (details) {
-        if ((details.primaryVelocity ?? 0) < -_openVelocity) open();
+        if ((details.primaryVelocity ?? 0) < -_openVelocity) {
+          TapOrigin.record(context, radius: AlistenRadii.md);
+          open();
+        }
       },
       child: Pressable(
         onPressed: open,

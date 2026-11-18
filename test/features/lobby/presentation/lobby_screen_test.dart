@@ -135,11 +135,12 @@ final class _Lobby {
     );
   }
 
-  // 加载指示器持续转动，pumpAndSettle 无法结束，只能按时间推进。
+  // 加载指示器持续转动，pumpAndSettle 无法结束，只能按时间推进。步长要盖过面板
+  // 弹簧约 0.5 秒的停稳时间。
   Future<void> settle() async {
     await tester.pump();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 700));
   }
 
   Future<void> systemBack() {

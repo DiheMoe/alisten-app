@@ -60,9 +60,10 @@ Future<ProviderContainer> pumpPlaylistsPage(
   return ProviderScope.containerOf(tester.element(find.byWidget(page)));
 }
 
-/// 加载中的忙碌指示器一直在转，不能等画面静止，只能按固定步长推进。
+/// 加载中的忙碌指示器一直在转，不能等画面静止，只能按固定步长推进。步长要
+/// 盖过面板弹簧约 0.5 秒的停稳时间。
 Future<void> settlePage(WidgetTester tester) async {
   await tester.pump();
   await tester.pump();
-  await tester.pump(const Duration(milliseconds: 500));
+  await tester.pump(const Duration(milliseconds: 700));
 }

@@ -13,6 +13,7 @@ import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
+import 'package:alisten/shared/ui/keyed_sliver_list.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/section_header.dart';
@@ -163,10 +164,6 @@ class QueueView extends ConsumerWidget {
               if (!started(entry)) entry,
           ]
         : snapshot.items;
-    final indexOf = {
-      for (var index = 0; index < waiting.length; index++)
-        waiting[index].id: index,
-    };
     return RepaintBoundary(
       child: EdgeFade(
         top: _topFade,
@@ -272,19 +269,16 @@ class QueueView extends ConsumerWidget {
               if (waiting.isEmpty)
                 _faded(const _NoneWaiting())
               else
-                SliverList.builder(
-                  itemCount: waiting.length,
-                  findChildIndexCallback: (key) =>
-                      key is ValueKey<String> ? indexOf[key.value] : null,
+                KeyedSliverList<QueueEntry>(
+                  items: waiting,
+                  keyOf: (entry) => entry.id,
                   // 自动添加的重绘边界包在 `EdgeFadeItem` 外，滚动时它不会
                   // 重绘，渐隐会停在旧位置，所以边界放在它内部。
                   addRepaintBoundaries: false,
-                  itemBuilder: (context, index) {
-                    final entry = waiting[index];
+                  itemBuilder: (context, entry, index) {
                     final inFlight = busy.entries.contains(entry.id);
                     final enabled = connected && !inFlight;
                     return EdgeFadeItem(
-                      key: ValueKey(entry.id),
                       child: RepaintBoundary(
                         child: _Panel(
                           last: index == waiting.length - 1,

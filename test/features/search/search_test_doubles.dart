@@ -175,11 +175,12 @@ final class SearchPage {
     return page;
   }
 
-  /// 加载动画持续转动，界面不会静止，只能按固定步长推进时间。
+  /// 加载动画持续转动，界面不会静止，只能按固定步长推进时间。步长要盖过面板
+  /// 弹簧约 0.5 秒的停稳时间。
   Future<void> settle() async {
     await tester.pump();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 700));
   }
 
   Future<void> search(String keyword) async {

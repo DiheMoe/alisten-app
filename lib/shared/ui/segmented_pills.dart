@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
+import 'package:alisten/shared/theme/motion.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/material.dart';
@@ -66,8 +67,8 @@ class SegmentedPills<T> extends StatelessWidget {
                   count == 1 ? 0 : -1 + 2 * chosen / (count - 1),
                   0,
                 ),
-                duration: AlistenDurations.of(context, AlistenDurations.medium),
-                curve: AlistenCurves.emphasized,
+                duration: AlistenDurations.of(context, AlistenMotion.segment),
+                curve: AlistenMotion.segmentCurve,
                 child: FractionallySizedBox(
                   widthFactor: 1 / count,
                   heightFactor: 1,
@@ -137,7 +138,7 @@ class _Segment<T> extends StatelessWidget {
     final ink = selected
         ? Theme.of(context).colorScheme.surface
         : colors.onGlass;
-    final duration = AlistenDurations.of(context, AlistenDurations.medium);
+    final duration = AlistenDurations.of(context, AlistenMotion.segmentLabel);
     final icon = segment.icon;
     return Pressable(
       onPressed: onPressed,
@@ -163,7 +164,7 @@ class _Segment<T> extends StatelessWidget {
                 TweenAnimationBuilder<Color?>(
                   tween: ColorTween(end: ink),
                   duration: duration,
-                  curve: AlistenCurves.emphasized,
+                  curve: AlistenMotion.segmentCurve,
                   builder: (context, color, _) =>
                       Icon(icon, size: AlistenSizes.iconSm, color: color),
                 ),
@@ -173,7 +174,7 @@ class _Segment<T> extends StatelessWidget {
                 Flexible(
                   child: AnimatedDefaultTextStyle(
                     duration: duration,
-                    curve: AlistenCurves.emphasized,
+                    curve: AlistenMotion.segmentCurve,
                     style: labelStyle(selected: selected).copyWith(color: ink),
                     child: Text(
                       segment.label,

@@ -14,6 +14,7 @@ import 'package:alisten/features/playlists/presentation/playlist_name_form.dart'
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/keyed_sliver_list.dart';
 import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
@@ -246,18 +247,15 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
         if (view.view == PlaylistView.grid)
           _grid(playlists, nowMs)
         else
-          SliverList.builder(
-            itemCount: playlists.length,
-            itemBuilder: (context, index) {
-              final playlist = playlists[index];
-              return _Row(
-                key: ValueKey(playlist.id),
-                playlist: playlist,
-                subtitle: _subtitle(playlist, nowMs),
-                onOpen: () => widget.onOpenPlaylist(playlist.id),
-                menu: _menu(playlist),
-              );
-            },
+          KeyedSliverList<MyPlaylist>(
+            items: playlists,
+            keyOf: (playlist) => playlist.id,
+            itemBuilder: (context, playlist, index) => _Row(
+              playlist: playlist,
+              subtitle: _subtitle(playlist, nowMs),
+              onOpen: () => widget.onOpenPlaylist(playlist.id),
+              menu: _menu(playlist),
+            ),
           ),
         SliverPadding(
           padding: EdgeInsets.only(bottom: bottom + AlistenSpacing.xl),
@@ -559,7 +557,6 @@ class _Row extends StatelessWidget {
     required this.subtitle,
     required this.onOpen,
     required this.menu,
-    super.key,
   });
 
   final MyPlaylist playlist;

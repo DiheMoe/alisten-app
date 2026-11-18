@@ -11,10 +11,11 @@ import 'package:alisten/features/playlists/presentation/playlist_cover.dart';
 import 'package:alisten/features/playlists/presentation/playlist_name_form.dart';
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
+import 'package:alisten/shared/theme/motion.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/animated_resize.dart';
-import 'package:alisten/shared/ui/fade_leaving_inert.dart';
+import 'package:alisten/shared/ui/fade_through.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
@@ -397,7 +398,7 @@ class _SaveToPlaylistSheetState extends ConsumerState<SaveToPlaylistSheet> {
     final key = target is SaveOneTrack ? trackKey(target.track) : null;
     final ticked = key == null ? null : list.memberships[key];
     final error = (playlists == null ? list.error : null) ?? _membershipError;
-    final motion = AlistenDurations.of(context, AlistenDurations.short);
+    final motion = AlistenDurations.of(context, AlistenMotion.fadeThrough);
     final Widget body;
     var titled = true;
     if (list.guest) {
@@ -458,7 +459,7 @@ class _SaveToPlaylistSheetState extends ConsumerState<SaveToPlaylistSheet> {
               ),
               AnimatedSwitcher(
                 duration: motion,
-                transitionBuilder: fadeLeavingInert,
+                transitionBuilder: _fadeFromTop,
                 layoutBuilder: _topAligned,
                 child: body,
               ),
@@ -473,7 +474,7 @@ class _SaveToPlaylistSheetState extends ConsumerState<SaveToPlaylistSheet> {
         alignment: Alignment.topCenter,
         child: AnimatedSwitcher(
           duration: motion,
-          transitionBuilder: fadeLeavingInert,
+          transitionBuilder: _fadeFromTop,
           layoutBuilder: _topAligned,
           child: content,
         ),
@@ -701,3 +702,5 @@ class _NewPlaylistRow extends StatelessWidget {
     );
   }
 }
+
+final _fadeFromTop = fadeThroughFrom(Alignment.topCenter);
