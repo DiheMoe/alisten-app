@@ -189,7 +189,7 @@ void main() {
     await tester.tap(find.text('复制到我的歌单'));
     await settlePage(tester);
 
-    expect(find.text('注册或登录之后就能把这个歌单复制到自己的歌单。'), findsOneWidget);
+    expect(find.text('登录后可以复制到自己的歌单'), findsOneWidget);
     await tester.tap(find.text('去账号设置'));
     await settlePage(tester);
     expect(accountOpened, 1);
@@ -205,7 +205,7 @@ void main() {
     final container = await open(tester, signedIn: false);
     await tester.tap(find.text('复制到我的歌单'));
     await settlePage(tester);
-    expect(find.text('注册或登录之后就能把这个歌单复制到自己的歌单。'), findsOneWidget);
+    expect(find.text('登录后可以复制到自己的歌单'), findsOneWidget);
 
     final identity = container.read(identityControllerProvider);
     container
@@ -213,7 +213,7 @@ void main() {
         .updateAccount(identity.member!.id, testAccount);
     await settlePage(tester);
 
-    expect(find.text('注册或登录之后就能把这个歌单复制到自己的歌单。'), findsNothing);
+    expect(find.text('登录后可以复制到自己的歌单'), findsNothing);
     expect(
       tester.widget<EditableText>(find.byType(EditableText)).controller.text,
       '夜跑',

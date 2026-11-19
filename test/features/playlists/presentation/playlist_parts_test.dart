@@ -174,7 +174,7 @@ void main() {
                 title: '复制到我的歌单',
                 confirmLabel: '复制',
                 busyLabel: '正在复制…',
-                guestMessage: '注册或登录之后就能把这个歌单复制到自己的歌单。',
+                guestMessage: '登录后可以复制到自己的歌单',
                 onOpenAccount: () => opened++,
                 onSubmit: (_) async => const MutationSucceeded('x'),
               ),
@@ -188,7 +188,7 @@ void main() {
 
     await tester.tap(find.text('打开'));
     await settlePage(tester);
-    expect(find.text('注册或登录之后就能把这个歌单复制到自己的歌单。'), findsOneWidget);
+    expect(find.text('登录后可以复制到自己的歌单'), findsOneWidget);
     expect(find.byType(EditableText), findsNothing);
 
     await tester.tap(find.text('去账号设置'));
@@ -286,8 +286,7 @@ void main() {
       Scaffold(body: PlaylistGuestState(onOpenAccount: () => opened++)),
     );
 
-    expect(find.text('收藏你喜欢的歌'), findsOneWidget);
-    expect(find.text('注册账号之后，就能收藏歌曲、建自己的歌单。'), findsOneWidget);
+    expect(find.text('登录后使用歌单'), findsOneWidget);
     await tester.tap(find.text('去账号设置'));
     await tester.pump();
     expect(opened, 1);

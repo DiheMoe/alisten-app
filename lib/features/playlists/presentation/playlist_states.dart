@@ -112,8 +112,7 @@ class PlaylistGuestState extends StatelessWidget {
   Widget build(BuildContext context) {
     return EmptyState(
       icon: AlistenIcons.starFill,
-      title: '收藏你喜欢的歌',
-      message: '注册账号之后，就能收藏歌曲、建自己的歌单。',
+      title: '登录后使用歌单',
       action: PillButton(
         label: '去账号设置',
         icon: AlistenIcons.user,

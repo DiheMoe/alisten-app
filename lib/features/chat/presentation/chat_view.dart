@@ -419,7 +419,6 @@ class _ChatViewState extends ConsumerState<ChatView> {
       timeline = const EmptyState(
         icon: AlistenIcons.chatsCircle,
         title: '还没有消息',
-        message: '说点什么，聊聊正在放的这首歌',
       );
     } else {
       // 只有房间丢弃了最早的几行时才找不到，那些行也已从时间线消失。

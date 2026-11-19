@@ -73,7 +73,7 @@ void main() {
   testWidgets('a guest is asked to sign in', (tester) async {
     await open(tester, signedIn: false);
 
-    expect(find.text('注册或登录之后就能保存这个歌单。'), findsOneWidget);
+    expect(find.text('登录后可以保存这个歌单'), findsOneWidget);
     expect(server.calls, isEmpty);
     await tester.tap(find.text('去账号设置'));
     await settlePage(tester);

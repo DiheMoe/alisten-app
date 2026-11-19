@@ -458,8 +458,9 @@ class _TitleBlock extends ConsumerWidget {
             final member? => '${member.name} 点歌',
             null => null,
           };
+    // 没有歌时副标题留空：占着那一行，开始播放时标题不跳。
     final subtitle = entry == null
-        ? '点的歌会在房间里同步播放'
+        ? ''
         : [
             entry.meta.artist,
             ?requester,

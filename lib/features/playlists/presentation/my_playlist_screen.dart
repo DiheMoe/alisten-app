@@ -488,7 +488,7 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
                 ? const EmptyState(
                     icon: AlistenIcons.queue,
                     title: '这个歌单还是空的',
-                    message: '在播放器、队列和播放历史里，可以把歌保存到歌单。',
+                    message: '在播放器、队列或播放历史里保存歌曲',
                   )
                 : error == null
                 ? const PlaylistLoading()

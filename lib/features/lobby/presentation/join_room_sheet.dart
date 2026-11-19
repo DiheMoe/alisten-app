@@ -233,15 +233,17 @@ class _RoomSummary extends StatelessWidget {
                 ),
               ),
               if (room != null) ...[
-                const SizedBox(height: AlistenSpacing.xxs),
-                Text(
-                  description.isEmpty ? '来这里，听见好音乐。' : description,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: AlistenTypography.secondary.copyWith(
-                    color: colors.onGlassMuted,
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: AlistenSpacing.xxs),
+                  Text(
+                    description,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: AlistenTypography.secondary.copyWith(
+                      color: colors.onGlassMuted,
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: AlistenSpacing.xs),
                 Wrap(
                   spacing: AlistenSpacing.sm,

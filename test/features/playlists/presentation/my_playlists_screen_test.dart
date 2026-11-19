@@ -92,8 +92,7 @@ void main() {
       'account settings', (tester) async {
     await open(tester, signedIn: false);
 
-    expect(find.text('收藏你喜欢的歌'), findsOneWidget);
-    expect(find.text('注册账号之后，就能收藏歌曲、建自己的歌单。'), findsOneWidget);
+    expect(find.text('登录后使用歌单'), findsOneWidget);
     await tester.tap(find.text('去账号设置'));
     expect(accountOpened, 1);
     expect(server.calls, isEmpty);

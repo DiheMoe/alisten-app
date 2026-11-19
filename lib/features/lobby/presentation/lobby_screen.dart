@@ -378,7 +378,6 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
               : EmptyState(
                   icon: AlistenIcons.door,
                   title: '还没有可加入的房间',
-                  message: '创建一个房间，邀请朋友一起听。',
                   action: PillButton(
                     label: '刷新',
                     icon: AlistenIcons.arrowClockwise,

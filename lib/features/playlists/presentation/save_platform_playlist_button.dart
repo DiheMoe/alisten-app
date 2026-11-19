@@ -43,7 +43,7 @@ class SavePlatformPlaylistButton extends StatelessWidget {
         initialName: name,
         confirmLabel: '保存',
         busyLabel: '正在保存…',
-        guestMessage: '注册或登录之后就能保存这个歌单。',
+        guestMessage: '登录后可以保存这个歌单',
         onOpenAccount: onOpenAccount,
         onSubmit: (name) => list.importPlatform(
           source: source,

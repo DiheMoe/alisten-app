@@ -143,13 +143,13 @@ void main() {
     final semantics = tester.ensureSemantics();
     await openOne(tester, signedIn: false, restored: false);
 
-    expect(find.text('注册或登录之后就能把歌保存到歌单。'), findsOneWidget);
+    expect(find.text('登录后可以保存到歌单'), findsOneWidget);
     expect(find.text('保存到歌单'), findsOneWidget);
     await tester.tap(find.text('去账号设置'));
     await settlePage(tester);
 
     expect(accountOpened, 1);
-    expect(find.text('注册或登录之后就能把歌保存到歌单。'), findsNothing);
+    expect(find.text('登录后可以保存到歌单'), findsNothing);
     expect(server.calls, isEmpty);
     semantics.dispose();
   });
@@ -569,7 +569,7 @@ void main() {
   ) async {
     final semantics = tester.ensureSemantics();
     final container = await openOne(tester, signedIn: false);
-    expect(find.text('注册或登录之后就能把歌保存到歌单。'), findsOneWidget);
+    expect(find.text('登录后可以保存到歌单'), findsOneWidget);
 
     final identity = container.read(identityControllerProvider);
     container
@@ -577,7 +577,7 @@ void main() {
         .updateAccount(identity.member!.id, testAccount);
     await settlePage(tester);
 
-    expect(find.text('注册或登录之后就能把歌保存到歌单。'), findsNothing);
+    expect(find.text('登录后可以保存到歌单'), findsNothing);
     expect(
       tester.getSemantics(row('晨跑')),
       isSemantics(hasCheckedState: true, isChecked: true),
@@ -596,7 +596,7 @@ void main() {
     await settlePage(tester);
 
     expect(find.text('保存到歌单'), findsNothing);
-    expect(find.text('注册或登录之后就能把歌保存到歌单。'), findsNothing);
+    expect(find.text('登录后可以保存到歌单'), findsNothing);
     expect(notices, [(ToastKind.failure, signedOutNotice)]);
     semantics.dispose();
   });

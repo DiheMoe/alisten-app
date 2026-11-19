@@ -111,7 +111,6 @@ class AppearanceSettingsScreen extends ConsumerWidget {
           children: [
             SettingRow(
               title: '主题',
-              description: '跟随系统时，随手机的深浅色切换',
               trailing: SelectMenuButton<AppTheme>(
                 label: '主题',
                 options: _themes,
@@ -163,7 +162,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
             ),
             SettingRow(
               title: '系统通知',
-              description: 'App 不在前台时，用系统通知提醒',
+              description: 'App 在后台时提醒',
               trailing: AlistenToggle(
                 value: settings.systemNotifications,
                 semanticLabel: '系统通知',
@@ -275,7 +274,6 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
           children: [
             SettingRow(
               title: '记录最近搜索',
-              description: '在点歌页显示最近搜过的词',
               trailing: AlistenToggle(
                 value: settings.recordSearch,
                 semanticLabel: '记录最近搜索',

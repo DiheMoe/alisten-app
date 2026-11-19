@@ -264,7 +264,7 @@ void main() {
     await _openHistory(tester, const [], api: api);
 
     expect(find.bySemanticsLabel('加载中'), findsOneWidget);
-    expect(find.text('你的音乐足迹，从这里开始'), findsNothing);
+    expect(find.text('还没有播放记录'), findsNothing);
 
     read.complete([heard('晴天', at: _now)]);
     await _settle(tester);
@@ -293,7 +293,7 @@ void main() {
     expectDisabled();
     read.complete(const []);
     await _settle(tester);
-    expect(find.text('你的音乐足迹，从这里开始'), findsOneWidget);
+    expect(find.text('还没有播放记录'), findsOneWidget);
     expectDisabled();
     semantics.dispose();
   });
@@ -329,12 +329,11 @@ void main() {
     expect(find.text('晴天'), findsOneWidget);
   });
 
-  testWidgets('an empty history invites to listen, in the words of the '
-      'web', (tester) async {
+  testWidgets('an empty history says so in one line', (tester) async {
     await _openHistory(tester, const []);
 
-    expect(find.text('你的音乐足迹，从这里开始'), findsOneWidget);
-    expect(find.text('你在房间里听过的歌会记在这里。'), findsOneWidget);
+    expect(find.text('还没有播放记录'), findsOneWidget);
+    expect(find.text('你在房间里听过的歌会记在这里。'), findsNothing);
     expect(_filter, findsNothing);
   });
 
@@ -346,7 +345,6 @@ void main() {
     await tester.enterText(_filter, '不存在');
     await _settle(tester);
     expect(find.text('没有找到相关记录'), findsOneWidget);
-    expect(find.text('换个关键词，再找找看。'), findsOneWidget);
 
     await tester.tap(find.text('清除筛选'));
     await _settle(tester);
@@ -513,7 +511,7 @@ void main() {
 
     expect(opened.api.clearMyListensCalls, 1);
     expect(find.text(_clearWarning), findsNothing);
-    expect(find.text('你的音乐足迹，从这里开始'), findsOneWidget);
+    expect(find.text('还没有播放记录'), findsOneWidget);
     semantics.dispose();
   });
 

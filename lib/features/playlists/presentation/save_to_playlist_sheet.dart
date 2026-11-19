@@ -406,7 +406,7 @@ class _SaveToPlaylistSheetState extends ConsumerState<SaveToPlaylistSheet> {
         key: const ValueKey('guest'),
         padding: const EdgeInsets.only(top: AlistenSpacing.md),
         child: PlaylistGuestPrompt(
-          message: '注册或登录之后就能把歌保存到歌单。',
+          message: '登录后可以保存到歌单',
           onOpenAccount: () {
             dismissSheet(context);
             widget.onOpenAccount();

@@ -333,8 +333,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               padding: EdgeInsets.only(bottom: bottom),
               child: const EmptyState(
                 icon: AlistenIcons.clockCounterClockwise,
-                title: '你的音乐足迹，从这里开始',
-                message: '你在房间里听过的歌会记在这里。',
+                title: '还没有播放记录',
               ),
             ),
           )
@@ -345,7 +344,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               child: EmptyState(
                 icon: AlistenIcons.magnifyingGlassMinus,
                 title: '没有找到相关记录',
-                message: '换个关键词，再找找看。',
                 action: PillButton(
                   label: '清除筛选',
                   style: PillButtonStyle.secondary,

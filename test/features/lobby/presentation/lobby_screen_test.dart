@@ -303,7 +303,8 @@ void main() {
     Finder inSheet(Finder finder) =>
         find.descendant(of: _joinSheet, matching: finder);
     expect(inSheet(find.text('私人房间')), findsOneWidget);
-    expect(inSheet(find.text('来这里，听见好音乐。')), findsOneWidget);
+    // 房间没写简介时不补一句客套话。
+    expect(inSheet(find.text('来这里，听见好音乐。')), findsNothing);
     expect(inSheet(find.text('2 / 16 人在线')), findsOneWidget);
     expect(inSheet(find.text('需要密码')), findsOneWidget);
     expect(inSheet(find.byType(EditableText)), findsOneWidget);

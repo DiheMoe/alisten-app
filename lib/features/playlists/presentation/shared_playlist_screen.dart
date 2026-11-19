@@ -66,7 +66,7 @@ class SharedPlaylistScreen extends ConsumerWidget {
         initialName: shared.name,
         confirmLabel: '复制',
         busyLabel: '正在复制…',
-        guestMessage: '注册或登录之后就能把这个歌单复制到自己的歌单。',
+        guestMessage: '登录后可以复制到自己的歌单',
         onOpenAccount: onOpenAccount,
         onSubmit: (name) async {
           final result = await page.copy(name);

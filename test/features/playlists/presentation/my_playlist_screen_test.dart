@@ -751,7 +751,7 @@ void main() {
   testWidgets('a guest is sent to the account settings', (tester) async {
     await open(tester, signedIn: false);
 
-    expect(find.text('收藏你喜欢的歌'), findsOneWidget);
+    expect(find.text('登录后使用歌单'), findsOneWidget);
     await tester.tap(find.text('去账号设置'));
     expect(accountOpened, 1);
     expect(server.calls, isEmpty);
@@ -776,7 +776,7 @@ void main() {
     await open(tester);
 
     expect(find.text('这个歌单还是空的'), findsOneWidget);
-    expect(find.text('在播放器、队列和播放历史里，可以把歌保存到歌单。'), findsOneWidget);
+    expect(find.text('在播放器、队列或播放历史里保存歌曲'), findsOneWidget);
     expect(find.bySemanticsLabel('编辑'), findsNothing);
   });
 

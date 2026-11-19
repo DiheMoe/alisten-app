@@ -91,14 +91,16 @@ class SettingsRowTitle extends StatelessWidget {
 class SettingRow extends StatelessWidget {
   const SettingRow({
     required this.title,
-    required this.description,
     required this.trailing,
+    this.description,
     this.labelled = true,
     super.key,
   });
 
   final String title;
-  final String description;
+
+  /// 只在标题说不清时写，比如要满足的条件。
+  final String? description;
   final Widget trailing;
   final bool labelled;
 
@@ -126,13 +128,15 @@ class SettingRow extends StatelessWidget {
                       excluding: labelled,
                       child: SettingsRowTitle(title),
                     ),
-                    const SizedBox(height: AlistenSpacing.xxs / 2),
-                    Text(
-                      description,
-                      style: AlistenTypography.secondary.copyWith(
-                        color: AlistenColors.of(context).onGlassMuted,
+                    if (description case final description?) ...[
+                      const SizedBox(height: AlistenSpacing.xxs / 2),
+                      Text(
+                        description,
+                        style: AlistenTypography.secondary.copyWith(
+                          color: AlistenColors.of(context).onGlassMuted,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
