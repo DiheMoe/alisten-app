@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/domain/track/track.dart';
+import 'package:alisten/features/playlists/presentation/playlist_cover.dart';
 import 'package:alisten/features/playlists/application/my_playlist_controller.dart';
 import 'package:alisten/features/playlists/application/my_playlists_controller.dart';
 import 'package:alisten/features/playlists/presentation/my_playlist_screen.dart';
@@ -198,6 +199,14 @@ void main() {
 
     expect(find.text('夜跑'), findsOneWidget);
     expect(find.textContaining('4 首，更新于'), findsOneWidget);
+    // 列表里的封面、名字和说明飞到这里。
+    final tags = myPlaylistHeroTags('pl-1');
+    for (final tag in [tags.cover, tags.name, tags.facts]) {
+      expect(
+        find.byWidgetPredicate((widget) => widget is Hero && widget.tag == tag),
+        findsOneWidget,
+      );
+    }
     expect(find.text('进入房间后可点歌'), findsNothing);
     expect(find.bySemanticsLabel('点歌《歌a》'), findsNothing);
     // 编辑和歌单操作在顶栏，不在封面下面。

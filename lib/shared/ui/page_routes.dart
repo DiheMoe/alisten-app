@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui show Image;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/motion.dart';
@@ -95,7 +94,12 @@ final class AlistenPage<T> extends Page<T> {
           source != null &&
           origin.rect.shortestSide >= AlistenSizes.largeTouchTarget) {
         final pixelRatio = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
-        return ZoomPageRoute<T>._(this, origin, source.snapshot(pixelRatio));
+        final image = source.snapshot(pixelRatio);
+        return ZoomPageRoute<T>._(
+          this,
+          origin,
+          image == null ? null : ZoomPicture(image, origin.shared),
+        );
       }
       // 有返回目标的页面（房间）没有入口卡片时从右边滑入，关闭时照样收进
       // 返回目标。
@@ -122,7 +126,7 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
   final LaunchOrigin? _origin;
 
   /// 起飞时入口卡片的样子，见 [ZoomSource]。
-  final ui.Image? _picture;
+  final ZoomPicture? _picture;
 
   AlistenPage<T> get _page => settings as AlistenPage<T>;
 
@@ -416,6 +420,10 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
         // 不回到入口卡片时（收进迷你播放条、卡片已不在屏幕上），卡片马上画
         // 出来，不留一个空位。
         if (closing && !start.source) _origin?.source?.show(this);
+        _hideReturnTarget(
+          away: closing || _dragging || _pull.value != 0 || _cross.value != 0,
+          landing: closing && morphSolid(growth) < 1,
+        );
         final picture = start.source ? _picture : null;
         final (double solid, double shown, double pictured) = switch (start) {
           // 从底部升起、滑进滑出时页面一直是实的。
@@ -461,8 +469,22 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
     );
   }
 
+  /// 页面就是返回目标（比如迷你播放条）展开的样子：拖动和缩回途中目标不画，
+  /// 外框落到它上面、底色开始变透明时才画出来，画面上只有一份。
+  void _hideReturnTarget({required bool away, required bool landing}) {
+    final tag = _page.returnTo;
+    if (tag == null) return;
+    if (away && !landing) {
+      ZoomTarget.hide(tag, this);
+    } else {
+      ZoomTarget.show(tag, this);
+    }
+  }
+
   @override
   void dispose() {
+    final tag = _page.returnTo;
+    if (tag != null) ZoomTarget.show(tag, this);
     _disposed = true;
     _follower?.dispose();
     _crossFollower?.dispose();
@@ -492,6 +514,20 @@ final class ZoomPageRoute<T> extends _ZoomRoute<T> {
 
   void _showSourceWhenClosed(AnimationStatus status) {
     if (status.isDismissed) _origin?.source?.show(this);
+  }
+
+  // 打开的第一帧页面在台下排版、不画，好让共享元素量出落点；卡片这一帧还得
+  // 画着，否则屏幕上空一帧。
+  @override
+  set offstage(bool value) {
+    super.offstage = value;
+    final source = _origin?.source;
+    if (source == null) return;
+    if (value) {
+      source.show(this);
+    } else if (!animation!.isDismissed) {
+      source.hide(this);
+    }
   }
 
   @override

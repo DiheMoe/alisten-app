@@ -2,6 +2,7 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_images.dart';
+import 'package:alisten/shared/ui/tracked_hero.dart';
 import 'package:flutter/material.dart';
 
 /// 封面只作装饰，读屏跳过它；使用处旁边须有说明同样内容的标题。
@@ -85,7 +86,37 @@ class CoverArt extends StatelessWidget {
       ),
     );
     final heroTag = this.heroTag;
-    if (heroTag != null) art = Hero(tag: heroTag, child: art);
+    if (heroTag != null) {
+      art = TrackedHero(
+        tag: heroTag,
+        flightShuttleBuilder: _crossFade,
+        child: art,
+      );
+    }
     return SizedBox.square(dimension: size, child: art);
   }
+}
+
+// 飞行中两头的封面交叉淡化：另一头按自己的大小解码的图还没出来时，飞的也一直
+// 是有图的封面，不闪底色。上面一层是被打开（或正在关闭）的页面里那一张，随页面
+// 出现的程度显出。
+Widget _crossFade(
+  BuildContext context,
+  Animation<double> animation,
+  HeroFlightDirection direction,
+  BuildContext fromContext,
+  BuildContext toContext,
+) {
+  final from = (fromContext.widget as Hero).child;
+  final to = (toContext.widget as Hero).child;
+  final (below, above) = direction == HeroFlightDirection.push
+      ? (from, to)
+      : (to, from);
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      below,
+      FadeTransition(opacity: animation, child: above),
+    ],
+  );
 }

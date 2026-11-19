@@ -13,6 +13,7 @@ import 'package:alisten/features/search/application/search_controller.dart';
 import 'package:alisten/features/search/application/search_state.dart';
 import 'package:alisten/features/search/application/shared_link.dart';
 import 'package:alisten/features/search/presentation/share_link_card.dart';
+import 'package:alisten/features/search/presentation/playlist_screen.dart';
 import 'package:alisten/features/search/presentation/song_row.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
@@ -32,6 +33,7 @@ import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/section_header.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
+import 'package:alisten/shared/ui/shared_text.dart';
 import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart' hide SearchController;
@@ -1118,35 +1120,45 @@ class _PlaylistTile extends StatelessWidget {
         onPressed: () => onOpen(playlist),
         focusRadius: BorderRadius.circular(AlistenRadii.md),
         child: LayoutBuilder(
-          builder: (context, constraints) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CoverArt(
-                url: playlist.coverUrl,
-                size: constraints.maxWidth,
-                radius: AlistenRadii.md,
-              ),
-              const SizedBox(height: AlistenSpacing.xs),
-              Text(
-                playlist.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AlistenTypography.bodyStrong.copyWith(
-                  color: colors.onGlass,
+          builder: (context, constraints) {
+            final tags = platformPlaylistHeroTags(playlist.source, playlist.id);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CoverArt(
+                  url: playlist.coverUrl,
+                  size: constraints.maxWidth,
+                  radius: AlistenRadii.md,
+                  heroTag: tags.cover,
                 ),
-              ),
-              Text(
-                playlist.creator.isEmpty
-                    ? '${playlist.trackCount} 首'
-                    : '${playlist.trackCount} 首 · ${playlist.creator}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AlistenTypography.secondary.copyWith(
-                  color: colors.onGlassMuted,
+                const SizedBox(height: AlistenSpacing.xs),
+                SharedText(
+                  tag: tags.name,
+                  child: Text(
+                    playlist.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AlistenTypography.bodyStrong.copyWith(
+                      color: colors.onGlass,
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
+                SharedText(
+                  tag: tags.facts,
+                  child: Text(
+                    playlist.creator.isEmpty
+                        ? '${playlist.trackCount} 首'
+                        : '${playlist.trackCount} 首 · ${playlist.creator}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AlistenTypography.secondary.copyWith(
+                      color: colors.onGlassMuted,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

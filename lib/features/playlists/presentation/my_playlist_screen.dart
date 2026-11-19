@@ -8,6 +8,7 @@ import 'package:alisten/domain/playlist/track_order.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/playlists/application/my_playlist_controller.dart';
 import 'package:alisten/features/playlists/application/my_playlists_controller.dart';
+import 'package:alisten/features/playlists/presentation/playlist_cover.dart';
 import 'package:alisten/features/playlists/presentation/playlist_header.dart';
 import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
@@ -433,6 +434,7 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
     return PlaylistHeader(
       coverUrl: playlist.coverUrl,
       favorites: playlist.favorites,
+      heroTags: myPlaylistHeroTags(playlist.id),
       name: playlist.name,
       facts:
           '$count 首，更新于${formatPlaylistDate(playlist.updatedAtMs, nowMs)}，'

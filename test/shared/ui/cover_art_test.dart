@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -88,6 +89,54 @@ void main() {
 
     expect(find.byIcon(AlistenIcons.starFill), findsOneWidget);
     expect(find.byIcon(AlistenIcons.musicNote), findsOneWidget);
+  });
+
+  testWidgets('a cover flying to another page cross-fades from its own '
+      'picture to the other one, the page\'s on top as the page shows, and '
+      'flies back the same way', (tester) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
+        home: const Align(
+          alignment: Alignment.topLeft,
+          child: CoverArt(url: null, size: 52, heroTag: 'cover'),
+        ),
+      ),
+    );
+
+    unawaited(
+      navigator.currentState!.push(
+        MaterialPageRoute<void>(
+          builder: (_) => const Center(
+            child: CoverArt(url: null, size: 184, heroTag: 'cover'),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    final shuttle = find.byWidgetPredicate(
+      (widget) => widget is FadeTransition && widget.child is DecoratedBox,
+    );
+    expect(shuttle, findsOneWidget);
+    final fade = tester.widget<FadeTransition>(shuttle);
+    expect(fade.opacity.value, inExclusiveRange(0, 1));
+    final flying = tester.getRect(shuttle);
+    expect(flying.width, inExclusiveRange(52, 184));
+    await tester.pumpAndSettle();
+
+    navigator.currentState!.pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(shuttle, findsOneWidget);
+    expect(
+      tester.widget<FadeTransition>(shuttle).opacity.value,
+      inExclusiveRange(0, 1),
+    );
+    await tester.pumpAndSettle();
+    expect(shuttle, findsNothing);
   });
 }
 

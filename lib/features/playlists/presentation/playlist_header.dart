@@ -1,7 +1,9 @@
 import 'package:alisten/features/playlists/presentation/playlist_cover.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/arrival_fade.dart';
 import 'package:alisten/shared/ui/cover_backdrop.dart';
+import 'package:alisten/shared/ui/shared_text.dart';
 import 'package:flutter/material.dart';
 
 /// 顶栏浮在页头之上，所以内容从顶栏下方开始。
@@ -12,10 +14,14 @@ class PlaylistHeader extends StatelessWidget {
     required this.name,
     this.facts,
     this.children = const [],
+    this.heroTags,
     super.key,
   });
 
   final String? coverUrl;
+
+  /// 列表里的封面、名字和说明飞到这里时用的标签。
+  final PlaylistHeroTags? heroTags;
   final bool favorites;
   final String name;
   final String? facts;
@@ -32,7 +38,10 @@ class PlaylistHeader extends StatelessWidget {
         AlistenSpacing.xs;
     return Stack(
       children: [
-        Positioned.fill(child: CoverBackdrop(url: coverUrl)),
+        // 封面飞到位、页面停稳后才铺上模糊的封面背景。
+        Positioned.fill(
+          child: ArrivalFade(child: CoverBackdrop(url: coverUrl)),
+        ),
         Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -62,29 +71,40 @@ class PlaylistHeader extends StatelessWidget {
                   size: AlistenSizes.pageCover,
                   radius: AlistenRadii.lg,
                   shadow: true,
+                  heroTag: heroTags?.cover,
                 ),
               ),
               const SizedBox(height: AlistenSpacing.lg),
               Semantics(
                 header: true,
-                child: PlaylistName(
-                  name: name,
-                  favorites: favorites,
-                  maxLines: 2,
-                  center: true,
-                  style: AlistenTypography.weighted(
-                    AlistenTypography.title,
-                    FontWeight.w700,
-                  ).copyWith(color: colors.onGlass),
+                child: Center(
+                  child: _shared(
+                    heroTags?.name,
+                    PlaylistName(
+                      name: name,
+                      favorites: favorites,
+                      maxLines: 2,
+                      center: true,
+                      style: AlistenTypography.weighted(
+                        AlistenTypography.title,
+                        FontWeight.w700,
+                      ).copyWith(color: colors.onGlass),
+                    ),
+                  ),
                 ),
               ),
               if (facts != null) ...[
                 const SizedBox(height: AlistenSpacing.xs),
-                Text(
-                  facts,
-                  textAlign: TextAlign.center,
-                  style: AlistenTypography.secondary.copyWith(
-                    color: colors.onGlassMuted,
+                Center(
+                  child: _shared(
+                    heroTags?.facts,
+                    Text(
+                      facts,
+                      textAlign: TextAlign.center,
+                      style: AlistenTypography.secondary.copyWith(
+                        color: colors.onGlassMuted,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -96,3 +116,6 @@ class PlaylistHeader extends StatelessWidget {
     );
   }
 }
+
+Widget _shared(Object? tag, Widget child) =>
+    tag == null ? child : SharedText(tag: tag, child: child);

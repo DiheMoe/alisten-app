@@ -1,7 +1,8 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui show Image;
+import 'dart:ui' show ClipOp;
 
 import 'package:alisten/shared/ui/morph.dart';
+import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:flutter/widgets.dart';
 
 /// 从屏幕上的一个元素长成自己的外框，页面和面板用。
@@ -41,8 +42,8 @@ class ZoomFrame extends SingleChildRenderObjectWidget {
   final Alignment contentAnchor;
 
   /// 盖在页面上的起点元素的样子，按外框宽度缩放、对齐外框顶边，不透明度是
-  /// [pictured]。
-  final ui.Image? picture;
+  /// [pictured]；自己飞的共享元素那几块留空。
+  final ZoomPicture? picture;
   final double pictured;
 
   @override
@@ -95,9 +96,9 @@ class RenderZoomFrame extends RenderMorph {
     required this._pictured,
   }) : super(border: const Color(0x00000000), shadow: null);
 
-  ui.Image? get picture => _picture;
-  ui.Image? _picture;
-  set picture(ui.Image? value) {
+  ZoomPicture? get picture => _picture;
+  ZoomPicture? _picture;
+  set picture(ZoomPicture? value) {
     if (value == _picture) return;
     _picture = value;
     markNeedsPaint();
@@ -114,16 +115,36 @@ class RenderZoomFrame extends RenderMorph {
   @override
   void paintCover(Canvas canvas, Offset offset, Rect shape, RRect outline) {
     final picture = _picture;
-    if (picture == null || _pictured <= 0 || picture.width == 0) return;
+    if (picture == null || _pictured <= 0) return;
+    final image = picture.image;
+    if (image.width == 0) return;
     final width = shape.width;
-    final height = width * picture.height / picture.width;
+    final height = width * image.height / image.width;
+    final placed = Rect.fromLTWH(
+      shape.left,
+      shape.top,
+      width,
+      height,
+    ).shift(offset);
     canvas
       ..save()
-      ..clipRRect(outline.shift(offset))
+      ..clipRRect(outline.shift(offset));
+    for (final hole in picture.holes) {
+      canvas.clipRect(
+        Rect.fromLTRB(
+          placed.left + hole.left * placed.width,
+          placed.top + hole.top * placed.height,
+          placed.left + hole.right * placed.width,
+          placed.top + hole.bottom * placed.height,
+        ),
+        clipOp: ClipOp.difference,
+      );
+    }
+    canvas
       ..drawImageRect(
-        picture,
-        Offset.zero & Size(picture.width.toDouble(), picture.height.toDouble()),
-        Rect.fromLTWH(shape.left, shape.top, width, height).shift(offset),
+        image,
+        Offset.zero & Size(image.width.toDouble(), image.height.toDouble()),
+        placed,
         Paint()
           ..color = Color.fromRGBO(0, 0, 0, _pictured.clamp(0, 1))
           ..filterQuality = FilterQuality.medium,

@@ -22,6 +22,7 @@ import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
+import 'package:alisten/shared/ui/shared_text.dart';
 import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
@@ -515,6 +516,7 @@ class _Card extends StatelessWidget {
                     favorites: playlist.favorites,
                     size: size,
                     radius: AlistenRadii.md,
+                    heroTag: myPlaylistHeroTags(playlist.id).cover,
                   ),
                   const SizedBox(height: AlistenSpacing.xs),
                   Padding(
@@ -524,20 +526,26 @@ class _Card extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        PlaylistName(
-                          name: playlist.name,
-                          favorites: playlist.favorites,
-                          style: AlistenTypography.bodyStrong.copyWith(
-                            color: colors.onGlass,
+                        SharedText(
+                          tag: myPlaylistHeroTags(playlist.id).name,
+                          child: PlaylistName(
+                            name: playlist.name,
+                            favorites: playlist.favorites,
+                            style: AlistenTypography.bodyStrong.copyWith(
+                              color: colors.onGlass,
+                            ),
                           ),
                         ),
                         const SizedBox(height: AlistenSpacing.xxs / 2),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AlistenTypography.secondary.copyWith(
-                            color: colors.onGlassMuted,
+                        SharedText(
+                          tag: myPlaylistHeroTags(playlist.id).facts,
+                          child: Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AlistenTypography.secondary.copyWith(
+                              color: colors.onGlassMuted,
+                            ),
                           ),
                         ),
                       ],
@@ -593,25 +601,32 @@ class _Row extends StatelessWidget {
                       url: playlist.coverUrl,
                       favorites: playlist.favorites,
                       size: AlistenSizes.rowCover,
+                      heroTag: myPlaylistHeroTags(playlist.id).cover,
                     ),
                     const SizedBox(width: AlistenSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          PlaylistName(
-                            name: playlist.name,
-                            favorites: playlist.favorites,
-                            style: AlistenTypography.bodyStrong.copyWith(
-                              color: colors.onGlass,
+                          SharedText(
+                            tag: myPlaylistHeroTags(playlist.id).name,
+                            child: PlaylistName(
+                              name: playlist.name,
+                              favorites: playlist.favorites,
+                              style: AlistenTypography.bodyStrong.copyWith(
+                                color: colors.onGlass,
+                              ),
                             ),
                           ),
-                          Text(
-                            subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AlistenTypography.secondary.copyWith(
-                              color: colors.onGlassMuted,
+                          SharedText(
+                            tag: myPlaylistHeroTags(playlist.id).facts,
+                            child: Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AlistenTypography.secondary.copyWith(
+                                color: colors.onGlassMuted,
+                              ),
                             ),
                           ),
                         ],

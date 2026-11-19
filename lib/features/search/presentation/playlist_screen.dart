@@ -10,14 +10,27 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
+import 'package:alisten/shared/ui/arrival_fade.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
+import 'package:alisten/shared/ui/shared_text.dart';
 import 'package:alisten/shared/ui/cover_backdrop.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// 点歌页里的歌单卡片和歌单页顶部共有的封面、名字和那行说明，打开时各自
+/// 飞到对应的位置。
+({Object cover, Object name, Object facts}) platformPlaylistHeroTags(
+  TrackSource source,
+  String id,
+) => (
+  cover: ('platform-playlist-cover', source, id),
+  name: ('platform-playlist-name', source, id),
+  facts: ('platform-playlist-facts', source, id),
+);
 
 class PlaylistScreen extends ConsumerWidget {
   const PlaylistScreen({
@@ -108,6 +121,7 @@ class PlaylistScreen extends ConsumerWidget {
               SliverToBoxAdapter(
                 child: _Header(
                   summary: summary,
+                  heroTags: platformPlaylistHeroTags(source, id),
                   songs: detail?.tracks.length,
                   saveAsMine: saveAsMine?.call(
                     summary == null || summary.name.trim().isEmpty
@@ -149,11 +163,13 @@ class PlaylistScreen extends ConsumerWidget {
 class _Header extends StatelessWidget {
   const _Header({
     required this.summary,
+    required this.heroTags,
     required this.songs,
     required this.saveAsMine,
   });
 
   final PlaylistSummary? summary;
+  final ({Object cover, Object name, Object facts}) heroTags;
 
   // 已加载的歌曲数，用于只知道 id 的歌单。
   final int? songs;
@@ -179,7 +195,10 @@ class _Header extends StatelessWidget {
         AlistenSpacing.xs;
     return Stack(
       children: [
-        Positioned.fill(child: CoverBackdrop(url: summary?.coverUrl)),
+        // 封面飞到位、页面停稳后才铺上模糊的封面背景。
+        Positioned.fill(
+          child: ArrivalFade(child: CoverBackdrop(url: summary?.coverUrl)),
+        ),
         Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -208,29 +227,40 @@ class _Header extends StatelessWidget {
                   size: AlistenSizes.pageCover,
                   radius: AlistenRadii.lg,
                   shadow: true,
+                  heroTag: heroTags.cover,
                 ),
               ),
               const SizedBox(height: AlistenSpacing.lg),
               Semantics(
                 header: true,
-                child: Text(
-                  summary?.name ?? '歌单',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: AlistenTypography.weighted(
-                    AlistenTypography.title,
-                    FontWeight.w700,
-                  ).copyWith(color: colors.onGlass),
+                child: Center(
+                  child: SharedText(
+                    tag: heroTags.name,
+                    child: Text(
+                      summary?.name ?? '歌单',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: AlistenTypography.weighted(
+                        AlistenTypography.title,
+                        FontWeight.w700,
+                      ).copyWith(color: colors.onGlass),
+                    ),
+                  ),
                 ),
               ),
               if (facts.isNotEmpty) ...[
                 const SizedBox(height: AlistenSpacing.xs),
-                Text(
-                  facts.join(' · '),
-                  textAlign: TextAlign.center,
-                  style: AlistenTypography.secondary.copyWith(
-                    color: colors.onGlassMuted,
+                Center(
+                  child: SharedText(
+                    tag: heroTags.facts,
+                    child: Text(
+                      facts.join(' · '),
+                      textAlign: TextAlign.center,
+                      style: AlistenTypography.secondary.copyWith(
+                        color: colors.onGlassMuted,
+                      ),
+                    ),
                   ),
                 ),
               ],

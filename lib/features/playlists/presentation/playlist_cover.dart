@@ -4,6 +4,16 @@ import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:flutter/material.dart';
 
+/// 歌单在列表里和歌单页顶部共有的封面、名字和那行说明，打开时各自飞到对应
+/// 的位置。
+typedef PlaylistHeroTags = ({Object cover, Object name, Object facts});
+
+PlaylistHeroTags myPlaylistHeroTags(String id) => (
+  cover: ('my-playlist-cover', id),
+  name: ('my-playlist-name', id),
+  facts: ('my-playlist-facts', id),
+);
+
 /// 没有封面时“我喜欢”显示星形，其他显示音符。大于行封面的“我喜欢”有图片时，
 /// 角上加一个小星标。星标只作装饰，读屏不读。
 class PlaylistCover extends StatelessWidget {
@@ -13,6 +23,7 @@ class PlaylistCover extends StatelessWidget {
     required this.size,
     this.radius = AlistenRadii.sm,
     this.shadow = false,
+    this.heroTag,
     super.key,
   });
 
@@ -22,6 +33,9 @@ class PlaylistCover extends StatelessWidget {
   final double radius;
   final bool shadow;
 
+  /// 见 [PlaylistHeroTags]。
+  final Object? heroTag;
+
   @override
   Widget build(BuildContext context) {
     final url = this.url;
@@ -30,6 +44,7 @@ class PlaylistCover extends StatelessWidget {
       size: size,
       radius: radius,
       shadow: shadow,
+      heroTag: heroTag,
       placeholderIcon: favorites
           ? AlistenIcons.starFill
           : AlistenIcons.musicNote,
@@ -96,8 +111,9 @@ class PlaylistName extends StatelessWidget {
       style: style,
     );
     if (!favorites) return text;
+    // 只占文字和星标那么宽，在页面之间移动时外框贴着它们，见 SharedText。
     return Row(
-      mainAxisSize: center ? MainAxisSize.min : MainAxisSize.max,
+      mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: center
           ? MainAxisAlignment.center
           : MainAxisAlignment.start,

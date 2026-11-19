@@ -19,6 +19,7 @@ import 'package:alisten/shared/ui/fade_leaving_inert.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/track_row.dart';
+import 'package:alisten/shared/ui/tracked_hero.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -334,7 +335,8 @@ class _Cover extends ConsumerWidget {
               scale: held && !compact ? _heldScale : 1,
               duration: AlistenDurations.of(context, AlistenDurations.layout),
               curve: AlistenCurves.bounce,
-              child: Hero(
+              // 房间从迷你播放条长出时，封面贴着长大的房间飞过来。
+              child: TrackedHero(
                 tag: nowPlaying == null
                     ? _silentCoverTag
                     : 'cover-${nowPlaying.entry.id}',

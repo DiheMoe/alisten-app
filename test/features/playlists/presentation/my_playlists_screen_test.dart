@@ -5,6 +5,7 @@ import 'package:alisten/domain/playlist/playlist_file.dart';
 import 'package:alisten/domain/playlist/playlist_sort.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/identity/index.dart';
+import 'package:alisten/features/playlists/presentation/playlist_cover.dart';
 import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
@@ -137,6 +138,14 @@ void main() {
 
     await tester.tap(find.text('夜跑'));
     expect(opened, ['pl-1']);
+    // 封面、名字和说明飞到歌单页顶部对应的位置，见 PlaylistHeader。
+    final tags = myPlaylistHeroTags('pl-1');
+    for (final tag in [tags.cover, tags.name, tags.facts]) {
+      expect(
+        find.byWidgetPredicate((widget) => widget is Hero && widget.tag == tag),
+        findsOneWidget,
+      );
+    }
     semantics.dispose();
   });
 

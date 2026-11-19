@@ -5,12 +5,21 @@ import 'package:flutter/widgets.dart';
 
 /// 一次点按：被点的元素在屏幕上的位置和圆角，是接下来打开的页面或面板的起点。
 final class LaunchOrigin {
-  LaunchOrigin._(RenderBox box, {required this.radius, this.source})
-    : rect = _globalRect(box),
-      _box = WeakReference(box);
+  LaunchOrigin._(
+    RenderBox box, {
+    required this.radius,
+    this.source,
+    this.shared = const [],
+  }) : rect = _globalRect(box),
+       _box = WeakReference(box);
 
   /// 不跟随任何元素的起点。
-  LaunchOrigin.at(this.rect, {this.radius = 0, this.source}) : _box = null;
+  LaunchOrigin.at(
+    this.rect, {
+    this.radius = 0,
+    this.source,
+    this.shared = const [],
+  }) : _box = null;
 
   /// 点按时的位置。
   final Rect rect;
@@ -18,6 +27,10 @@ final class LaunchOrigin {
 
   /// 被点的是入口卡片时是它；页面只从入口卡片长出，否则普通推入。
   final ZoomSourceHandle? source;
+
+  /// 入口卡片里会自己飞过去的共享元素（[Hero]）的位置，按卡片宽高的比例，
+  /// 见 [ZoomPicture.holes]。
+  final List<Rect> shared;
   final WeakReference<RenderBox>? _box;
 
   /// 元素现在的位置；元素已不在树上时为 null。
@@ -58,7 +71,12 @@ abstract final class TapOrigin {
     final source = context.findAncestorStateOfType<_ZoomSourceState>();
     final box = (source?.context ?? context).findRenderObject();
     if (box is! RenderBox || !box.attached || !box.hasSize) return;
-    _last = LaunchOrigin._(box, radius: radius, source: source);
+    _last = LaunchOrigin._(
+      box,
+      radius: radius,
+      source: source,
+      shared: source?._sharedParts() ?? const [],
+    );
     _at = now();
   }
 
@@ -92,11 +110,32 @@ class ZoomTarget extends StatefulWidget {
     return _globalRect(box);
   }
 
+  /// 同 [ZoomSourceHandle.hide]：都放开才重新画出来。
+  static void hide(String tag, Object by) => _targets[tag]?._hide(by);
+  static void show(String tag, Object by) => _targets[tag]?._show(by);
+
   @override
   State<ZoomTarget> createState() => _ZoomTargetState();
 }
 
 class _ZoomTargetState extends State<ZoomTarget> {
+  final _hiding = GlobalKey();
+  final _hiders = <Object>{};
+
+  // 页面在构建阶段调用，这里只标记重绘，不重建。
+  void _hide(Object by) {
+    if (_hiders.add(by)) _sync();
+  }
+
+  void _show(Object by) {
+    if (_hiders.remove(by)) _sync();
+  }
+
+  void _sync() {
+    final hiding = _hiding.currentContext?.findRenderObject();
+    if (hiding is _RenderHiding) hiding.hidden = _hiders.isNotEmpty;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -122,7 +161,8 @@ class _ZoomTargetState extends State<ZoomTarget> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.child;
+  Widget build(BuildContext context) =>
+      _Hiding(key: _hiding, hidden: _hiders.isNotEmpty, child: widget.child);
 }
 
 /// 能长出页面的入口：被点的东西就是要打开的东西，比如房间卡片、歌单卡片。只有
@@ -136,6 +176,18 @@ class ZoomSource extends StatefulWidget {
 
   @override
   State<ZoomSource> createState() => _ZoomSourceState();
+}
+
+/// 入口卡片起飞时的样子。卡片里的共享元素（[Hero]，比如封面）自己飞过去，
+/// [holes] 是它们在卡片里的位置，按卡片宽高的比例；画快照时这些地方留空，同
+/// 一个东西不出现两份。
+final class ZoomPicture {
+  ZoomPicture(this.image, this.holes);
+
+  final ui.Image image;
+  final List<Rect> holes;
+
+  void dispose() => image.dispose();
 }
 
 /// 页面用来拍下入口卡片、在飞行期间藏起它。
@@ -152,6 +204,38 @@ class _ZoomSourceState extends State<ZoomSource> implements ZoomSourceHandle {
   final _hiding = GlobalKey();
   final _boundary = GlobalKey();
   final _hiders = <Object>{};
+
+  List<Rect> _sharedParts() {
+    final card = context.findRenderObject();
+    if (card is! RenderBox || !card.hasSize || card.size.isEmpty) {
+      return const [];
+    }
+    final parts = <Rect>[];
+    void visit(Element element) {
+      if (element.widget is! Hero) {
+        element.visitChildren(visit);
+        return;
+      }
+      final box = element.findRenderObject();
+      if (box is! RenderBox || !box.attached || !box.hasSize) return;
+      final rect = MatrixUtils.transformRect(
+        box.getTransformTo(card),
+        Offset.zero & box.size,
+      );
+      final size = card.size;
+      parts.add(
+        Rect.fromLTRB(
+          rect.left / size.width,
+          rect.top / size.height,
+          rect.right / size.width,
+          rect.bottom / size.height,
+        ),
+      );
+    }
+
+    context.visitChildElements(visit);
+    return parts;
+  }
 
   @override
   ui.Image? snapshot(double pixelRatio) {

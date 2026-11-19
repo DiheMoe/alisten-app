@@ -1,9 +1,11 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/motion.dart';
+import 'package:alisten/shared/ui/arrival_fade.dart';
 import 'package:alisten/shared/ui/page_routes.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/tap_origin.dart';
+import 'package:alisten/shared/ui/tracked_hero.dart';
 import 'package:alisten/shared/ui/zoom_frame.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +22,7 @@ const _openTask = Key('open task');
 const _openTaskHigh = Key('open task high');
 const _openPush = Key('open push');
 const _openSmall = Key('open small');
+const _home = Key('home');
 
 Widget _filled(Key key, [Widget? child]) => ColoredBox(
   key: key,
@@ -33,6 +36,9 @@ Future<GoRouter> _app(
   Widget Function()? second,
   Widget Function()? task,
   ValueListenable<bool>? cardShown,
+  Rect card = const Rect.fromLTWH(_width - 180, 40, 160, 80),
+  HeroFlightShuttleBuilder? cardShuttle,
+  String? returnTo,
 }) async {
   late final GoRouter router;
   Widget button(Key key, String to) => Pressable(
@@ -52,9 +58,8 @@ Future<GoRouter> _app(
             Stack(
               children: [
                 // 入口卡片：页面从它长出。
-                Positioned(
-                  right: 20,
-                  top: 40,
+                Positioned.fromRect(
+                  rect: card,
                   child: ValueListenableBuilder<bool>(
                     valueListenable: cardShown ?? ValueNotifier(true),
                     builder: (context, shown, _) => shown
@@ -65,19 +70,48 @@ Future<GoRouter> _app(
                                 Radius.circular(12),
                               ),
                               onPressed: () => router.go('/b'),
-                              child: const ColoredBox(
+                              // 卡片里的封面是共享元素，自己飞。
+                              child: ColoredBox(
                                 color: Colors.white,
-                                child: SizedBox(width: 160, height: 80),
+                                child: SizedBox.expand(
+                                  child: Align(
+                                    alignment: Alignment.topLeft,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(10),
+                                      child: TrackedHero(
+                                        tag: 'cover',
+                                        flightShuttleBuilder: cardShuttle,
+                                        child: const SizedBox.square(
+                                          key: ValueKey('small'),
+                                          dimension: 40,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           )
-                        : const SizedBox(width: 160, height: 80),
+                        : const SizedBox.expand(),
                   ),
                 ),
                 Positioned(
                   right: 20,
                   top: 160,
                   child: button(_openSmall, '/b'),
+                ),
+                // 返回目标：页面关闭时可以缩回这里，像迷你播放条。
+                const Positioned(
+                  left: 20,
+                  top: 300,
+                  child: ZoomTarget(
+                    tag: 'home',
+                    child: ColoredBox(
+                      key: _home,
+                      color: Colors.white,
+                      child: SizedBox(width: 120, height: 60),
+                    ),
+                  ),
                 ),
                 Positioned(
                   right: 20,
@@ -103,6 +137,7 @@ Future<GoRouter> _app(
             path: 'b',
             pageBuilder: (_, state) => AlistenPage<void>(
               key: state.pageKey,
+              returnTo: returnTo,
               child: second?.call() ?? _filled(_b),
             ),
           ),
@@ -174,6 +209,29 @@ Future<void> _open(WidgetTester tester, GoRouter router) async {
   await tester.pumpAndSettle();
 }
 
+/// 逐帧跟着飞行的元素直到页面关掉或停稳，返回看到它的帧数。页面里的元素在
+/// 页面的外框里，飞着的也要整个一直在外框里，不从被裁掉的地方绕过来。
+Future<int> _staysInPage(WidgetTester tester, Finder flying) async {
+  var seen = 0;
+  for (var frame = 0; frame < 40; frame++) {
+    await tester.pump(const Duration(milliseconds: 16));
+    if (find.byKey(_b, skipOffstage: false).evaluate().isEmpty) break;
+    if (flying.evaluate().isEmpty) continue;
+    final shape = _shape(tester, _b).inflate(1);
+    final rect = tester.getRect(flying.last);
+    expect(
+      rect.left >= shape.left &&
+          rect.top >= shape.top &&
+          rect.right <= shape.right &&
+          rect.bottom <= shape.bottom,
+      isTrue,
+      reason: 'frame $frame: $rect outside $shape',
+    );
+    seen++;
+  }
+  return seen;
+}
+
 Future<void> _drag(
   WidgetTester tester,
   double distance, {
@@ -239,6 +297,202 @@ void main() {
     expect(_dim(tester), closeTo(AlistenMotion.coveredDim, 1e-6));
   });
 
+  testWidgets('a shared element in the card is left out of the card\'s '
+      'picture, so it only shows where it flies itself', (tester) async {
+    await _app(tester);
+
+    await tester.tap(find.byKey(_openPage));
+    await tester.pump();
+    await tester.pump();
+    final holes = _frame(tester, _b).picture!.holes;
+    expect(holes, hasLength(1));
+    expect(
+      holes.single,
+      rectMoreOrLessEquals(
+        const Rect.fromLTRB(10 / 160, 10 / 80, 50 / 160, 50 / 80),
+        epsilon: 1e-6,
+      ),
+    );
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a shared element flies along with the growing page and lands '
+      'as it settles, instead of running ahead to where the page will end up, '
+      'and flies back the same way', (tester) async {
+    final router = await _app(
+      tester,
+      second: () => _filled(
+        _b,
+        const Align(
+          alignment: Alignment(0, 0.7),
+          child: TrackedHero(
+            tag: 'cover',
+            child: SizedBox.square(key: ValueKey('big'), dimension: 120),
+          ),
+        ),
+      ),
+    );
+    final flying = find.byKey(const ValueKey('big'));
+
+    // 打开时飞的是页面那头的样子，收回时是卡片那头的。
+    await tester.tap(find.byKey(_openPage));
+    await tester.pump();
+    expect(await _staysInPage(tester, flying), greaterThan(5));
+    await tester.pumpAndSettle();
+    final rest = tester.getRect(flying);
+
+    router.go('/');
+    await tester.pump();
+    expect(
+      await _staysInPage(tester, find.byKey(const ValueKey('small'))),
+      greaterThan(5),
+    );
+    await tester.pumpAndSettle();
+    expect(rest.center.dy, greaterThan(300));
+  });
+
+  testWidgets('out of a wide card low on the screen, like the mini player, '
+      'the shared element rises inside the page as it grows up, instead of '
+      'heading for the part of the page still cut off below', (tester) async {
+    final router = await _app(
+      tester,
+      card: const Rect.fromLTWH(20, 500, _width - 40, 80),
+      second: () => _filled(
+        _b,
+        const Align(
+          alignment: Alignment(0, -0.3),
+          child: TrackedHero(
+            tag: 'cover',
+            child: SizedBox.square(key: ValueKey('big'), dimension: 240),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(_openPage));
+    await tester.pump();
+    expect(
+      await _staysInPage(tester, find.byKey(const ValueKey('big'))),
+      greaterThan(5),
+    );
+    await tester.pumpAndSettle();
+
+    router.go('/');
+    await tester.pump();
+    expect(
+      await _staysInPage(tester, find.byKey(const ValueKey('small'))),
+      greaterThan(5),
+    );
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a shared element keeps pace with the page: halfway grown, it '
+      'is halfway between its two sizes, opening and closing alike', (
+    tester,
+  ) async {
+    final router = await _app(
+      tester,
+      second: () => _filled(
+        _b,
+        const Align(
+          alignment: Alignment(0, -0.5),
+          child: TrackedHero(
+            tag: 'cover',
+            child: SizedBox.square(key: ValueKey('big'), dimension: 120),
+          ),
+        ),
+      ),
+    );
+    final landing = find.descendant(
+      of: find.byKey(_b, skipOffstage: false),
+      matching: find.byType(Hero),
+      skipOffstage: false,
+    );
+
+    Future<int> keepsPace(Finder flying) async {
+      var seen = 0;
+      for (var frame = 0; frame < 60; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        if (find.byKey(_b, skipOffstage: false).evaluate().isEmpty) break;
+        if (flying.evaluate().isEmpty) continue;
+        final growth = _frame(tester, _b).growth;
+        if (growth < 0.25 || growth > 0.75) continue;
+        // 卡片里的元素 40 宽，页面里的此刻随页面缩放。
+        final inPage = tester.getRect(landing).width;
+        expect(
+          tester.getRect(flying.last).width,
+          closeTo(40 + (inPage - 40) * growth, 0.04 * (inPage - 40) + 0.5),
+          reason: 'frame $frame, growth $growth',
+        );
+        seen++;
+      }
+      return seen;
+    }
+
+    await tester.tap(find.byKey(_openPage));
+    await tester.pump();
+    expect(await keepsPace(find.byKey(const ValueKey('big'))), greaterThan(2));
+    await tester.pumpAndSettle();
+
+    router.go('/');
+    await tester.pump();
+    expect(
+      await keepsPace(find.byKey(const ValueKey('small'))),
+      greaterThan(2),
+    );
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a shared element with no flight look of its own flies with '
+      'the look of the other end', (tester) async {
+    await _app(
+      tester,
+      cardShuttle: (_, _, _, _, _) =>
+          const ColoredBox(key: ValueKey('card look'), color: Colors.red),
+      second: () => _filled(
+        _b,
+        const Center(
+          child: TrackedHero(
+            tag: 'cover',
+            child: SizedBox.square(key: ValueKey('big'), dimension: 120),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(_openPage));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.byKey(const ValueKey('card look')), findsOneWidget);
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('the card stays drawn for the frame in which the new page is '
+      'laid out unseen, so the screen never flashes empty', (tester) async {
+    await _app(tester);
+
+    await tester.tap(find.byKey(_openPage));
+    bool? offstage;
+    bool? cardDrawn;
+    // 第一帧画完、页面回到台上之前看一眼。
+    tester.binding.addPostFrameCallback((_) {
+      offstage = (_routeOf(tester, _b)! as ModalRoute<dynamic>).offstage;
+      final drawn = paints..rect();
+      cardDrawn = (drawn as Matcher).matches(
+        _card(tester),
+        <dynamic, dynamic>{},
+      );
+    });
+    await tester.pump();
+    expect(offstage, isTrue);
+    expect(cardDrawn, isTrue);
+
+    await tester.pump();
+    expect((_routeOf(tester, _b)! as ModalRoute<dynamic>).offstage, isFalse);
+    expect(_card(tester), paintsNothing);
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('closing shrinks it back into its card, the card\'s picture '
       'coming back as it lands, and the card is drawn again', (tester) async {
     final router = await _app(tester);
@@ -258,6 +512,42 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(_b), findsNothing);
     expect(_card(tester), paints..rect());
+  });
+
+  testWidgets('a page that goes back into a target, like the room into the '
+      'mini player, keeps the target undrawn while dragged and flying back, '
+      'and draws it once the page landing on it turns see-through', (
+    tester,
+  ) async {
+    final router = await _app(tester, returnTo: 'home');
+    await _open(tester, router);
+    RenderObject target() =>
+        tester.renderObject(find.byType(ZoomTarget, skipOffstage: false));
+
+    final gesture = await tester.startGesture(const Offset(300, 300));
+    for (var step = 0; step < 20; step++) {
+      await gesture.moveBy(const Offset(30, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(target(), paintsNothing);
+
+    await gesture.up();
+    var landing = 0;
+    for (var frame = 0; frame < 80; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      if (find.byKey(_b, skipOffstage: false).evaluate().isEmpty) break;
+      final growth = _frame(tester, _b).growth;
+      if (morphSolid(growth) >= 1) {
+        expect(target(), paintsNothing, reason: 'frame $frame, $growth');
+      } else {
+        expect(target(), paints..rect(), reason: 'frame $frame, $growth');
+        landing++;
+      }
+    }
+    expect(landing, greaterThan(0));
+    await tester.pumpAndSettle();
+    expect(router.state.uri.path, '/');
+    expect(target(), paints..rect());
   });
 
   testWidgets('a card no longer on screen: the page slides out to the right '
@@ -490,6 +780,51 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(_frame(tester, _b).atRest, isTrue);
+  });
+
+  testWidgets('something that waits for the page to arrive shows only once '
+      'it has settled, stays while the page is dragged, and goes as the page '
+      'closes', (tester) async {
+    final router = await _app(
+      tester,
+      second: () => _filled(
+        _b,
+        const ArrivalFade(child: ColoredBox(color: Colors.white)),
+      ),
+    );
+    double shown() => tester
+        .widget<FadeTransition>(
+          find.descendant(
+            of: find.byType(ArrivalFade, skipOffstage: false),
+            matching: find.byType(FadeTransition, skipOffstage: false),
+          ),
+        )
+        .opacity
+        .value;
+
+    await tester.tap(find.byKey(_openPage));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(shown(), 0);
+    await tester.pumpAndSettle();
+    expect(shown(), 1);
+
+    final gesture = await tester.startGesture(const Offset(300, 300));
+    for (var i = 0; i < 8; i++) {
+      await gesture.moveBy(const Offset(20, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(shown(), 1);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(shown(), 1);
+
+    router.go('/');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(shown(), 0);
+    await tester.pumpAndSettle();
   });
 
   group('a pushed page', () {
