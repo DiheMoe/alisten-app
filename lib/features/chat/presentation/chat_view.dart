@@ -9,6 +9,7 @@ import 'package:alisten/features/chat/presentation/member_panel.dart';
 import 'package:alisten/features/chat/presentation/send_flight.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
+import 'package:alisten/shared/theme/motion.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
@@ -34,6 +35,19 @@ const _pauseMs = 5 * 60 * 1000;
 
 // 自己的头像在飞行气泡到达落点后这么快淡入。
 const _avatarIn = Duration(milliseconds: 120);
+
+// 别人新发来的行：前 0.27 秒从零长到原高，把上面的行推上去；内容在前 0.18 秒
+// 淡入；气泡从靠头像的一角由 0.8 倍放大，落定时和自己发出的消息一样轻轻一弹。
+const _entrance = Duration(milliseconds: 450);
+const _entranceGrow = Interval(0, 0.6, curve: Curves.easeOutCubic);
+const _entranceFade = Interval(0, 0.4, curve: Curves.easeOut);
+const _entranceScale = 0.8;
+
+// 列表会把高度为零、贴在边上的行当作已经滚出视野回收掉，从这么一点点高起步。
+const _entranceLeast = 0.001;
+
+// 一次涌进来比这更多行时直接显示（如断线重连后补齐），不一条条地弹。
+const _entranceMost = 3;
 
 // 输入框飞出去之后，新的空输入框晚 0.12 秒从 94% 大小展开并淡入，共 0.37 秒。
 const _fieldReturn = Duration(milliseconds: 370);
@@ -70,6 +84,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   // 飞行中的气泡已经到过落点的那几条消息，按落点的键记。
   final _arrived = <GlobalKey>{};
+
+  // 刚收到、要做入场动画的行，按行的键记；动画结束后移除。
+  final _entering = <String>{};
+
+  // 上一帧以来别人新发来的行。一批里的消息是一条条到的，到下一次构建时才知道
+  // 这一批有多少。
+  final _arrivals = <String>[];
   final _flights = <OverlayEntry>{};
 
   /// 时间线所在的区域，飞行只画在它和输入框里，不盖住成员条和房间顶栏。
@@ -322,10 +343,36 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // 锚点行已不存在（如房间丢弃了最早的几行）时无位置可保持。
     final anchored = next.any((item) => item.key == _anchor);
     if (held && anchored) return;
+    _markEntering(previous, next);
     _anchorAtLatest(next);
     _following = false;
     _followRun++;
     _jump(0);
+  }
+
+  // 停在底部时别人新发来的行做入场动画；自己发的消息由输入框飞过去。
+  void _markEntering(List<ChatItem>? previous, List<ChatItem> next) {
+    if (previous == null || MediaQuery.disableAnimationsOf(context)) return;
+    final self = ref.read(roomControllerProvider).member?.id;
+    final before = {for (final item in previous) item.key};
+    final fresh = [
+      for (final item in next)
+        if (!before.contains(item.key) &&
+            !(item is ChatMessageItem && item.member.id == self))
+          item,
+    ];
+    _arrivals.addAll([for (final item in fresh) item.key]);
+  }
+
+  void _admitArrivals() {
+    if (_arrivals.length <= _entranceMost) {
+      for (final key in _arrivals) {
+        _entering
+          ..add(key)
+          ..add('time-$key');
+      }
+    }
+    _arrivals.clear();
   }
 
   // 在当前最早一行之上多显示窗口新增的行数。
@@ -478,6 +525,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
   // [rows] 从旧到新。到 [_anchor] 为止的行从固定点向上排，其余向下排；读者
   // 离开底部后有新行到达之前，固定点就是时间线底部。
   Widget _timeline(List<_Row> rows) {
+    _admitArrivals();
     final anchorAt = rows.indexWhere((row) => row.key == _anchor);
     final split = anchorAt < 0 ? rows.length : anchorAt + 1;
     final chat = ref.read(chatControllerProvider.notifier);
@@ -503,6 +551,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                   rows: rows.sublist(split),
                   flying: _flying,
                   arrived: _arrived,
+                  entering: _entering,
                   onShowEarlier: chat.showEarlier,
                 ),
               ),
@@ -518,6 +567,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                   rows: rows.sublist(0, split).reversed.toList(growable: false),
                   flying: _flying,
                   arrived: _arrived,
+                  entering: _entering,
                   onShowEarlier: chat.showEarlier,
                 ),
               ),
@@ -535,12 +585,14 @@ class _RowList extends StatelessWidget {
     required this.rows,
     required this.flying,
     required this.arrived,
+    required this.entering,
     required this.onShowEarlier,
   });
 
   final List<_Row> rows;
   final Map<String, GlobalKey> flying;
   final Set<GlobalKey> arrived;
+  final Set<String> entering;
   final VoidCallback onShowEarlier;
 
   @override
@@ -557,32 +609,38 @@ class _RowList extends StatelessWidget {
       addRepaintBoundaries: false,
       itemBuilder: (context, index) {
         final row = rows[index];
+        final content = switch (row) {
+          _EarlierRow() => Center(
+            child: PillButton(
+              label: '查看更早的消息',
+              icon: AlistenIcons.clockCounterClockwise,
+              style: PillButtonStyle.ghost,
+              onPressed: onShowEarlier,
+            ),
+          ),
+          // 时间属于它下面那条消息：自己的消息还在飞时不先出来，和头像一起
+          // 在到达时淡入。
+          _TimeRow(:final at, :final before) => _TimeLabel(
+            at: at,
+            shown: flying[before] == null || arrived.contains(flying[before]),
+          ),
+          _MessageRow() => _MessageLine(
+            row: row,
+            landing: flying[row.key],
+            arrived: arrived.contains(flying[row.key]),
+          ),
+          _ActivityRow(:final item) => _ActivityPill(item: item),
+        };
         return EdgeFadeItem(
           key: ValueKey(row.key),
           child: RepaintBoundary(
-            child: switch (row) {
-              _EarlierRow() => Center(
-                child: PillButton(
-                  label: '查看更早的消息',
-                  icon: AlistenIcons.clockCounterClockwise,
-                  style: PillButtonStyle.ghost,
-                  onPressed: onShowEarlier,
-                ),
-              ),
-              // 时间属于它下面那条消息：自己的消息还在飞时不先出来，和头像一起
-              // 在到达时淡入。
-              _TimeRow(:final at, :final before) => _TimeLabel(
-                at: at,
-                shown:
-                    flying[before] == null || arrived.contains(flying[before]),
-              ),
-              _MessageRow() => _MessageLine(
-                row: row,
-                landing: flying[row.key],
-                arrived: arrived.contains(flying[row.key]),
-              ),
-              _ActivityRow(:final item) => _ActivityPill(item: item),
-            },
+            child: _Entrance(
+              enabled: entering.contains(row.key),
+              // 别人的消息从靠头像的左下角冒出；时间和动态只长高、淡入。
+              pop: row is _MessageRow && !row.mine,
+              onDone: () => entering.remove(row.key),
+              child: content,
+            ),
           ),
         );
       },
@@ -1422,5 +1480,86 @@ class _DeliveryMark extends ConsumerWidget {
       ),
       ChatDelivery.sent || null => const SizedBox.shrink(),
     };
+  }
+}
+
+class _Entrance extends StatefulWidget {
+  const _Entrance({
+    required this.enabled,
+    required this.pop,
+    required this.onDone,
+    required this.child,
+  });
+
+  /// 只在行刚建好时读：已经在时间线上的行不会再做一遍。
+  final bool enabled;
+  final bool pop;
+  final VoidCallback onDone;
+  final Widget child;
+
+  @override
+  State<_Entrance> createState() => _EntranceState();
+}
+
+class _EntranceState extends State<_Entrance>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _clock;
+  late final _bounce = SpringCurve(
+    AlistenSprings.chatFlight,
+    seconds: _entrance.inMicroseconds / Duration.microsecondsPerSecond,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.enabled) return;
+    _clock = AnimationController(vsync: this, duration: _entrance);
+    unawaited(
+      _clock!.forward().whenComplete(() {
+        if (mounted) widget.onDone();
+      }),
+    );
+  }
+
+  // 还没长完就滚出了视野、被回收时也算做过了，滚回来不再做一遍。
+  @override
+  void dispose() {
+    final clock = _clock;
+    if (clock != null && !clock.isCompleted) widget.onDone();
+    clock?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final clock = _clock;
+    if (clock == null) return widget.child;
+    return AnimatedBuilder(
+      animation: clock,
+      child: widget.child,
+      builder: (context, child) {
+        final t = clock.value;
+        final grown = _entranceGrow.transform(t);
+        final scale = widget.pop
+            ? lerpDouble(_entranceScale, 1, _bounce.transform(t))!
+            : 1.0;
+        // 长到原高之前裁掉露在下面的部分；之后不裁，落定时的轻弹不被切掉。
+        return ClipRect(
+          clipBehavior: grown < 1 ? Clip.hardEdge : Clip.none,
+          child: Align(
+            alignment: Alignment.topCenter,
+            heightFactor: math.max(grown, _entranceLeast),
+            child: Opacity(
+              opacity: _entranceFade.transform(t),
+              child: Transform.scale(
+                scale: scale,
+                alignment: Alignment.bottomLeft,
+                child: child,
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }

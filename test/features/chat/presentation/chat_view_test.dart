@@ -755,6 +755,109 @@ void main() {
     expectFadedByRow(tester, find.byType(ChatView), top: true, bottom: false);
   });
 
+  group('a line arriving from someone else', () {
+    Finder rowOf(String text) => find
+        .ancestor(of: find.text(text), matching: find.byType(EdgeFadeItem))
+        .first;
+
+    Future<_Room> openWith(WidgetTester tester, List<String> lines) async {
+      final room = _Room(tester);
+      await room.open();
+      for (final line in lines) {
+        room.say(_xiaoming, line);
+      }
+      await room.deliver();
+      await room.showChat();
+      await tester.pump(const Duration(seconds: 1));
+      return room;
+    }
+
+    testWidgets('grows in at the bottom, pushing the lines above up '
+        'smoothly, fades in and pops out of its avatar corner', (tester) async {
+      final room = await openWith(tester, ['先到的']);
+      final earlier = find.text('先到的');
+
+      room.say(_xiaoming, '刚到的');
+      await room.deliver();
+      final arriving = find.text('刚到的');
+
+      final tops = <double>[];
+      final heights = <double>[];
+      final widths = <double>[];
+      final opacities = <double>[];
+      for (var frame = 0; frame < 30; frame++) {
+        tops.add(tester.getTopLeft(earlier).dy);
+        heights.add(tester.getSize(rowOf('刚到的')).height);
+        widths.add(tester.getRect(arriving).width);
+        opacities.add(_opacityOf(arriving));
+        await tester.pump(_frame);
+      }
+      await tester.pump(const Duration(seconds: 1));
+      final height = tester.getSize(rowOf('刚到的')).height;
+      final width = tester.getRect(arriving).width;
+
+      expect(heights.first, lessThan(height / 2));
+      expect(opacities.first, lessThan(1));
+      expect(widths.first, lessThan(width));
+      for (var index = 1; index < tops.length; index++) {
+        // 上面的行一路往上让，不来回跳。
+        expect(tops[index], lessThanOrEqualTo(tops[index - 1] + 0.01));
+        expect(heights[index], greaterThanOrEqualTo(heights[index - 1] - 0.01));
+      }
+      expect(_opacityOf(arriving), 1);
+      expect(tester.getTopLeft(earlier).dy, closeTo(tops.last, 0.5));
+    });
+
+    Future<void> expectAtOnce(WidgetTester tester, String text) async {
+      await tester.pump(_frame);
+      await tester.scrollUntilVisible(
+        find.text(text),
+        -300,
+        scrollable: _timelineScrollable,
+      );
+      final height = tester.getSize(rowOf(text)).height;
+      expect(_opacityOf(find.text(text)), 1);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.getSize(rowOf(text)).height, height);
+    }
+
+    testWidgets('is simply there when many arrive at once', (tester) async {
+      final room = await openWith(tester, ['一']);
+      for (final line in ['二', '三', '四', '五']) {
+        room.say(_xiaoming, line);
+      }
+      await room.deliver();
+      await expectAtOnce(tester, '五');
+    });
+
+    testWidgets('is simply there when it arrives while history is read', (
+      tester,
+    ) async {
+      final room = await openWith(tester, [
+        for (var index = 0; index < 40; index++) '消息 $index',
+      ]);
+      await _readBackTo(tester, '消息 10');
+      room.say(_xiaoming, '翻看时来的');
+      await room.deliver();
+      await expectAtOnce(tester, '翻看时来的');
+    });
+
+    testWidgets('without animations is simply there', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      final room = await openWith(tester, ['先到的']);
+      room.say(_xiaoming, '直接出现');
+      await room.deliver();
+      expect(_opacityOf(find.text('直接出现')), 1);
+      final height = tester.getSize(rowOf('直接出现')).height;
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.getSize(rowOf('直接出现')).height, height);
+    });
+  });
+
   testWidgets('lines arriving while history is read leave it in place and '
       'are counted', (tester) async {
     final room = _Room(tester);
