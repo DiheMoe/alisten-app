@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:ui' as ui show Image;
-import 'dart:ui' show ImageFilter, lerpDouble;
+import 'dart:ui' show ImageFilter;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/motion.dart';
@@ -16,21 +16,6 @@ const _shadowSpan = 0.5;
 
 // 收起的最后 0.12 秒里，缩回按钮大小的底色淡出。
 const _fadeOutFrom = 0.76;
-
-/// 按预乘透明度在两种颜色之间过渡。[Color.lerp] 直接插值各通道，半透明的浅色
-/// 底色和不透明的卡片之间会出现比两端都深（或都浅）的灰。
-Color _blend(Color from, Color to, double t) {
-  final alpha = lerpDouble(from.a, to.a, t)!;
-  if (alpha <= 0) return to.withValues(alpha: 0);
-  double channel(double a, double b) =>
-      lerpDouble(a * from.a, b * to.a, t)! / alpha;
-  return Color.from(
-    alpha: alpha,
-    red: channel(from.r, to.r),
-    green: channel(from.g, to.g),
-    blue: channel(from.b, to.b),
-  );
-}
 
 /// 点按浮层外部或系统返回时只调用 [onClose]：这次点按不传给页面，页面也不退出。
 class Popover extends StatefulWidget {
@@ -330,7 +315,7 @@ class _PopoverState extends State<Popover> with TickerProviderStateMixin {
                     // 液滴按自己的进度淡入淡出底色、阴影和描边。
                     fill: pour != null
                         ? colors.raised
-                        : _blend(tint, colors.raised, solid),
+                        : lerpPremultiplied(tint, colors.raised, solid),
                     border: colors.glassStroke.withValues(
                       alpha: colors.glassStroke.a * (pour != null ? 1 : solid),
                     ),

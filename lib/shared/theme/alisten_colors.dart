@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -452,4 +453,19 @@ _Legible _legibleUnder(Color ink, HSLColor start, HSLColor end) {
 double _contrast(Color a, Color b) {
   final (first, second) = (a.computeLuminance(), b.computeLuminance());
   return (math.max(first, second) + 0.05) / (math.min(first, second) + 0.05);
+}
+
+/// 按预乘透明度在两种颜色之间过渡。[Color.lerp] 直接插值各通道，半透明的浅色
+/// 底色和不透明的卡片之间会出现比两端都深（或都浅）的灰。
+Color lerpPremultiplied(Color from, Color to, double t) {
+  final alpha = lerpDouble(from.a, to.a, t)!;
+  if (alpha <= 0) return to.withValues(alpha: 0);
+  double channel(double a, double b) =>
+      lerpDouble(a * from.a, b * to.a, t)! / alpha;
+  return Color.from(
+    alpha: alpha,
+    red: channel(from.r, to.r),
+    green: channel(from.g, to.g),
+    blue: channel(from.b, to.b),
+  );
 }

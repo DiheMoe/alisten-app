@@ -965,8 +965,8 @@ void main() {
       return answers;
     }
 
-    testWidgets('a sent message flies out of the input into its bubble, which '
-        'then spins until the room has it', (tester) async {
+    testWidgets('the whole input box flies off into its bubble, which then '
+        'spins until the room has it', (tester) async {
       final semantics = tester.ensureSemantics();
       final room = _Room(tester);
       await room.open();
@@ -976,6 +976,15 @@ void main() {
       await tester.enterText(find.byType(TextField), '飞过去');
       await tester.pump();
       final typed = tester.getRect(find.byType(EditableText));
+      final box = find
+          .ancestor(
+            of: find.byType(TextField),
+            matching: find.byType(DecoratedBox),
+          )
+          .first;
+      final boxRect = tester.getRect(box);
+      final boxLook =
+          tester.widget<DecoratedBox>(box).decoration as BoxDecoration;
       await tester.tap(find.bySemanticsLabel('发送'));
       await tester.pump();
 
@@ -998,6 +1007,28 @@ void main() {
         0,
       );
 
+      // 飞出去的是整个输入框：同样的位置、圆角和底色。原处的输入框先藏着，
+      // 键盘留着。
+      BoxDecoration frameOf(Finder text) =>
+          tester
+                  .widget<DecoratedBox>(
+                    find
+                        .ancestor(of: text, matching: find.byType(DecoratedBox))
+                        .first,
+                  )
+                  .decoration
+              as BoxDecoration;
+      final frame = find
+          .ancestor(of: copies.last, matching: find.byType(DecoratedBox))
+          .first;
+      expect(tester.getRect(frame).topLeft, _near(boxRect.topLeft));
+      expect(tester.getRect(frame).bottomRight, _near(boxRect.bottomRight));
+      expect(frameOf(copies.last).color, boxLook.color);
+      expect(frameOf(copies.last).borderRadius, boxLook.borderRadius);
+      expect(_opacityOf(find.byType(TextField)), 0);
+      expect(_hasFocus(tester), isTrue);
+      final takeoffHeight = tester.getRect(copies.last).height;
+
       // 飞行中的文字与气泡里的一样，不带缺少 Material 时的下划线。
       final flying = tester.renderObject<RenderParagraph>(copies.last);
       expect(
@@ -1005,12 +1036,27 @@ void main() {
         TextDecoration.none,
       );
 
-      await frames(tester, const Duration(milliseconds: 150));
+      // 起飞不久：底色正从输入框的颜色变成气泡的颜色，文字大小不变。
+      await frames(tester, const Duration(milliseconds: 48));
+      final colors = AlistenColors.of(tester.element(find.byType(TextField)));
+      expect(frameOf(copies.last).color, isNot(boxLook.color));
+      expect(frameOf(copies.last).color, isNot(colors.brand));
+      expect(tester.getRect(copies.last).height, closeTo(takeoffHeight, 0.5));
+
+      await frames(tester, const Duration(milliseconds: 102));
       final midway = tester.getRect(copies.last).center.dy;
       expect(midway, lessThan(typed.center.dy - 24));
+      expect(tester.getRect(copies.last).height, closeTo(takeoffHeight, 0.5));
+      // 新的空输入框正展开出现。
+      final returning = _opacityOf(find.byType(TextField));
+      expect(returning, inExclusiveRange(0, 1));
+      expect(_scaleOf(tester, find.byType(TextField)), lessThan(1));
 
       await frames(tester, const Duration(seconds: 1));
       expect(find.text('飞过去'), findsOneWidget);
+      expect(_opacityOf(find.byType(TextField)), 1);
+      expect(_scaleOf(tester, find.byType(TextField)), 1);
+      expect(_hasFocus(tester), isTrue);
       expect(find.byType(BusyIndicator), findsOneWidget);
       expect(find.bySemanticsLabel('发送中'), findsOneWidget);
       expect(find.text('发送中'), findsNothing);
@@ -1030,6 +1076,76 @@ void main() {
       expect(find.byType(BusyIndicator), findsNothing);
 
       semantics.dispose();
+      unawaited(room.transport.stop());
+    });
+
+    testWidgets('the time over a new message waits for it to land and comes '
+        'in with it', (tester) async {
+      final room = _Room(tester);
+      await room.open();
+      await room.showChat();
+      await holdAnswers(room);
+
+      await tester.enterText(find.byType(TextField), '几点了');
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel('发送'));
+      await tester.pump();
+      final time = find.textContaining(RegExp(r'\d{2}:\d{2}'));
+      expect(time, findsOneWidget);
+      expect(_opacityOf(time), 0);
+
+      await frames(tester, const Duration(milliseconds: 150));
+      expect(_opacityOf(time), 0);
+      await frames(tester, const Duration(seconds: 1));
+      expect(_opacityOf(time), 1);
+      unawaited(room.transport.stop());
+    });
+
+    testWidgets('a message the room confirms mid-flight stays hidden in the '
+        'timeline until the flight has landed, its avatar until the flight '
+        'has reached it', (tester) async {
+      final room = _Room(tester);
+      await room.open();
+      await room.showChat();
+      final answers = await holdAnswers(room);
+
+      await tester.enterText(find.byType(TextField), '很快就到');
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel('发送'));
+      await tester.pump();
+      answers.single.complete(const {});
+      room.say(_me, '很快就到');
+      await room.deliver();
+
+      final copies = find.text('很快就到');
+      final avatar = find.descendant(
+        of: _timeline,
+        matching: find.byType(MemberAvatar),
+      );
+      expect(avatar, findsOneWidget);
+      Rect frameOf(Finder text) => tester.getRect(
+        find.ancestor(of: text, matching: find.byType(DecoratedBox)).first,
+      );
+      var checked = 0;
+      var reached = false;
+      var avatarBeforeLanding = false;
+      // 时间线上的那一份排在飞行的几份之前。
+      for (var i = 0; i < 60 && copies.evaluate().length > 1; i++) {
+        expect(_opacityOf(copies.first), 0);
+        expect(find.byType(BusyIndicator), findsNothing);
+        // 飞行从下往上：外框顶边到了气泡的顶边就算到了。
+        reached |= frameOf(copies.last).top <= frameOf(copies.first).top + 0.5;
+        if (!reached) expect(_opacityOf(avatar), 0);
+        if (_opacityOf(avatar) > 0) avatarBeforeLanding = true;
+        checked++;
+        await tester.pump(_frame);
+      }
+      expect(checked, greaterThan(10), reason: 'the flight was looked at');
+      expect(avatarBeforeLanding, isTrue);
+      await frames(tester, const Duration(seconds: 1));
+      expect(copies, findsOneWidget);
+      expect(_opacityOf(copies), 1);
+      expect(_opacityOf(avatar), 1);
       unawaited(room.transport.stop());
     });
 
@@ -1169,6 +1285,7 @@ void main() {
       await tester.pump();
 
       expect(_fieldText(tester), isEmpty);
+      expect(_opacityOf(find.byType(TextField)), 1);
       expect(find.text('直接出现'), findsOneWidget);
       expect(
         tester
@@ -1201,6 +1318,17 @@ double _opacityOf(Finder finder) {
   });
   return opacity;
 }
+
+bool _hasFocus(WidgetTester tester) =>
+    tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus;
+
+// 最近一层 [Transform] 的横向缩放。
+double _scaleOf(WidgetTester tester, Finder finder) => tester
+    .widget<Transform>(
+      find.ancestor(of: finder, matching: find.byType(Transform)).first,
+    )
+    .transform
+    .entry(0, 0);
 
 // 文字所在那一行开始逐字显出后过了几秒。
 double _cascadeOf(WidgetTester tester, Finder text) => tester

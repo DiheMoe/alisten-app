@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show lerpDouble;
 
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/chat/application/chat_controller.dart';
@@ -31,6 +32,14 @@ const _runWindowMs = 2 * 60 * 1000;
 // 消息间隔超过此时长时，下一条消息上方显示时间。
 const _pauseMs = 5 * 60 * 1000;
 
+// 自己的头像在飞行气泡到达落点后这么快淡入。
+const _avatarIn = Duration(milliseconds: 120);
+
+// 输入框飞出去之后，新的空输入框晚 0.12 秒从 94% 大小展开并淡入，共 0.37 秒。
+const _fieldReturn = Duration(milliseconds: 370);
+const _fieldReturnMove = Interval(0.32, 1, curve: Curves.easeOutCubic);
+const _fieldReturnScale = 0.94;
+
 // 草稿超过此字数后，输入框显示剩余可输入字数。
 const _lengthHintFrom = 450;
 
@@ -58,6 +67,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// 正在从输入框飞进时间线的消息：行键对应落点气泡的键。房间广播回来时
   /// 换成新的行键，落点不变。
   final _flying = <String, GlobalKey>{};
+
+  // 飞行中的气泡已经到过落点的那几条消息，按落点的键记。
+  final _arrived = <GlobalKey>{};
   final _flights = <OverlayEntry>{};
 
   /// 时间线所在的区域，飞行只画在它和输入框里，不盖住成员条和房间顶栏。
@@ -116,20 +128,20 @@ class _ChatViewState extends ConsumerState<ChatView> {
     super.dispose();
   }
 
-  // 开始发送：时间线回到最新一行，文字从输入框飞向它的气泡。
-  void _sent(String? key, FlightSource? source) {
+  // 开始发送：时间线回到最新一行，输入框飞向这条消息的气泡。返回是否飞了。
+  bool _sent(String? key, FlightSource? source) {
     _toLatest();
     if (key == null ||
         source == null ||
         MediaQuery.disableAnimationsOf(context)) {
-      return;
+      return false;
     }
     final item = ref
         .read(chatControllerProvider)
         .pending
         .where((item) => item.key == key)
         .firstOrNull;
-    if (item == null) return;
+    if (item == null) return false;
     final colors = AlistenColors.of(context);
     final landing = GlobalKey();
     setState(() => _flying[key] = landing);
@@ -143,16 +155,23 @@ class _ChatViewState extends ConsumerState<ChatView> {
         fill: colors.brand,
         target: () => _landingOf(landing),
         bounds: _flightBounds,
+        onArrived: () {
+          if (mounted) setState(() => _arrived.add(landing));
+        },
         onLanded: () {
           entry.remove();
           _flights.remove(entry);
           if (!mounted) return;
-          setState(() => _flying.removeWhere((_, key) => key == landing));
+          setState(() {
+            _flying.removeWhere((_, key) => key == landing);
+            _arrived.remove(landing);
+          });
         },
       ),
     );
     _flights.add(entry);
     Overlay.of(context).insert(entry);
+    return true;
   }
 
   // 从时间线顶部到聊天区底部（输入框）。
@@ -484,6 +503,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                 sliver: _RowList(
                   rows: rows.sublist(split),
                   flying: _flying,
+                  arrived: _arrived,
                   onShowEarlier: chat.showEarlier,
                 ),
               ),
@@ -498,6 +518,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                 sliver: _RowList(
                   rows: rows.sublist(0, split).reversed.toList(growable: false),
                   flying: _flying,
+                  arrived: _arrived,
                   onShowEarlier: chat.showEarlier,
                 ),
               ),
@@ -514,11 +535,13 @@ class _RowList extends StatelessWidget {
   const _RowList({
     required this.rows,
     required this.flying,
+    required this.arrived,
     required this.onShowEarlier,
   });
 
   final List<_Row> rows;
   final Map<String, GlobalKey> flying;
+  final Set<GlobalKey> arrived;
   final VoidCallback onShowEarlier;
 
   @override
@@ -547,8 +570,18 @@ class _RowList extends StatelessWidget {
                   onPressed: onShowEarlier,
                 ),
               ),
-              _TimeRow(:final at) => _TimeLabel(at: at),
-              _MessageRow() => _MessageLine(row: row, landing: flying[row.key]),
+              // 时间属于它下面那条消息：自己的消息还在飞时不先出来，和头像一起
+              // 在到达时淡入。
+              _TimeRow(:final at, :final before) => _TimeLabel(
+                at: at,
+                shown:
+                    flying[before] == null || arrived.contains(flying[before]),
+              ),
+              _MessageRow() => _MessageLine(
+                row: row,
+                landing: flying[row.key],
+                arrived: arrived.contains(flying[row.key]),
+              ),
               _ActivityRow(:final item) => _ActivityPill(item: item),
             },
           ),
@@ -572,9 +605,13 @@ final class _EarlierRow extends _Row {
 final class _TimeRow extends _Row {
   _TimeRow(ChatMessageItem next)
     : at = DateTime.fromMillisecondsSinceEpoch(next.sentAtMs),
+      before = next.key,
       super('time-${next.key}');
 
   final DateTime at;
+
+  /// 下面那条消息。
+  final String before;
 }
 
 final class _MessageRow extends _Row {
@@ -647,13 +684,14 @@ const _stripMinHeight =
     2 * AlistenSizes.minTouchTarget;
 
 class _TimeLabel extends StatelessWidget {
-  const _TimeLabel({required this.at});
+  const _TimeLabel({required this.at, required this.shown});
 
   final DateTime at;
+  final bool shown;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final label = Padding(
       padding: const EdgeInsets.only(
         top: AlistenSpacing.md,
         bottom: AlistenSpacing.xxs,
@@ -667,6 +705,12 @@ class _TimeLabel extends StatelessWidget {
           ),
         ),
       ),
+    );
+    return AnimatedOpacity(
+      opacity: shown ? 1 : 0,
+      duration: AlistenDurations.of(context, _avatarIn),
+      alwaysIncludeSemantics: true,
+      child: label,
     );
   }
 }
@@ -689,13 +733,17 @@ String _timeOf(DateTime at, DateTime now) {
 }
 
 class _MessageLine extends StatelessWidget {
-  const _MessageLine({required this.row, this.landing});
+  const _MessageLine({required this.row, this.landing, this.arrived = false});
 
   final _MessageRow row;
 
-  /// 不为 null 时，这条消息正从输入框飞过来：气泡先藏着、占好位置，飞行中的
-  /// 气泡按它的键找到落点。
+  /// 不为 null 时，这条消息正从输入框飞过来：气泡和发送状态先藏着、占好位置，
+  /// 飞行中的气泡按它的键找到落点，落地停稳后才显出。房间在飞行途中就确认了
+  /// 这条消息时也一样。
   final GlobalKey? landing;
+
+  /// 飞行中的气泡已经到过落点：头像这时就淡入，不等气泡停稳。
+  final bool arrived;
 
   @override
   Widget build(BuildContext context) {
@@ -741,14 +789,22 @@ class _MessageLine extends StatelessWidget {
         ),
       ),
     );
-    final avatar = SizedBox(
-      width: AlistenSizes.avatar,
-      child: first
-          ? MemberAvatar(
-              name: item.member.name,
-              imageUrl: item.member.avatarUrl(AlistenSizes.avatar),
-            )
-          : null,
+    final shown = landing == null
+        ? bubble
+        : Opacity(opacity: 0, alwaysIncludeSemantics: true, child: bubble);
+    // 头像在飞行气泡到达时就淡入，不凭空冒出来，也不等它停稳。
+    final avatar = AnimatedOpacity(
+      opacity: landing == null || arrived ? 1 : 0,
+      duration: AlistenDurations.of(context, _avatarIn),
+      child: SizedBox(
+        width: AlistenSizes.avatar,
+        child: first
+            ? MemberAvatar(
+                name: item.member.name,
+                imageUrl: item.member.avatarUrl(AlistenSizes.avatar),
+              )
+            : null,
+      ),
     );
     final content = Flexible(
       child: Column(
@@ -782,19 +838,11 @@ class _MessageLine extends StatelessWidget {
                   _DeliveryMark(item: item),
                   const SizedBox(width: AlistenSpacing.xxs),
                 ],
-                Flexible(
-                  child: landing == null
-                      ? bubble
-                      : Opacity(
-                          opacity: 0,
-                          alwaysIncludeSemantics: true,
-                          child: bubble,
-                        ),
-                ),
+                Flexible(child: shown),
               ],
             )
           else
-            bubble,
+            shown,
           if (mine && item.note != null && landing == null)
             Padding(
               padding: const EdgeInsets.only(
@@ -1019,18 +1067,26 @@ class _FloatingChip extends StatelessWidget {
 class _Composer extends ConsumerStatefulWidget {
   const _Composer({required this.onSend});
 
-  /// 开始发送时即调用，不等发送结果：带上本地消息的行键和输入框里那段文字的
-  /// 位置，没能发出时都为 null。
-  final void Function(String? key, FlightSource? source) onSend;
+  /// 开始发送时即调用，不等发送结果：带上本地消息的行键和发送那一刻的输入框，
+  /// 没能发出时都为 null。返回输入框是否飞了出去，飞了就换上新的空输入框。
+  final bool Function(String? key, FlightSource? source) onSend;
 
   @override
   ConsumerState<_Composer> createState() => _ComposerState();
 }
 
-class _ComposerState extends ConsumerState<_Composer> {
+class _ComposerState extends ConsumerState<_Composer>
+    with SingleTickerProviderStateMixin {
   late final TextEditingController _input;
   final _focus = FocusNode();
   final _field = GlobalKey();
+
+  // 输入框飞出去之后，原处的新输入框从这里开始重新出现；键盘和焦点一直留着。
+  late final _comeback = AnimationController(
+    vsync: this,
+    duration: _fieldReturn,
+    value: 1,
+  );
 
   @override
   void initState() {
@@ -1043,6 +1099,7 @@ class _ComposerState extends ConsumerState<_Composer> {
 
   @override
   void dispose() {
+    _comeback.dispose();
     _focus
       ..removeListener(_onFocus)
       ..dispose();
@@ -1076,7 +1133,11 @@ class _ComposerState extends ConsumerState<_Composer> {
     unawaited(chat.send());
     final pending = ref.read(chatControllerProvider).pending;
     final sent = pending.length > waiting;
-    widget.onSend(sent ? pending.last.key : null, sent ? source : null);
+    final flew = widget.onSend(
+      sent ? pending.last.key : null,
+      sent ? source : null,
+    );
+    if (flew) unawaited(_comeback.forward(from: 0));
   }
 
   @override
@@ -1206,7 +1267,23 @@ class _ComposerState extends ConsumerState<_Composer> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Expanded(child: field),
+                Expanded(
+                  child: AnimatedBuilder(
+                    animation: _comeback,
+                    child: field,
+                    builder: (context, field) {
+                      final back = _fieldReturnMove.transform(_comeback.value);
+                      return Opacity(
+                        opacity: back,
+                        alwaysIncludeSemantics: true,
+                        child: Transform.scale(
+                          scale: lerpDouble(_fieldReturnScale, 1, back),
+                          child: field,
+                        ),
+                      );
+                    },
+                  ),
+                ),
                 const SizedBox(width: AlistenSpacing.xs),
                 _SendButton(onPressed: canSend ? _send : null),
               ],
