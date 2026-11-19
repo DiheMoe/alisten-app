@@ -172,8 +172,8 @@ void main() {
     expect(probe.siteProbed, isEmpty);
   });
 
-  test('a room link on a website that is not Alisten is a song link like '
-      'any other', () async {
+  test('a room link on a website that is not Alisten is no invite, and as a '
+      'web page that is no media file it is not offered either', () async {
     await enterListen(RoomKind.persistent);
     probe.siteResults['https://www.reddit.com'] = const ProbeFailed(
       ProbeFailure.notAlisten,
@@ -183,6 +183,20 @@ void main() {
     final page = await check();
 
     expect(offer(), isNull);
-    expect(page.read()?.link, 'https://www.reddit.com/r/flutterdev');
+    expect(page.read(), isNull);
+  });
+
+  test('from the clipboard a web link is offered only when it points at a '
+      'media file', () async {
+    await enterListen(RoomKind.persistent);
+
+    clipboard.copy('https://github.com/DiheMoe/alisten-app/releases');
+    var page = await check();
+    expect(page.read(), isNull);
+    page.close();
+
+    clipboard.copy('https://example.com/music/a.FLAC?sign=1');
+    page = await check();
+    expect(page.read()?.link, 'https://example.com/music/a.FLAC?sign=1');
   });
 }

@@ -88,6 +88,13 @@ final class ClipboardLinkController extends Notifier<ResolvedShare?> {
     final (:text, :share, stamp: _) = read!;
     if (text == null || share == null) return;
     if (ref.read(_clipboardMemoryProvider).offered == text) return;
+    // 主动提示只给认得出是歌的链接。普通网页服务端也会试着下载，但多半不是
+    // 歌（比如顺手复制的项目主页），留给用户自己粘贴到搜索框。
+    if (share.platform == LinkPlatform.web &&
+        share.linkRoute == null &&
+        !_pointsAtMedia(share.link)) {
+      return;
+    }
     final kind = ref.read(roomControllerProvider).snapshot?.room.kind;
     // 链接曲目能否点取决于房间类型：类型未知时不做判断，留给下一次检查。
     final link = share.track?.source == TrackSource.link;
@@ -102,4 +109,25 @@ final class ClipboardLinkController extends Notifier<ResolvedShare?> {
   void dismiss() {
     if (ref.mounted) state = null;
   }
+}
+
+const _mediaExtensions = {
+  'aac',
+  'ape',
+  'flac',
+  'm4a',
+  'mp3',
+  'mp4',
+  'oga',
+  'ogg',
+  'opus',
+  'wav',
+  'webm',
+};
+
+bool _pointsAtMedia(String link) {
+  final path = Uri.tryParse(link)?.path ?? '';
+  final dot = path.lastIndexOf('.');
+  return dot > path.lastIndexOf('/') &&
+      _mediaExtensions.contains(path.substring(dot + 1).toLowerCase());
 }
