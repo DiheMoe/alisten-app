@@ -62,9 +62,25 @@ class MyPlaylistScreen extends ConsumerStatefulWidget {
   ConsumerState<MyPlaylistScreen> createState() => _MyPlaylistScreenState();
 }
 
-class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
+class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen>
+    with SingleTickerProviderStateMixin {
   // iPad 上导出的分享弹窗指向“⋯”按钮。
   final _menu = GlobalKey();
+
+  // 页面出来以后才读到的歌淡入；打开时已经有（上次读到的）就直接显示。
+  late final _arrival = AnimationController(vsync: this, value: 1);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _arrival.duration = AlistenDurations.of(context, AlistenDurations.medium);
+  }
+
+  @override
+  void dispose() {
+    _arrival.dispose();
+    super.dispose();
+  }
 
   // 自己删除之后列表先去掉了它：离开的转场里页面保持原样，不闪出“不存在了”。
   bool _leaving = false;
@@ -300,6 +316,13 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(
+      myPlaylistControllerProvider(widget.id)
+          .select((detail) => detail.items != null),
+      (had, has) {
+        if (had == false && has) unawaited(_arrival.forward(from: 0));
+      },
+    );
     final list = ref.watch(myPlaylistsControllerProvider);
     final detail = ref.watch(myPlaylistControllerProvider(widget.id));
     final found = _find(list.playlists, widget.id);
@@ -437,7 +460,8 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
       heroTags: myPlaylistHeroTags(playlist.id),
       name: playlist.name,
       facts:
-          '$count 首，更新于${formatPlaylistDate(playlist.updatedAtMs, nowMs)}，'
+          // 和“我的歌单”里卡片上的那行一样用“ · ”分隔，这行从卡片飞过来。
+          '$count 首 · 更新于${formatPlaylistDate(playlist.updatedAtMs, nowMs)} · '
           '创建于${formatPlaylistDate(playlist.createdAtMs, nowMs)}',
     );
   }
@@ -508,34 +532,38 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen> {
       // 读屏的“移到开头”“上移”“下移”“移到末尾”由它加在每一项上，中文取自
       // WidgetsLocalizations。拖动只从选择时出现的把手开始：平时一行只留点歌和
       // “⋯”，长按留给复制歌名。
-      SliverReorderableList(
-        itemCount: items.length,
-        onReorderItem: (from, to) => _drag(items, from, to),
-        proxyDecorator: (child, _, _) => DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.raised,
-            borderRadius: BorderRadius.circular(AlistenRadii.md),
-            border: Border.all(color: colors.glassStroke),
+      SliverFadeTransition(
+        opacity: _arrival,
+        sliver: SliverReorderableList(
+          itemCount: items.length,
+          onReorderItem: (from, to) => _drag(items, from, to),
+          proxyDecorator: (child, _, _) => DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.raised,
+              borderRadius: BorderRadius.circular(AlistenRadii.md),
+              border: Border.all(color: colors.glassStroke),
+            ),
+            child: child,
           ),
-          child: child,
+          itemBuilder: (context, index) {
+            final item = items[index];
+            final key = trackKey(item.track);
+            return _Song(
+              key: ValueKey(key),
+              item: item,
+              index: index,
+              editing: selecting,
+              selected: detail.selected.contains(key),
+              onToggle: () => _detail.toggle(key),
+              onPick: _pick,
+              onCopyTitle: widget.onCopyTitle,
+              onSave: () => _save(
+                SaveOneTrack(track: item.track, title: item.meta.title),
+              ),
+              onRemove: () => unawaited(_edit(_detail.remove([item.track]))),
+            );
+          },
         ),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          final key = trackKey(item.track);
-          return _Song(
-            key: ValueKey(key),
-            item: item,
-            index: index,
-            editing: selecting,
-            selected: detail.selected.contains(key),
-            onToggle: () => _detail.toggle(key),
-            onPick: _pick,
-            onCopyTitle: widget.onCopyTitle,
-            onSave: () =>
-                _save(SaveOneTrack(track: item.track, title: item.meta.title)),
-            onRemove: () => unawaited(_edit(_detail.remove([item.track]))),
-          );
-        },
       ),
       SliverPadding(
         padding: EdgeInsets.only(

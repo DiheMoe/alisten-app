@@ -192,13 +192,40 @@ void main() {
     expect(tester.testTextInput.isVisible, isFalse);
   }
 
+  testWidgets('songs read after the page is shown fade in instead of '
+      'appearing all at once', (tester) async {
+    final reading = server.hold('items');
+    await open(tester);
+    expect(find.text('歌a'), findsNothing);
+
+    double shown() => tester
+        .widget<SliverFadeTransition>(
+          find.ancestor(
+            of: find.text('歌a'),
+            matching: find.byType(SliverFadeTransition),
+          ),
+        )
+        .opacity
+        .value;
+
+    reading.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(shown(), lessThan(0.5));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(shown(), inExclusiveRange(0, 1));
+    await settlePage(tester);
+    expect(shown(), 1);
+  });
+
   testWidgets('the header tells the songs and the dates; outside a room '
       'the songs show no pick button and no notice about it', (tester) async {
     final semantics = tester.ensureSemantics();
     await open(tester);
 
     expect(find.text('夜跑'), findsOneWidget);
-    expect(find.textContaining('4 首，更新于'), findsOneWidget);
+    expect(find.textContaining('4 首 · 更新于'), findsOneWidget);
+    expect(find.textContaining(' · 创建于'), findsOneWidget);
     // 列表里的封面、名字和说明飞到这里。
     final tags = myPlaylistHeroTags('pl-1');
     for (final tag in [tags.cover, tags.name, tags.facts]) {

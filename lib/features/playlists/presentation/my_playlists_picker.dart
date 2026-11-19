@@ -4,6 +4,7 @@ import 'package:alisten/domain/playlist/playlist_sort.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/playlists/application/my_playlist_controller.dart';
 import 'package:alisten/features/playlists/application/my_playlists_controller.dart';
+import 'package:alisten/features/playlists/application/picked_playlist.dart';
 import 'package:alisten/features/playlists/application/playlist_view_controller.dart';
 import 'package:alisten/features/playlists/presentation/playlist_song.dart';
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
@@ -21,8 +22,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 点歌页“我的歌单”来源的内容，是一个 sliver：一排歌单标签，下面是选中歌单里的
-/// 歌，每首可以直接点。歌单顺序与“我的歌单”页相同，默认选第一个。[filter] 按
-/// 歌名、歌手和专辑筛选选中歌单里的歌。
+/// 歌，每首可以直接点。歌单顺序与“我的歌单”页相同；默认选上次在这里选的，没
+/// 有就选第一个有歌的，不一打开就是空的“我喜欢”。[filter] 按歌名、歌手和专辑
+/// 筛选选中歌单里的歌。
 class MyPlaylistsPicker extends ConsumerStatefulWidget {
   const MyPlaylistsPicker({
     required this.filter,
@@ -48,6 +50,7 @@ class _MyPlaylistsPickerState extends ConsumerState<MyPlaylistsPicker> {
 
   void _choose(String id) {
     setState(() => _chosen = id);
+    ref.read(pickedPlaylistProvider.notifier).pick(id);
     // 从“全部歌单”里选的标签可能还在屏幕外，等这一帧排好再滚过去。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final chip = _chipKeys[id]?.currentContext;
@@ -117,9 +120,17 @@ class _MyPlaylistsPickerState extends ConsumerState<MyPlaylistsPicker> {
     if (playlists.isEmpty) return _note('还没有歌单');
     final sort = ref.watch(playlistViewProvider.select((view) => view.sort));
     final shown = sortPlaylists(playlists, sort);
-    final chosen = shown.any((playlist) => playlist.id == _chosen)
-        ? _chosen!
-        : shown.first.id;
+    String? present(String? id) =>
+        shown.any((playlist) => playlist.id == id) ? id : null;
+    final chosen =
+        present(_chosen) ??
+        present(ref.watch(pickedPlaylistProvider)) ??
+        shown
+            .firstWhere(
+              (playlist) => playlist.trackCount > 0,
+              orElse: () => shown.first,
+            )
+            .id;
     return SliverMainAxisGroup(
       slivers: [
         SliverToBoxAdapter(

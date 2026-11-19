@@ -93,6 +93,82 @@ void main() {
     expect(detail.read().gone, isFalse);
   });
 
+  // 歌单页从“我的歌单”打开，列表在下面一直开着。
+  group('opened again', () {
+    Future<void> openOverList() async {
+      await open();
+      final list = opened.container.listen(
+        myPlaylistsControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(list.close);
+    }
+
+    Future<void> reopen() async {
+      detail.close();
+      await pumpEventQueue();
+      expect(
+        opened.container.exists(myPlaylistControllerProvider('pl-1')),
+        isFalse,
+      );
+      detail = opened.container.listen(
+        myPlaylistControllerProvider('pl-1'),
+        (_, _) {},
+      );
+    }
+
+    test('unchanged since, it shows the songs read before at once and reads '
+        'them again', () async {
+      await openOverList();
+      final reading = server.hold('items');
+      server.contents['pl-1'] = [song('a'), song('b')];
+
+      await reopen();
+      expect(keys(), ['netease:a', 'netease:b', 'netease:c', 'netease:d']);
+
+      reading.complete();
+      await pumpEventQueue();
+      expect(keys(), ['netease:a', 'netease:b']);
+    });
+
+    test('changed since, it waits for this read', () async {
+      await openOverList();
+      server.playlists[1] = playlist(
+        'pl-1',
+        name: '夜跑',
+        trackCount: 4,
+        updatedAtMs: 2,
+      );
+      await opened.container
+          .read(myPlaylistsControllerProvider.notifier)
+          .load();
+      final reading = server.hold('items');
+
+      await reopen();
+      expect(detail.read().items, isNull);
+      reading.complete();
+      await pumpEventQueue();
+      expect(keys(), hasLength(4));
+    });
+
+    test('after signing out and in again, nothing read before shows', () async {
+      await openOverList();
+      detail.close();
+      await pumpEventQueue();
+      await signOut();
+      await signIn();
+      final reading = server.hold('items');
+
+      detail = opened.container.listen(
+        myPlaylistControllerProvider('pl-1'),
+        (_, _) {},
+      );
+      expect(detail.read().items, isNull);
+      reading.complete();
+      await pumpEventQueue();
+    });
+  });
+
   test('a playlist the server does not know is gone', () async {
     server.playlists.removeLast();
     await open();

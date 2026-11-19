@@ -72,6 +72,28 @@ const _unchanged = Object();
 
 typedef _Listed = ({bool present, int updatedAtMs});
 
+typedef _Read = ({int updatedAtMs, List<TrackSummary> items});
+
+/// 这次运行里读到过的歌单内容，记着读到时列表里它的更新时间。再打开时更新
+/// 时间没变就先显示它，不用等这次读取。歌单只属于原来的服务器和账号，换了
+/// 就清空。
+final _readBeforeProvider = NotifierProvider<_ReadBefore, Map<String, _Read>>(
+  _ReadBefore.new,
+);
+
+final class _ReadBefore extends Notifier<Map<String, _Read>> {
+  @override
+  Map<String, _Read> build() {
+    ref.watch(playlistApiProvider);
+    ref.watch(
+      identityControllerProvider.select((identity) => identity.session),
+    );
+    return const {};
+  }
+
+  void remember(String id, _Read read) => state = {...state, id: read};
+}
+
 final myPlaylistControllerProvider = NotifierProvider.autoDispose
     .family<MyPlaylistController, MyPlaylistState, String>(
       MyPlaylistController.new,
@@ -131,8 +153,16 @@ final class MyPlaylistController extends Notifier<MyPlaylistState> {
     });
     if (!account) return const MyPlaylistState();
     unawaited(Future.microtask(load));
+    final listed = _listed(ref.read(myPlaylistsControllerProvider));
+    final before = ref.read(_readBeforeProvider)[id];
     return MyPlaylistState(
-      gone: _listed(ref.read(myPlaylistsControllerProvider))?.present == false,
+      items:
+          listed != null &&
+              listed.present &&
+              before?.updatedAtMs == listed.updatedAtMs
+          ? before?.items
+          : null,
+      gone: listed?.present == false,
     );
   }
 
@@ -181,6 +211,13 @@ final class MyPlaylistController extends Notifier<MyPlaylistState> {
   }
 
   void _show(List<TrackSummary> items) {
+    final listed = _listed(ref.read(myPlaylistsControllerProvider));
+    if (listed != null && listed.present) {
+      ref.read(_readBeforeProvider.notifier).remember(id, (
+        updatedAtMs: listed.updatedAtMs,
+        items: items,
+      ));
+    }
     final keys = {for (final item in items) trackKey(item.track)};
     state = state.copyWith(
       items: items,

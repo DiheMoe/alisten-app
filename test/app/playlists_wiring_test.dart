@@ -314,7 +314,7 @@ void main() {
       final semantics = tester.ensureSemantics();
       final server = FakePlaylistApi()
         ..playlists.addAll([
-          favoritesPlaylist,
+          playlist('fav', name: '我喜欢', favorites: true, trackCount: 1),
           playlist('pl-1', name: '夜跑', trackCount: 2),
         ])
         ..contents['fav'] = [song('z', title: '晴天')]
@@ -326,7 +326,7 @@ void main() {
         fromPlaylists: true,
       );
       final router = appContainer(tester).read(routerProvider);
-      // 没有平台的推荐；默认选中排在最前的“我喜欢”。
+      // 没有平台的推荐；默认选中排在最前、有歌的“我喜欢”。
       expect(find.text('为你推荐'), findsNothing);
       expect(find.bySemanticsLabel('点歌《晴天》'), findsOneWidget);
       expect(tester.takeException(), isNull);
