@@ -858,7 +858,7 @@ class _MessageLine extends StatelessWidget {
         child: first
             ? MemberAvatar(
                 name: item.member.name,
-                imageUrl: item.member.avatarUrl(AlistenSizes.avatar),
+                imageUrl: item.member.avatarUrl,
               )
             : null,
       ),

@@ -24,7 +24,7 @@ class ProfileHeader extends StatelessWidget {
         children: [
           MemberAvatar(
             name: name,
-            imageUrl: member?.avatarUrl(AlistenSizes.profileAvatar),
+            imageUrl: member?.avatarUrl,
             size: AlistenSizes.profileAvatar,
           ),
           const SizedBox(width: AlistenSpacing.md),

@@ -281,39 +281,41 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
     );
     return RepaintBoundary(
       key: _page,
-      child: AlistenScaffold(
-        background: background,
-        topBar: topBar,
-        contentMaxWidth: twoPanes
-            ? double.infinity
-            : AlistenSizes.contentMaxWidth,
-        // 两栏时键盘只推高右栏，由 `_TwoPanes` 处理。
-        resizeToAvoidBottomInset: !twoPanes,
-        body: twoPanes
-            ? _TwoPanes(
-                player: player,
-                side: _SidePanel(
-                  mode: _side,
-                  onSelect: _chooseSide,
-                  pages: RoomPager(
-                    key: _sidePages,
-                    pages: [for (final side in _sideModes) side.value],
-                    page: _side,
-                    onSettled: _settleSide,
-                    builder: content,
+      child: QueueCoverWarmup(
+        child: AlistenScaffold(
+          background: background,
+          topBar: topBar,
+          contentMaxWidth: twoPanes
+              ? double.infinity
+              : AlistenSizes.contentMaxWidth,
+          // 两栏时键盘只推高右栏，由 `_TwoPanes` 处理。
+          resizeToAvoidBottomInset: !twoPanes,
+          body: twoPanes
+              ? _TwoPanes(
+                  player: player,
+                  side: _SidePanel(
+                    mode: _side,
+                    onSelect: _chooseSide,
+                    pages: RoomPager(
+                      key: _sidePages,
+                      pages: [for (final side in _sideModes) side.value],
+                      page: _side,
+                      onSettled: _settleSide,
+                      builder: content,
+                    ),
                   ),
+                )
+              : player,
+          bottomBar: twoPanes
+              ? null
+              : RoomModeBar(
+                  mode: mode,
+                  position: _phonePosition,
+                  onSelect: _choosePhone,
+                  onSearch: _searchSongs,
+                  onPickFromPlaylists: _pickFromPlaylists,
                 ),
-              )
-            : player,
-        bottomBar: twoPanes
-            ? null
-            : RoomModeBar(
-                mode: mode,
-                position: _phonePosition,
-                onSelect: _choosePhone,
-                onSearch: _searchSongs,
-                onPickFromPlaylists: _pickFromPlaylists,
-              ),
+        ),
       ),
     );
   }

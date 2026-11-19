@@ -63,7 +63,7 @@ class MemberAvatar extends StatelessWidget {
           avatar,
           ClipOval(
             child: Image(
-              image: _imageOf(context, imageUrl, size),
+              image: avatarImageOf(context, imageUrl),
               fit: BoxFit.cover,
               excludeFromSemantics: true,
               gaplessPlayback: true,
@@ -107,21 +107,21 @@ class MemberAvatar extends StatelessWidget {
   }
 }
 
-ImageProvider _imageOf(BuildContext context, String url, double size) =>
+/// 头像不论画多大都按最大的一档解码，同一个人的头像只解码一次：在一处出现
+/// 过，换到另一处（比如从大厅进设置）第一帧就有图，不先露出首字。
+ImageProvider avatarImageOf(BuildContext context, String url) =>
     ResizeImage.resizeIfNeeded(
-      (size * MediaQuery.devicePixelRatioOf(context)).round(),
+      (AlistenSizes.profileAvatar * MediaQuery.devicePixelRatioOf(context))
+          .round(),
       null,
       AvatarImages.of(context, url),
     );
 
-/// 提前解码头像，之后同样大小的 [MemberAvatar] 第一帧就画出图片。没设头像的
-/// 成员取图会失败，界面显示首字，这里不报错。
-Future<void> precacheMemberAvatar(
-  BuildContext context,
-  String imageUrl,
-  double size,
-) => precacheImage(
-  _imageOf(context, imageUrl, size),
-  context,
-  onError: (_, _) {},
-);
+/// 提前解码头像，之后 [MemberAvatar] 第一帧就画出图片。没设头像的成员取图会
+/// 失败，界面显示首字，这里不报错。
+Future<void> precacheMemberAvatar(BuildContext context, String imageUrl) =>
+    precacheImage(
+      avatarImageOf(context, imageUrl),
+      context,
+      onError: (_, _) {},
+    );

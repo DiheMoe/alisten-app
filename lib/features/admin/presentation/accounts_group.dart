@@ -126,9 +126,7 @@ class _AccountsGroupState extends ConsumerState<AccountsGroup> {
               children: [
                 MemberAvatar(
                   name: account.member.name,
-                  imageUrl: account.member.avatarUrl(
-                    AlistenSizes.profileAvatar,
-                  ),
+                  imageUrl: account.member.avatarUrl,
                   size: AlistenSizes.profileAvatar,
                 ),
                 const SizedBox(width: AlistenSpacing.md),

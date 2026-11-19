@@ -33,9 +33,11 @@ class CoverArt extends StatelessWidget {
     final colors = AlistenColors.of(context);
     final shape = BorderRadius.circular(radius);
     final url = this.url;
-    // 没有封面时是一块低调的色块，不抢有封面的行。
+    // 没有封面时是一块低调的色块，不抢有封面的行。取图途中也是这块颜色，
+    // 不是一块和卡片一样白的空白。
+    final tint = colors.onGlass.withValues(alpha: 0.08);
     final placeholder = ColoredBox(
-      color: colors.onGlass.withValues(alpha: 0.08),
+      color: tint,
       child: Center(
         child: Icon(
           placeholderIcon,
@@ -47,15 +49,9 @@ class CoverArt extends StatelessWidget {
     Widget art = url == null || url.isEmpty
         ? placeholder
         : ColoredBox(
-            color: colors.glassFill,
+            color: tint,
             child: Image(
-              image: ResizeImage(
-                CoverImages.of(context, url),
-                width:
-                    ((decodeSize ?? size) *
-                            MediaQuery.devicePixelRatioOf(context))
-                        .round(),
-              ),
+              image: _imageOf(context, url, decodeSize ?? size),
               width: size,
               height: size,
               fit: BoxFit.cover,
@@ -96,6 +92,17 @@ class CoverArt extends StatelessWidget {
     return SizedBox.square(dimension: size, child: art);
   }
 }
+
+ImageProvider _imageOf(BuildContext context, String url, double size) =>
+    ResizeImage(
+      CoverImages.of(context, url),
+      width: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+    );
+
+/// 提前取图并解码，之后同样 [size] 的 [CoverArt] 第一帧就画出封面。取不到
+/// 图时界面显示占位，这里不报错。
+Future<void> precacheCoverArt(BuildContext context, String url, double size) =>
+    precacheImage(_imageOf(context, url, size), context, onError: (_, _) {});
 
 // 飞行中两头的封面交叉淡化：另一头按自己的大小解码的图还没出来时，飞的也一直
 // 是有图的封面，不闪底色。上面一层是被打开（或正在关闭）的页面里那一张，随页面

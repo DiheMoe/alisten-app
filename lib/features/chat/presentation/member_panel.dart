@@ -235,9 +235,9 @@ class _MemberStripState extends ConsumerState<MemberStrip>
   // 下次展开时头像要飞到各行的大小，先解码好，飞的时候第一帧就有图。
   void _precache(List<Member> members) {
     for (final member in members) {
-      final url = member.avatarUrl(AlistenSizes.listAvatar);
+      final url = member.avatarUrl;
       if (url != null && _precached.add(url)) {
-        unawaited(precacheMemberAvatar(context, url, AlistenSizes.listAvatar));
+        unawaited(precacheMemberAvatar(context, url));
       }
     }
   }
@@ -731,7 +731,7 @@ class _MemberStripState extends ConsumerState<MemberStrip>
                 child: MemberAvatar(
                   key: ValueKey('member-flight-${member.id}'),
                   name: member.name,
-                  imageUrl: member.avatarUrl(AlistenSizes.listAvatar),
+                  imageUrl: member.avatarUrl,
                   size: AlistenSizes.listAvatar,
                 ),
               ),
@@ -822,7 +822,7 @@ class _AvatarStack extends StatelessWidget {
               left: _stripStep * index,
               child: MemberAvatar(
                 name: members[index].name,
-                imageUrl: members[index].avatarUrl(AlistenSizes.avatar),
+                imageUrl: members[index].avatarUrl,
                 ring: true,
               ),
             ),

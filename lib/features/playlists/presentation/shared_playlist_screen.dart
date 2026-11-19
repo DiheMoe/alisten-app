@@ -237,10 +237,7 @@ class SharedPlaylistScreen extends ConsumerWidget {
           children: [
             MemberAvatar(
               name: shared.ownerName,
-              imageUrl: avatarUrlFor(
-                shared.ownerAvatarHash,
-                AlistenSizes.memberTag,
-              ),
+              imageUrl: avatarUrlFor(shared.ownerAvatarHash),
               size: AlistenSizes.memberTag,
             ),
             const SizedBox(width: AlistenSpacing.xxs),

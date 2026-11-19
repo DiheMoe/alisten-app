@@ -1,6 +1,3 @@
-// Gravatar 提供的最大图片边长，单位为像素。
-const _gravatarMaxSize = 2048;
-
 final class Member {
   const Member({
     required this.id,
@@ -13,14 +10,15 @@ final class Member {
 
   final String avatarHash;
 
-  String? avatarUrl(double size) => avatarUrlFor(avatarHash, size);
+  String? get avatarUrl => avatarUrlFor(avatarHash);
 }
 
-/// 固定按 [size] 的两倍取图：在大多数屏幕上足够清晰，各台设备请求的也是同一张
-/// 图片。
-String? avatarUrlFor(String avatarHash, double size) {
+/// 头像不论画多大都取同一张图，边长是最大的头像（64 点）的两倍：同一个人的头像
+/// 只下载、解码一次，换个地方显示第一帧就有图；各台设备请求的也是同一张。
+const avatarPixels = 128;
+
+String? avatarUrlFor(String avatarHash) {
   if (avatarHash.isEmpty) return null;
-  final pixels = (size * 2).round().clamp(1, _gravatarMaxSize);
   // 没设头像时要 404 而不是生成的图案：各镜像生成的图案不同，界面改显示首字。
-  return 'https://www.gravatar.com/avatar/$avatarHash?d=404&s=$pixels';
+  return 'https://www.gravatar.com/avatar/$avatarHash?d=404&s=$avatarPixels';
 }

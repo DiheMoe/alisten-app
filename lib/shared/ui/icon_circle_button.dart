@@ -35,7 +35,7 @@ class IconCircleButton extends StatelessWidget {
   final bool? expanded;
 
   /// 加载成功后按头像大小居中淡入，取代 [icon]；加载中和失败时显示 [icon]。
-  /// 读屏只读 [semanticLabel]。
+  /// 读屏只读 [semanticLabel]。按传入的样子解码，调用方自己决定解码大小。
   final ImageProvider? image;
 
   @override
@@ -80,13 +80,7 @@ class IconCircleButton extends StatelessWidget {
                 ? glyph
                 : Center(
                     child: Image(
-                      image: ResizeImage.resizeIfNeeded(
-                        (AlistenSizes.avatar *
-                                MediaQuery.devicePixelRatioOf(context))
-                            .round(),
-                        null,
-                        image,
-                      ),
+                      image: image,
                       width: AlistenSizes.avatar,
                       height: AlistenSizes.avatar,
                       fit: BoxFit.cover,

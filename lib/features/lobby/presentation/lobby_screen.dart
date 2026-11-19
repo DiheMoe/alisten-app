@@ -10,7 +10,7 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
-import 'package:alisten/shared/ui/avatar_images.dart';
+import 'package:alisten/shared/ui/member_avatar.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/collapsible.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
@@ -177,9 +177,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     final lobby = ref.watch(lobbyControllerProvider);
     final brand = ref.watch(lobbyBrandProvider);
     final avatarUrl = ref.watch(
-      identityControllerProvider.select(
-        (state) => state.member?.avatarUrl(AlistenSizes.avatar),
-      ),
+      identityControllerProvider.select((state) => state.member?.avatarUrl),
     );
     final listError = lobby.listError;
     final busy = lobby.busy || _joinSheetShown;
@@ -222,7 +220,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                           style: IconCircleButtonStyle.plain,
                           image: avatarUrl == null
                               ? null
-                              : AvatarImages.of(context, avatarUrl),
+                              : avatarImageOf(context, avatarUrl),
                           onPressed: widget.onOpenSettings,
                         ),
                       ],

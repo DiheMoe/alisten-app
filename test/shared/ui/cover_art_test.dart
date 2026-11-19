@@ -52,6 +52,58 @@ void main() {
     expect(shown.width, 96);
   });
 
+  testWidgets('a cover decoded ahead at the same size is drawn in the very '
+      'first frame, with nothing else to wait for', (tester) async {
+    final png = (await tester.runAsync(() => _png(200)))!;
+    ImageProvider resolve(String url) => MemoryImage(png);
+    late BuildContext context;
+    await tester.pumpWidget(
+      app(
+        CoverImages(
+          resolve: resolve,
+          child: Builder(
+            builder: (inner) {
+              context = inner;
+              return const SizedBox();
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.runAsync(() => precacheCoverArt(context, _cover, 48));
+
+    await tester.pumpWidget(
+      app(
+        CoverImages(
+          resolve: resolve,
+          child: const CoverArt(url: _cover, size: 48),
+        ),
+      ),
+    );
+
+    expect(tester.widget<RawImage>(find.byType(RawImage)).image, isNotNull);
+  });
+
+  testWidgets('while its image is on the way a cover is the same soft tint '
+      'as a missing one, not a blank like the card under it', (tester) async {
+    await tester.pumpWidget(
+      app(
+        CoverImages(
+          resolve: (url) => MemoryImage(Uint8List(0)),
+          child: const CoverArt(url: _cover, size: 48),
+        ),
+      ),
+    );
+
+    final colors = AlistenColors.of(tester.element(find.byType(CoverArt)));
+    expect(
+      tester.widget<ColoredBox>(find.byType(ColoredBox).last).color,
+      colors.onGlass.withValues(alpha: 0.08),
+    );
+    expect(find.byIcon(AlistenIcons.musicNote), findsNothing);
+    await _finishLoading(tester);
+  });
+
   testWidgets('a cover the image source cannot load shows the placeholder', (
     tester,
   ) async {

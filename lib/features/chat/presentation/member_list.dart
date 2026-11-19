@@ -102,7 +102,7 @@ class _MemberRow extends StatelessWidget {
             avatar(
               MemberAvatar(
                 name: member.name,
-                imageUrl: member.avatarUrl(AlistenSizes.listAvatar),
+                imageUrl: member.avatarUrl,
                 size: AlistenSizes.listAvatar,
               ),
             ),

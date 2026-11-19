@@ -478,7 +478,7 @@ class _EntryRow extends StatelessWidget {
       subtitleLeading: by != null
           ? MemberAvatar(
               name: by.name,
-              imageUrl: by.avatarUrl(AlistenSizes.memberTag),
+              imageUrl: by.avatarUrl,
               size: AlistenSizes.memberTag,
             )
           : entry.auto

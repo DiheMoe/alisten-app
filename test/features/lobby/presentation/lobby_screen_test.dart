@@ -1083,7 +1083,7 @@ void main() {
 
   group('the settings button', () {
     const listener = Member(id: 'member-id', name: '听众', avatarHash: 'abc123');
-    final avatarUrl = listener.avatarUrl(AlistenSizes.avatar)!;
+    final avatarUrl = listener.avatarUrl!;
 
     setUp(() {
       imageCache
@@ -1157,9 +1157,7 @@ void main() {
         tester,
         api: api,
         credentials: FakeCredentialStore()..memberToken = 'member-token',
-        avatarCache: FakeAvatarCache(
-          avatars: {withAvatar.avatarUrl(AlistenSizes.avatar)!: png},
-        ),
+        avatarCache: FakeAvatarCache(avatars: {withAvatar.avatarUrl!: png}),
       );
       await _finishLoading(tester);
       expect(gear(), findsOneWidget);
