@@ -102,8 +102,9 @@ class SearchScreen extends ConsumerStatefulWidget {
     required this.onShowQueue,
     required this.onOpenRoom,
     this.library,
+    this.libraryOnly = false,
     super.key,
-  });
+  }) : assert(!libraryOnly || library != null, 'library-only needs a library');
 
   /// 在比页面存活更久的地方报告点歌结果，例如提示。
   final QueueResultCallback onResult;
@@ -121,13 +122,16 @@ class SearchScreen extends ConsumerStatefulWidget {
 
   final SearchLibrary? library;
 
+  /// 只在 [library] 里点歌：没有平台可选，输入框只用来筛选。
+  final bool libraryOnly;
+
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   late final TextEditingController _input;
-  bool _inLibrary = false;
+  late bool _inLibrary = widget.libraryOnly;
   final _focus = FocusNode();
 
   SearchController get _search => ref.read(searchControllerProvider.notifier);
@@ -140,7 +144,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     super.initState();
     final search = ref.read(searchControllerProvider);
     final home = _home(search);
-    _input = TextEditingController(text: home ? '' : search.keyword);
+    _input = TextEditingController(
+      text: home || widget.libraryOnly ? '' : search.keyword,
+    );
+    // 只在歌单里点歌时用不上平台的推荐和剪贴板里的链接。
+    if (widget.libraryOnly) return;
     // 等首次构建之后再检查：构建时已监听剪贴板提示，它才会在页面显示期间一直
     // 保留。
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -191,6 +199,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _swipeSource(DragEndDetails details) {
+    if (widget.libraryOnly) return;
     final velocity = details.primaryVelocity ?? 0;
     if (velocity.abs() < _swipeVelocity) return;
     final sources = <TrackSource?>[
@@ -333,7 +342,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 style: IconCircleButtonStyle.plain,
                 onPressed: () => unawaited(Navigator.maybePop(context)),
               ),
-              title: '点歌',
+              title: widget.libraryOnly ? '从歌单点歌' : '搜歌',
               actions: [_PickedCount(onPressed: widget.onShowQueue)],
             ),
             Padding(
@@ -355,20 +364,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 onClear: _clear,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AlistenSpacing.md,
+            if (!widget.libraryOnly)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AlistenSpacing.md,
+                ),
+                child: _Filters(
+                  source: library == null ? search.source : null,
+                  libraryLabel: widget.library?.label,
+                  view: library != null || home || typed != null
+                      ? null
+                      : search.view,
+                  onSource: _chooseSource,
+                  onView: _changeView,
+                ),
               ),
-              child: _Filters(
-                source: library == null ? search.source : null,
-                libraryLabel: widget.library?.label,
-                view: library != null || home || typed != null
-                    ? null
-                    : search.view,
-                onSource: _chooseSource,
-                onView: _changeView,
-              ),
-            ),
             const PickUnavailableNotice(),
           ],
         ),

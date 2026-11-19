@@ -38,7 +38,7 @@ void main() {
       reason: 'the queue is in a column of its own beside the player',
     );
     expect(
-      tester.getRect(find.text('点歌')).bottom,
+      tester.getRect(find.byTooltip('搜歌')).bottom,
       lessThan(tester.getRect(play).top),
       reason: '点歌 is in the bar at the top',
     );
@@ -239,7 +239,7 @@ void main() {
 
     expect(lyrics, findsOneWidget);
     expect(tester.getRect(lyrics).left, greaterThan((760 - 640) / 2));
-    expect(tester.getRect(find.text('点歌')).right, lessThan(760 - 60));
+    expect(tester.getRect(find.byTooltip('搜歌')).right, lessThan(760 - 60));
     semantics.dispose();
   });
 }

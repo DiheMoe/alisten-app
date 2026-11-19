@@ -45,12 +45,16 @@ final deepLinkControllerProvider = Provider<DeepLinkController>((ref) {
   return controller;
 });
 
+/// 房间里“从歌单点歌”的页面。只在 App 里有，分享出去的房间链接里没有。
+const pickFromPlaylistsSegment = 'from-playlists';
+
 final class DeepLinkController {
   DeepLinkController({required this._config, this.source});
 
   static final appSections = {
     ...linkRoomSections,
     for (final mode in RoomMode.values) ?mode.path,
+    pickFromPlaylistsSegment,
   };
 
   final AppConfig Function() _config;

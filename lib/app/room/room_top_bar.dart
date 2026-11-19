@@ -1,4 +1,5 @@
 import 'package:alisten/app/room/connection_pill.dart';
+import 'package:alisten/app/room/song_buttons.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
@@ -6,7 +7,6 @@ import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/animated_resize.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
-import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/popover.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/toast.dart';
@@ -23,7 +23,8 @@ class RoomTopBar extends StatefulWidget {
     required this.onInvite,
     required this.onLeave,
     this.onRetryNow,
-    this.onAddSong,
+    this.onSearch,
+    this.onPickFromPlaylists,
     super.key,
   });
 
@@ -38,7 +39,9 @@ class RoomTopBar extends StatefulWidget {
 
   final VoidCallback? onRetryNow;
 
-  final VoidCallback? onAddSong;
+  /// 宽屏时点歌的两个按钮在顶栏；窄屏时在底部的模式条，这里为 null。
+  final VoidCallback? onSearch;
+  final VoidCallback? onPickFromPlaylists;
 
   @override
   State<RoomTopBar> createState() => _RoomTopBarState();
@@ -84,12 +87,12 @@ class _RoomTopBarState extends State<RoomTopBar> {
               ),
             ),
             actions: [
-              if (widget.onAddSong case final onAddSong?) ...[
-                PillButton(
-                  label: '点歌',
-                  icon: AlistenIcons.plusBold,
-                  onPressed: onAddSong,
-                ),
+              if (widget.onPickFromPlaylists case final pick?) ...[
+                PickFromPlaylistsButton(onPressed: pick),
+                const SizedBox(width: AlistenSpacing.xs),
+              ],
+              if (widget.onSearch case final search?) ...[
+                SearchSongsButton(onPressed: search),
                 const SizedBox(width: AlistenSpacing.xs),
               ],
               Popover(

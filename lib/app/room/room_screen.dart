@@ -142,8 +142,11 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
     if (_routeUnchanged) _show(mode);
   }
 
-  void _addSong() =>
+  void _searchSongs() =>
       unawaited(context.push<void>('/r/${widget.roomRef}/search'));
+
+  void _pickFromPlaylists() =>
+      unawaited(context.push<void>('/r/${widget.roomRef}/from-playlists'));
 
   void _invite(_RoomView room) {
     final link = ref
@@ -248,7 +251,8 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
               ref.read(roomControllerProvider.notifier).checkConnection(),
             )
           : null,
-      onAddSong: twoPanes ? _addSong : null,
+      onSearch: twoPanes ? _searchSongs : null,
+      onPickFromPlaylists: twoPanes ? _pickFromPlaylists : null,
     );
     final player = NowPlayingHeader(
       key: _player,
@@ -307,7 +311,8 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
                 mode: mode,
                 position: _phonePosition,
                 onSelect: _choosePhone,
-                onAddSong: _addSong,
+                onSearch: _searchSongs,
+                onPickFromPlaylists: _pickFromPlaylists,
               ),
       ),
     );

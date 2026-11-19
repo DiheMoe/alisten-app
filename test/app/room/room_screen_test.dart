@@ -16,7 +16,6 @@ import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/index.dart';
-import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
@@ -25,6 +24,7 @@ import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/zoom_frame.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
@@ -128,7 +128,7 @@ void main() {
     expect(find.bySemanticsLabel('投票切歌'), findsOneWidget);
     expect(tester.getSize(_cover('entry-a')).width, greaterThan(200));
 
-    await tester.tap(find.text('队列'));
+    await tester.tap(_modeTab('队列'));
     await settle();
 
     expect(router.state.uri.path, '/r/listen/queue');
@@ -136,7 +136,7 @@ void main() {
     expect(playControl, findsOneWidget);
     expect(tester.getSize(_cover('entry-a')).width, lessThanOrEqualTo(64));
 
-    await tester.tap(find.text('队列'));
+    await tester.tap(_modeTab('队列'));
     await settle();
 
     expect(router.state.uri.path, '/r/listen');
@@ -297,16 +297,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('点歌 opens song search above the room, which keeps its mode', (
+  testWidgets('the search button opens song search above the room, which '
+      'keeps its mode; search offers the platforms but not my playlists', (
     tester,
   ) async {
     final (rooms: _, :router, :settle) = await _enterRoom(tester);
     router.go('/r/listen/lyrics');
     await settle();
 
-    await tester.tap(find.text('点歌'));
+    await tester.tap(find.byTooltip('搜歌'));
     await settle();
     expect(router.state.uri.path, '/r/listen/search');
+    Finder inSearch(Finder finder) =>
+        find.descendant(of: find.byType(SearchScreen), matching: finder);
+    expect(inSearch(find.text('搜歌')), findsOneWidget);
+    expect(inSearch(find.text('QQ 音乐')), findsOneWidget);
+    expect(inSearch(find.text('我的歌单')), findsNothing);
+
+    router.pop();
+    await settle();
+    expect(router.state.uri.path, '/r/listen/lyrics');
+  });
+
+  testWidgets('the plus button opens picking from my playlists above the '
+      'room, with no platforms to choose', (tester) async {
+    final (rooms: _, :router, :settle) = await _enterRoom(tester);
+    router.go('/r/listen/lyrics');
+    await settle();
+
+    await tester.tap(find.byTooltip('从歌单点歌'));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/from-playlists');
+    Finder inPicker(Finder finder) =>
+        find.descendant(of: find.byType(SearchScreen), matching: finder);
+    expect(inPicker(find.text('从歌单点歌')), findsOneWidget);
+    expect(inPicker(find.text('QQ 音乐')), findsNothing);
+    expect(inPicker(find.text('网易云')), findsNothing);
 
     router.pop();
     await settle();
@@ -320,7 +346,7 @@ void main() {
     router.go('/r/listen/lyrics');
     await settle();
 
-    await tester.tap(find.text('点歌'));
+    await tester.tap(find.byTooltip('搜歌'));
     await settle();
 
     final field = find.descendant(
@@ -344,7 +370,7 @@ void main() {
       router.go('/r/listen/lyrics');
       await settle();
 
-      await tester.tap(find.text('点歌'));
+      await tester.tap(find.byTooltip('搜歌'));
       await settle();
 
       final route = ModalRoute.of(tester.element(find.byType(SearchScreen)))!;
@@ -827,7 +853,7 @@ void main() {
       lastInput = inputBottom;
     }
 
-    await tester.tap(find.text('队列'));
+    await tester.tap(_modeTab('队列'));
     await settle();
     expect(router.state.uri.path, '/r/listen/queue');
     semantics.dispose();
@@ -921,7 +947,7 @@ void main() {
     await settle();
     final routes = _routesOf(router);
 
-    await tester.tap(find.text('聊天'));
+    await tester.tap(_modeTab('聊天'));
     final shown = <double>[];
     for (var frame = 0; frame < 30; frame++) {
       await tester.pump(const Duration(milliseconds: 16));
@@ -951,7 +977,7 @@ void main() {
     await settle();
     final routes = _routesOf(router);
 
-    await tester.tap(find.text('聊天'));
+    await tester.tap(_modeTab('聊天'));
     for (var frame = 0; frame < 10; frame++) {
       await tester.pump(const Duration(milliseconds: 16));
       expect(_scrolledPages(tester), 2, reason: 'frame $frame');
@@ -985,16 +1011,16 @@ void main() {
     router.go('/r/listen/chat');
     await expectStraight(from: 0, to: 2, reason: 'route');
 
-    await tester.tap(find.text('聊天'));
+    await tester.tap(_modeTab('聊天'));
     await settle();
     expect(router.state.uri.path, '/r/listen');
-    await tester.tap(find.text('歌词'));
+    await tester.tap(_modeTab('歌词'));
     await settle();
-    await tester.tap(find.text('歌词'));
+    await tester.tap(_modeTab('歌词'));
     await settle();
     expect(router.state.uri.path, '/r/listen');
 
-    await tester.tap(find.text('聊天'));
+    await tester.tap(_modeTab('聊天'));
     await expectStraight(from: null, to: 2, reason: 'from the player');
     expect(router.state.uri.path, '/r/listen/chat');
   });
@@ -1004,10 +1030,9 @@ void main() {
     final (rooms: _, :router, :settle) = await _enterRoom(tester);
     router.go('/r/listen/lyrics');
     await settle();
-    final thumb = _thumb(tester);
     final lyrics = _tab(tester, '歌词');
     final queue = _tab(tester, '队列');
-    expect(tester.getRect(thumb).left, moreOrLessEquals(lyrics.left));
+    expect(_thumbRect(tester).left, moreOrLessEquals(lyrics.left));
 
     final gesture = await tester.startGesture(
       tester.getCenter(_inRoom(find.byType(LyricsView))),
@@ -1017,7 +1042,7 @@ void main() {
     await gesture.moveBy(const Offset(-120, 0));
     await tester.pump();
 
-    final halfway = tester.getRect(thumb).left;
+    final halfway = _thumbRect(tester).left;
     final step = queue.left - lyrics.left;
     expect(halfway, greaterThan(lyrics.left + step / 4));
     expect(halfway, lessThan(queue.left - step / 4));
@@ -1226,9 +1251,9 @@ void main() {
     router.go('/r/listen/lyrics');
     await settle();
 
-    await tester.tap(find.text('聊天'));
+    await tester.tap(_modeTab('聊天'));
     await tester.pump();
-    await tester.tap(find.text('歌词'));
+    await tester.tap(_modeTab('歌词'));
     await settle();
 
     expect(router.state.uri.path, '/r/listen/lyrics');
@@ -1240,13 +1265,13 @@ void main() {
     final (rooms: _, :router, :settle) = await _enterRoom(tester);
     router.go('/r/listen/lyrics');
     await settle();
-    await tester.tap(find.text('歌词'));
+    await tester.tap(_modeTab('歌词'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(router.state.uri.path, '/r/listen');
     expect(_inRoom(find.byType(LyricsView)), findsOneWidget, reason: 'fading');
 
-    await tester.tap(find.text('聊天'));
+    await tester.tap(_modeTab('聊天'));
     for (var frame = 0; frame < 30; frame++) {
       await tester.pump(const Duration(milliseconds: 16));
       expect(_inRoom(find.byType(QueueView)), findsNothing);
@@ -1262,7 +1287,7 @@ void main() {
     router.go('/r/listen/lyrics');
     await settle();
 
-    await tester.tap(find.text('聊天'));
+    await tester.tap(_modeTab('聊天'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     final caught = _scrolledPages(tester)!;
@@ -1401,19 +1426,33 @@ List<String> _routesOf(GoRouter router) {
   return routes;
 }
 
-Finder _thumb(WidgetTester tester) {
-  final fill = AlistenColors.of(tester.element(find.byType(RoomModeBar)))
-      .selectedFill;
-  return find.descendant(
-    of: find.byType(RoomModeBar),
-    matching: find.byWidgetPredicate(
-      (widget) =>
-          widget is DecoratedBox &&
-          widget.decoration is BoxDecoration &&
-          (widget.decoration as BoxDecoration).color == fill,
-    ),
+// 模式条的滑块此刻画在哪：它在绘制时随滑动移动，不是一个组件。
+Rect _thumbRect(WidgetTester tester) {
+  final box = tester.renderObject<RenderCustomPaint>(
+    find.byKey(const ValueKey('mode-thumb')),
   );
+  Rect? drawn;
+  expect(
+    box,
+    paints..something((method, arguments) {
+      if (method != #drawRRect) return false;
+      drawn = (arguments.first as RRect).outerRect;
+      return true;
+    }),
+  );
+  return drawn!.shift(box.localToGlobal(Offset.zero));
 }
+
+// 模式条里的一格。没选中的格子收起了文字，点按落在整格上。
+Finder _modeTab(String label) => find
+    .ancestor(
+      of: find.descendant(
+        of: find.byType(RoomModeBar),
+        matching: find.text(label),
+      ),
+      matching: find.byType(Pressable),
+    )
+    .first;
 
 Rect _tab(WidgetTester tester, String label) => tester.getRect(
   find

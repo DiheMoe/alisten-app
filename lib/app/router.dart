@@ -71,6 +71,44 @@ final routerProvider = Provider<GoRouter>((ref) {
   late final GoRouter router;
   void openAccount() => router.go('/settings/account');
 
+  // 房间里点歌的两个入口：搜索平台（或粘贴链接），或者从自己的歌单里点。
+  Widget songs(
+    BuildContext context,
+    GoRouterState state, {
+    required bool fromPlaylists,
+  }) {
+    final roomRef = state.pathParameters['ref']!;
+    return RoomTheme(
+      child: RoomRouteGate(
+        roomRef: roomRef,
+        child: SearchScreen(
+          onResult: reportPick,
+          onNotice: notice,
+          // 歌单页叠在点歌页之上，返回时点歌页保持原样。
+          onOpenPlaylist: (playlist) => unawaited(
+            context.push<void>(
+              '/r/$roomRef/playlists/${playlist.source.name}/${playlist.id}',
+            ),
+          ),
+          onShowQueue: () => context.go(RoomMode.queue.routeIn(roomRef)),
+          onOpenRoom: context.go,
+          libraryOnly: fromPlaylists,
+          library: fromPlaylists
+              ? SearchLibrary(
+                  label: '我的歌单',
+                  hint: '在选中的歌单里找歌',
+                  builder: (context, filter, onPick) => MyPlaylistsPicker(
+                    filter: filter,
+                    onPick: onPick,
+                    onOpenAccount: openAccount,
+                  ),
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+
   Widget history(BuildContext context, GoRouterState state) => HistoryScreen(
     onResult: reportPick,
     onNotice: toasts.show,
@@ -346,38 +384,20 @@ final routerProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: songSearchSegment,
                         parentNavigatorKey: rootNavigator,
-                        pageBuilder: _page(task: true, (context, state) {
-                          final roomRef = state.pathParameters['ref']!;
-                          return RoomTheme(
-                            child: RoomRouteGate(
-                              roomRef: roomRef,
-                              child: SearchScreen(
-                                onResult: reportPick,
-                                onNotice: notice,
-                                // 歌单页叠在点歌页之上，返回时点歌页保持原样。
-                                onOpenPlaylist: (playlist) => unawaited(
-                                  context.push<void>(
-                                    '/r/$roomRef/playlists/'
-                                    '${playlist.source.name}/${playlist.id}',
-                                  ),
-                                ),
-                                onShowQueue: () =>
-                                    context.go(RoomMode.queue.routeIn(roomRef)),
-                                onOpenRoom: context.go,
-                                library: SearchLibrary(
-                                  label: '我的歌单',
-                                  hint: '在选中的歌单里找歌',
-                                  builder: (context, filter, onPick) =>
-                                      MyPlaylistsPicker(
-                                        filter: filter,
-                                        onPick: onPick,
-                                        onOpenAccount: openAccount,
-                                      ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
+                        pageBuilder: _page(
+                          task: true,
+                          (context, state) =>
+                              songs(context, state, fromPlaylists: false),
+                        ),
+                      ),
+                      GoRoute(
+                        path: pickFromPlaylistsSegment,
+                        parentNavigatorKey: rootNavigator,
+                        pageBuilder: _page(
+                          task: true,
+                          (context, state) =>
+                              songs(context, state, fromPlaylists: true),
+                        ),
                       ),
                       GoRoute(
                         path: playlistSegment,

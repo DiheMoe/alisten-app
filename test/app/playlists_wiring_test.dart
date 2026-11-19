@@ -6,6 +6,7 @@ import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -270,11 +271,12 @@ void main() {
     expect(request['data'], {'source': 'qq', 'playlistId': '3003'});
   });
 
-  group('song search and my playlists', () {
+  group('song search and picking from my playlists', () {
     Future<FakeRoomTransportFactory> openSearch(
       WidgetTester tester, {
       required bool signedIn,
       FakePlaylistApi? server,
+      bool fromPlaylists = false,
     }) async {
       tester.view
         ..physicalSize = const Size(360, 780) * 3
@@ -296,7 +298,9 @@ void main() {
         rooms: rooms,
         playlists: server,
       );
-      appContainer(tester).read(routerProvider).go('/r/listen/search');
+      appContainer(tester)
+          .read(routerProvider)
+          .go(fromPlaylists ? '/r/listen/from-playlists' : '/r/listen/search');
       await settle(tester);
       rooms.last
         ..responses.addAll(defaultSearchAnswers())
@@ -305,10 +309,8 @@ void main() {
       return rooms;
     }
 
-    testWidgets('my playlists are a third source of song search: a playlist '
-        'is chosen and its songs are picked without leaving the page', (
-      tester,
-    ) async {
+    testWidgets('picking from my playlists: a playlist is chosen and its '
+        'songs are picked without leaving the page', (tester) async {
       final semantics = tester.ensureSemantics();
       final server = FakePlaylistApi()
         ..playlists.addAll([
@@ -317,13 +319,14 @@ void main() {
         ])
         ..contents['fav'] = [song('z', title: '晴天')]
         ..contents['pl-1'] = [song('a'), song('b')];
-      final rooms = await openSearch(tester, signedIn: true, server: server);
+      final rooms = await openSearch(
+        tester,
+        signedIn: true,
+        server: server,
+        fromPlaylists: true,
+      );
       final router = appContainer(tester).read(routerProvider);
-      expect(find.text('为你推荐'), findsOneWidget);
-
-      await tester.tap(find.text('我的歌单'));
-      await settle(tester);
-      // 换成歌单之后不再有平台的推荐；默认选中排在最前的“我喜欢”。
+      // 没有平台的推荐；默认选中排在最前的“我喜欢”。
       expect(find.text('为你推荐'), findsNothing);
       expect(find.bySemanticsLabel('点歌《晴天》'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -340,7 +343,7 @@ void main() {
         for (final request in rooms.last.requests)
           if (request['type'] == 'queue.add') request,
       ], hasLength(1));
-      expect(router.state.uri.path, '/r/listen/search');
+      expect(router.state.uri.path, '/r/listen/from-playlists');
 
       // 输入框筛选选中的歌单，不去搜索平台。
       await tester.enterText(find.byType(EditableText), '歌b');
@@ -350,14 +353,6 @@ void main() {
       expect(find.bySemanticsLabel('点歌《歌a》'), findsNothing);
       expect(
         rooms.last.requests.where((r) => r['type'] == 'search.tracks'),
-        isEmpty,
-      );
-
-      await tester.tap(find.text('QQ 音乐'));
-      await settle(tester);
-      expect(find.text('为你推荐'), findsOneWidget);
-      expect(
-        tester.widget<EditableText>(find.byType(EditableText)).controller.text,
         isEmpty,
       );
       semantics.dispose();
@@ -373,9 +368,12 @@ void main() {
             playlist('pl-$i', name: '歌单$i', updatedAtMs: 100 - i),
         ])
         ..contents['pl-20'] = [song('a')];
-      await openSearch(tester, signedIn: true, server: server);
-      await tester.tap(find.text('我的歌单'));
-      await settle(tester);
+      await openSearch(
+        tester,
+        signedIn: true,
+        server: server,
+        fromPlaylists: true,
+      );
       expect(tester.takeException(), isNull);
       expect(find.text('歌单20').hitTestable(), findsNothing);
 
@@ -392,44 +390,43 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('a sideways fling moves to the next source and back', (
-      tester,
-    ) async {
+    testWidgets('a sideways fling in song search moves between the '
+        'platforms only, never into my playlists', (tester) async {
       final server = FakePlaylistApi()..playlists.add(favoritesPlaylist);
       await openSearch(tester, signedIn: true, server: server);
       const page = Offset(180, 600);
+      bool chosen(String platform) =>
+          tester
+              .widget<Pressable>(
+                find
+                    .ancestor(
+                      of: find.text(platform),
+                      matching: find.byType(Pressable),
+                    )
+                    .first,
+              )
+              .selected ??
+          false;
 
       await tester.flingFrom(page, const Offset(-200, 0), 1500);
       await settle(tester);
-      expect(find.text('为你推荐'), findsOneWidget, reason: '网易云');
-      expect(find.text('还没有歌单'), findsNothing);
+      expect(find.text('为你推荐'), findsOneWidget);
+      expect(chosen('网易云'), isTrue);
 
+      // 已经是最后一个平台，再甩不动，也不会甩进我的歌单。
       await tester.flingFrom(page, const Offset(-200, 0), 1500);
       await settle(tester);
-      expect(find.text('为你推荐'), findsNothing, reason: '我的歌单');
-      expect(find.text('这个歌单还是空的'), findsOneWidget);
-
-      // 已经是最后一个来源，再甩不动。
-      await tester.flingFrom(page, const Offset(-200, 0), 1500);
-      await settle(tester);
-      expect(find.text('这个歌单还是空的'), findsOneWidget);
+      expect(chosen('网易云'), isTrue);
+      expect(find.text('这个歌单还是空的'), findsNothing);
 
       await tester.flingFrom(page, const Offset(200, 0), 1500);
       await settle(tester);
-      expect(find.text('为你推荐'), findsOneWidget);
-
-      // 竖向滚动不换来源。
-      await tester.flingFrom(page, const Offset(0, -200), 1500);
-      await settle(tester);
-      expect(find.text('这个歌单还是空的'), findsNothing);
+      expect(chosen('QQ 音乐'), isTrue);
     });
 
-    testWidgets('a guest who chooses my playlists is led to the account '
+    testWidgets('a guest who picks from my playlists is led to the account '
         'settings', (tester) async {
-      await openSearch(tester, signedIn: false);
-
-      await tester.tap(find.text('我的歌单'));
-      await settle(tester);
+      await openSearch(tester, signedIn: false, fromPlaylists: true);
 
       expect(find.text('去账号设置'), findsOneWidget);
       expect(find.text('为你推荐'), findsNothing);
