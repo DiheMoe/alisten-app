@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/chat/application/chat_controller.dart';
 import 'package:alisten/features/chat/application/chat_item.dart';
-import 'package:alisten/features/chat/presentation/member_list.dart';
+import 'package:alisten/features/chat/presentation/member_panel.dart';
 import 'package:alisten/features/chat/presentation/send_flight.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
@@ -19,9 +18,7 @@ import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
 import 'package:alisten/shared/ui/outer_horizontal_drag.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
-import 'package:alisten/shared/ui/popover.dart';
 import 'package:alisten/shared/ui/pressable.dart';
-import 'package:alisten/shared/ui/section_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderDecoratedBox;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,18 +33,6 @@ const _pauseMs = 5 * 60 * 1000;
 
 // 草稿超过此字数后，输入框显示剩余可输入字数。
 const _lengthHintFrom = 450;
-
-const _stripAvatars = 5;
-
-const _stripStep = AlistenSizes.avatar - AlistenSpacing.sm;
-
-// 成员面板最多占屏幕的这一份高度，至少能放下标题和两三个成员。
-const _panelShare = 0.6;
-const _panelMinHeight = 160.0;
-
-// 向上推成员面板超过这么远，或甩出这么快（像素每秒），就收起。
-const _pushToClose = 24.0;
-const _flickToClose = 300.0;
 
 const _bubblePadding = EdgeInsets.symmetric(
   horizontal: AlistenSpacing.sm,
@@ -444,7 +429,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       builder: (context, constraints) {
         return Column(
           children: [
-            if (constraints.maxHeight >= _stripMinHeight) const _MemberStrip(),
+            if (constraints.maxHeight >= _stripMinHeight) const MemberStrip(),
             Expanded(
               child: GestureDetector(
                 key: _timelineArea,
@@ -660,307 +645,6 @@ const _stripMinHeight =
     AlistenSizes.minTouchTarget +
     (AlistenSpacing.xs + AlistenSizes.minTouchTarget + AlistenSpacing.sm) +
     2 * AlistenSizes.minTouchTarget;
-
-// 在线人数取服务端按会话（每台设备一个）计的值，与房间顶栏和大厅一致。
-/// 成员条点开就地向下展开成员面板，往上推、点空白处或返回就收回成员条。
-class _MemberStrip extends ConsumerStatefulWidget {
-  const _MemberStrip();
-
-  @override
-  ConsumerState<_MemberStrip> createState() => _MemberStripState();
-}
-
-class _MemberStripState extends ConsumerState<_MemberStrip> {
-  bool _open = false;
-  double _panelHeight = 0;
-
-  void _toggle() {
-    if (!_open) {
-      final box = context.findRenderObject();
-      final media = MediaQuery.of(context);
-      final below = box is RenderBox && box.hasSize
-          ? box.localToGlobal(Offset(0, box.size.height)).dy
-          : 0.0;
-      // 不盖过键盘，也不超过屏幕的六成。
-      _panelHeight = math.min(
-        media.size.height * _panelShare,
-        media.size.height -
-            media.viewInsets.bottom -
-            media.padding.bottom -
-            below -
-            AlistenSpacing.xl,
-      );
-    }
-    setState(() => _open = !_open);
-  }
-
-  void _close() {
-    if (_open) setState(() => _open = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = AlistenColors.of(context);
-    final sessions = ref.watch(
-      roomControllerProvider.select((room) => room.snapshot?.members),
-    );
-    final online = ref.watch(
-      roomControllerProvider.select((room) => room.snapshot?.onlineCount ?? 0),
-    );
-    final capacity = ref.watch(
-      roomControllerProvider.select((room) => room.snapshot?.room.capacity),
-    );
-    final members = [
-      for (final (:member, sessions: _) in membersOf(sessions ?? const []))
-        member,
-    ];
-    final shown = members.take(_stripAvatars).toList(growable: false);
-    final more = members.length - shown.length;
-    final muted = AlistenTypography.secondary.copyWith(
-      color: colors.onGlassMuted,
-    );
-    final strip = Pressable(
-      semanticLabel: '查看房间成员',
-      expanded: _open,
-      onPressed: _toggle,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minHeight: AlistenSizes.minTouchTarget,
-        ),
-        child: Padding(
-          // 与下方时间线中的头像对齐。
-          padding: const EdgeInsets.fromLTRB(
-            AlistenSpacing.sm,
-            AlistenSpacing.xxs,
-            AlistenSpacing.xs,
-            AlistenSpacing.xxs,
-          ),
-          child: Row(
-            children: [
-              if (shown.isNotEmpty) ...[
-                _AvatarStack(members: shown, more: more),
-                const SizedBox(width: AlistenSpacing.sm),
-              ],
-              Expanded(
-                child: Text(
-                  _onlineText(online, capacity),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AlistenTypography.weighted(
-                    AlistenTypography.secondary,
-                    FontWeight.w700,
-                  ).copyWith(color: colors.onGlass),
-                ),
-              ),
-              ExcludeSemantics(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('成员', style: muted),
-                    AnimatedRotation(
-                      turns: _open ? 0.5 : 0,
-                      duration: AlistenDurations.of(
-                        context,
-                        AlistenDurations.short,
-                      ),
-                      curve: AlistenCurves.standard,
-                      child: Icon(
-                        AlistenIcons.caretDown,
-                        size: AlistenSizes.iconSm,
-                        color: colors.onGlassMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    return LayoutBuilder(
-      builder: (context, constraints) => Popover(
-        open: _open,
-        onClose: _close,
-        childAnchor: Alignment.bottomCenter,
-        contentAnchor: Alignment.topCenter,
-        offset: const Offset(0, AlistenSpacing.xxs),
-        padding: EdgeInsets.zero,
-        content: _MembersPanel(
-          width: constraints.maxWidth - 2 * AlistenSpacing.xs,
-          maxHeight: _panelHeight,
-          onClose: _close,
-        ),
-        child: strip,
-      ),
-    );
-  }
-}
-
-class _AvatarStack extends StatelessWidget {
-  const _AvatarStack({required this.members, required this.more});
-
-  final List<Member> members;
-  final int more;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = AlistenColors.of(context);
-    final count = members.length + (more > 0 ? 1 : 0);
-    return SizedBox(
-      width: _stripStep * (count - 1) + AlistenSizes.avatar,
-      height: AlistenSizes.avatar,
-      child: Stack(
-        children: [
-          for (var index = 0; index < members.length; index++)
-            Positioned(
-              left: _stripStep * index,
-              child: MemberAvatar(
-                name: members[index].name,
-                imageUrl: members[index].avatarUrl(AlistenSizes.avatar),
-                ring: true,
-              ),
-            ),
-          if (more > 0)
-            Positioned(
-              left: _stripStep * members.length,
-              child: Container(
-                width: AlistenSizes.avatar,
-                height: AlistenSizes.avatar,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: colors.raised,
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.surface,
-                    width: AlistenSizes.ring,
-                  ),
-                ),
-                child: Text(
-                  '+$more',
-                  // 数字按圆形大小排版，不随字体缩放；旁边的在线人数已完整
-                  // 给出人数。
-                  textScaler: TextScaler.noScaling,
-                  style: AlistenTypography.caption.copyWith(
-                    color: colors.onGlass,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MembersPanel extends ConsumerStatefulWidget {
-  const _MembersPanel({
-    required this.width,
-    required this.maxHeight,
-    required this.onClose,
-  });
-
-  final double width;
-  final double maxHeight;
-  final VoidCallback onClose;
-
-  @override
-  ConsumerState<_MembersPanel> createState() => _MembersPanelState();
-}
-
-class _MembersPanelState extends ConsumerState<_MembersPanel> {
-  double _pushed = 0;
-
-  // 向上推过一点或向上甩就收起，方向与它展开的方向相反。
-  void _onPushEnd(DragEndDetails details) {
-    final velocity = details.primaryVelocity ?? 0;
-    if (_pushed < -_pushToClose || velocity < -_flickToClose) {
-      widget.onClose();
-    }
-    _pushed = 0;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = AlistenColors.of(context);
-    final sessions = ref.watch(
-      roomControllerProvider.select((room) => room.snapshot?.members),
-    );
-    final online = ref.watch(
-      roomControllerProvider.select((room) => room.snapshot?.onlineCount ?? 0),
-    );
-    final capacity = ref.watch(
-      roomControllerProvider.select((room) => room.snapshot?.room.capacity),
-    );
-    final self = ref.watch(
-      roomControllerProvider.select((room) => room.member?.id),
-    );
-    final grabber = Semantics(
-      container: true,
-      button: true,
-      label: '收起成员',
-      onTap: widget.onClose,
-      child: SizedBox(
-        height: AlistenSizes.minTouchTarget * 0.6,
-        width: double.infinity,
-        child: Center(
-          child: Container(
-            width: AlistenSizes.sheetHandle.width,
-            height: AlistenSizes.sheetHandle.height,
-            decoration: BoxDecoration(
-              color: colors.onGlass.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(AlistenRadii.pill),
-            ),
-          ),
-        ),
-      ),
-    );
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      // 读屏用“收起成员”按钮收起；手势不能把标题和按钮并成一个节点。
-      excludeFromSemantics: true,
-      onVerticalDragUpdate: (details) => _pushed += details.delta.dy,
-      onVerticalDragEnd: _onPushEnd,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: widget.width,
-          minWidth: widget.width,
-          maxHeight: math.max(widget.maxHeight, _panelMinHeight),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SectionHeader(
-              '房间成员',
-              padding: const EdgeInsets.fromLTRB(
-                AlistenSpacing.md,
-                AlistenSpacing.sm,
-                AlistenSpacing.md,
-                AlistenSpacing.xs,
-              ),
-              trailing: Text(
-                _onlineText(online, capacity),
-                style: AlistenTypography.secondary.copyWith(
-                  color: colors.onGlassMuted,
-                ),
-              ),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AlistenSpacing.sm,
-                ),
-                child: MemberList(sessions: sessions ?? const [], selfId: self),
-              ),
-            ),
-            grabber,
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _TimeLabel extends StatelessWidget {
   const _TimeLabel({required this.at});
@@ -1663,8 +1347,4 @@ class _DeliveryMark extends ConsumerWidget {
       ChatDelivery.sent || null => const SizedBox.shrink(),
     };
   }
-}
-
-String _onlineText(int online, int? capacity) {
-  return capacity == null ? '$online 人在线' : '$online / $capacity 人在线';
 }

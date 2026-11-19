@@ -12,8 +12,9 @@ import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
+import 'package:alisten/shared/ui/edge_fade.dart';
+import 'package:alisten/shared/ui/glyph_cascade.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
-import 'package:alisten/shared/ui/morph_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -342,7 +343,7 @@ void main() {
     expect(_fieldText(tester), '还没写完');
   });
 
-  testWidgets('the members of a room of 30 unfold from the strip in a panel '
+  testWidgets('the members of a room of 30 unfold over the strip in a panel '
       'that scrolls without overflowing, someone on two devices listed once, '
       'and a push up folds it back', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -364,33 +365,314 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('房间成员'), findsOneWidget);
-    final panel = find.byType(MorphPanel);
-    expect(tester.getRect(panel).top, greaterThanOrEqualTo(strip.bottom));
-    expect(tester.getRect(panel).top, lessThan(strip.bottom + 16));
+    expect(tester.getRect(_memberPanel).top, closeTo(strip.top, 0.5));
+    expect(_shownCount(find.text('31 / 64 人在线')), 1);
     expect(
-      find.descendant(of: panel, matching: find.text('31 / 64 人在线')),
+      find.descendant(of: _memberPanel, matching: find.text('31 / 64 人在线')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: panel, matching: find.text('${_me.name}（我）')),
+      find.descendant(of: _memberPanel, matching: find.text('${_me.name}（我）')),
       findsOneWidget,
     );
     expect(find.text('2 台设备'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('成员29'),
-      200,
-      scrollable: find
-          .descendant(of: panel, matching: find.byType(Scrollable))
-          .first,
+    // 最多露出 5 行，下面还有人，下边缘渐隐。
+    final list = find
+        .descendant(of: _memberPanel, matching: find.byType(Scrollable))
+        .first;
+    final row = MemberList.rowExtent(tester.element(list));
+    expect(tester.getSize(list).height, closeTo(5 * row, 0.5));
+    EdgeFade fade() => tester.widget<EdgeFade>(
+      find.descendant(of: _memberPanel, matching: find.byType(EdgeFade)),
     );
+    expect(fade().top, 0);
+    expect(fade().bottom, greaterThan(0));
+    await tester.drag(list, const Offset(0, -100));
+    await tester.pumpAndSettle();
+    expect(fade().top, greaterThan(0));
+    await tester.scrollUntilVisible(find.text('成员29'), 200, scrollable: list);
+    await tester.pumpAndSettle();
+    expect(fade().bottom, 0);
     expect(find.text('成员29'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.drag(find.bySemanticsLabel('收起成员'), const Offset(0, -80));
     await tester.pumpAndSettle();
-    expect(find.text('房间成员'), findsNothing);
+    expect(_memberPanel, findsNothing);
+    expect(_shownCount(find.text('31 / 64 人在线')), 1);
     semantics.dispose();
+  });
+
+  testWidgets('a room of two has a member list just two rows tall, with no '
+      'fading edges', (tester) async {
+    final room = _Room(tester);
+    await room.open();
+    await room.showChat();
+    await tester.tap(find.text('2 / 16 人在线'));
+    await tester.pumpAndSettle();
+
+    final list = find
+        .descendant(of: _memberPanel, matching: find.byType(Scrollable))
+        .first;
+    final row = MemberList.rowExtent(tester.element(list));
+    expect(tester.getSize(list).height, closeTo(2 * row, 0.5));
+    final fade = tester.widget<EdgeFade>(
+      find.descendant(of: _memberPanel, matching: find.byType(EdgeFade)),
+    );
+    expect((fade.top, fade.bottom), (0.0, 0.0));
+  });
+
+  testWidgets('with the keyboard up the member panel stays above it', (
+    tester,
+  ) async {
+    final room = _Room(tester);
+    await room.open(
+      members: [
+        for (var index = 0; index < 30; index++)
+          Member(id: 'm$index', name: '成员$index', avatarHash: ''),
+      ],
+    );
+    tester.view.viewInsets = const FakeViewPadding(bottom: 420 * 3);
+    addTearDown(tester.view.resetViewInsets);
+    await room.showChat();
+    await tester.tap(find.text('30 / 16 人在线'));
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(_memberPanel).bottom, lessThanOrEqualTo(780 - 420));
+    expect(tester.takeException(), isNull);
+  });
+
+  group('the member panel', () {
+    final eight = [
+      _me,
+      _xiaoming,
+      for (var index = 1; index <= 6; index++)
+        Member(id: 'm$index', name: '成员$index', avatarHash: ''),
+    ];
+    const count = '8 / 16 人在线';
+    final flight = find.byKey(ValueKey('member-flight-${_me.id}'));
+    Finder inPanel(Finder finder) =>
+        find.descendant(of: _memberPanel, matching: finder);
+
+    testWidgets('drops down from the strip without overshooting while the '
+        'avatars travel to their rows and the count stays one', (tester) async {
+      final room = _Room(tester);
+      await room.open(members: eight);
+      await room.showChat();
+      final strip = tester.getRect(find.bySemanticsLabel(RegExp('查看房间成员')));
+      final source = tester.getRect(find.byType(MemberAvatar).first);
+      expect(_shownCount(find.text('+3')), 1);
+
+      await tester.tap(find.text(count));
+      await tester.pump();
+      final heights = <double>[];
+      final path = <Rect>[];
+      for (var frame = 0; frame < 30; frame++) {
+        expect(_shownCount(find.text(count)), 1);
+        expect(tester.getRect(_memberPanel).top, closeTo(strip.top, 0.5));
+        heights.add(tester.getRect(_memberPanel).height);
+        if (flight.evaluate().isNotEmpty) path.add(tester.getRect(flight));
+        await tester.pump(_frame);
+      }
+      await tester.pumpAndSettle();
+
+      final full = tester.getRect(_memberPanel).height;
+      final row = tester.getRect(inPanel(find.byType(MemberAvatar)).first);
+      expect(heights.first, closeTo(strip.height, 1));
+      for (var index = 1; index < heights.length; index++) {
+        expect(heights[index], greaterThanOrEqualTo(heights[index - 1]));
+        expect(heights[index], lessThanOrEqualTo(full + 0.01));
+      }
+      expect(path.first.center, _near(source.center));
+      expect(path.first.width, closeTo(source.width, 0.5));
+      final midway = path[6];
+      expect(
+        midway.center.dy,
+        inExclusiveRange(source.center.dy, row.center.dy),
+      );
+      expect(midway.width, greaterThan(source.width));
+      expect(path.last.center, _near(row.center));
+      expect(flight, findsNothing);
+      expect(_shownCount(find.text('+3')), 0);
+      expect(_shownCount(find.text(count)), 1);
+    });
+
+    testWidgets('sets the avatars off one after another', (tester) async {
+      final room = _Room(tester);
+      await room.open(members: eight);
+      await room.showChat();
+      final from = [
+        for (var index = 0; index < 2; index++)
+          tester.getRect(find.byType(MemberAvatar).at(index)).center.dy,
+      ];
+      final flights = [
+        flight,
+        find.byKey(ValueKey('member-flight-${_xiaoming.id}')),
+      ];
+
+      await tester.tap(find.text(count));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      final midway = [
+        for (final flight in flights) tester.getRect(flight).center.dy,
+      ];
+      await tester.pumpAndSettle();
+      final to = [
+        for (var index = 0; index < 2; index++)
+          tester
+              .getRect(inPanel(find.byType(MemberAvatar)).at(index))
+              .center
+              .dy,
+      ];
+
+      double travelled(int index) =>
+          (midway[index] - from[index]) / (to[index] - from[index]);
+      expect(travelled(0), greaterThan(travelled(1) + 0.05));
+    });
+
+    testWidgets('pops the names up character by character after the '
+        'avatars, the top rows first', (tester) async {
+      final room = _Room(tester);
+      await room.open(members: eight);
+      await room.showChat();
+      final me = find.text('${_me.name}（我）');
+
+      await tester.tap(find.text(count));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(_shownCount(me), 0);
+
+      await tester.pump(const Duration(milliseconds: 180));
+      expect(_shownCount(find.text('小明')), 1);
+      expect(
+        _cascadeOf(tester, find.text('小明')),
+        inExclusiveRange(0, glyphCascadeSeconds),
+      );
+      expect(_shownCount(find.text('成员5')), 0);
+
+      // 头像落了地就交给列表那一行，昵称还在一个字一个字地出来。
+      await tester.pump(const Duration(milliseconds: 90));
+      expect(flight, findsNothing);
+      expect(_opacityOf(inPanel(find.byType(MemberAvatar)).first), 1);
+      expect(_cascadeOf(tester, me), lessThan(glyphCascadeSeconds));
+
+      await tester.pumpAndSettle();
+      for (final name in ['小明', '成员5', '成员6']) {
+        expect(_shownCount(find.text(name)), 1);
+        expect(
+          _cascadeOf(tester, find.text(name)),
+          greaterThanOrEqualTo(glyphCascadeSeconds),
+        );
+      }
+      expect(_shownCount(me), 1);
+    });
+
+    testWidgets('folding back by a tap on its title, the names fade out first '
+        'and then the avatars fly home', (tester) async {
+      final room = _Room(tester);
+      await room.open(members: eight);
+      await room.showChat();
+      final source = tester.getRect(find.byType(MemberAvatar).first);
+      await tester.tap(find.text(count));
+      await tester.pumpAndSettle();
+      final row = tester.getRect(inPanel(find.byType(MemberAvatar)).first);
+
+      await tester.tap(inPanel(find.text(count)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(_opacityOf(inPanel(find.text('小明'))), inExclusiveRange(0, 1));
+      expect(tester.getRect(flight).center, _near(row.center, within: 2));
+
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(_opacityOf(inPanel(find.text('小明'))), 0);
+      expect(
+        tester.getRect(flight).center.dy,
+        inExclusiveRange(source.center.dy, row.center.dy),
+      );
+
+      await tester.pumpAndSettle();
+      expect(_memberPanel, findsNothing);
+      expect(_shownCount(find.text(count)), 1);
+      expect(_shownCount(find.text('+3')), 1);
+      expect(tester.getRect(find.byType(MemberAvatar).first), source);
+    });
+
+    testWidgets('an avatar whose row was scrolled away comes home by fading '
+        'in on the strip', (tester) async {
+      final room = _Room(tester);
+      await room.open(
+        members: [
+          _me,
+          for (var index = 1; index < 30; index++)
+            Member(id: 'm$index', name: '成员$index', avatarHash: ''),
+        ],
+        capacity: 64,
+      );
+      await room.showChat();
+      final source = tester.getRect(find.byType(MemberAvatar).first);
+      await tester.tap(find.text('30 / 64 人在线'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('成员29'),
+        200,
+        scrollable: inPanel(find.byType(Scrollable)).first,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tester.getRect(flight).center, _near(source.center));
+      expect(_opacityOf(flight), inExclusiveRange(0, 1));
+
+      await tester.pumpAndSettle();
+      expect(_memberPanel, findsNothing);
+    });
+
+    testWidgets('a tap outside folds it without reaching the page', (
+      tester,
+    ) async {
+      final room = _Room(tester);
+      await room.open(members: eight);
+      await room.showChat();
+      await tester.tap(find.text(count));
+      await tester.pumpAndSettle();
+
+      await tester.tapAt(const Offset(180, 700));
+      await tester.pumpAndSettle();
+      expect(_memberPanel, findsNothing);
+      expect(find.byType(TextField), findsOneWidget);
+      expect(
+        tester.testTextInput.hasAnyClients,
+        isFalse,
+        reason: 'the tap did not reach the composer',
+      );
+    });
+
+    testWidgets('without animations the panel is simply there and simply '
+        'gone', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      final room = _Room(tester);
+      await room.open(members: eight);
+      await room.showChat();
+
+      await tester.tap(find.text(count));
+      await tester.pump();
+      final height = tester.getRect(_memberPanel).height;
+      expect(flight, findsNothing);
+      expect(_shownCount(find.text('成员6')), 1);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.getRect(_memberPanel).height, height);
+
+      await tester.tap(inPanel(find.text(count)));
+      await tester.pump();
+      expect(_memberPanel, findsNothing);
+      expect(_shownCount(find.text(count)), 1);
+    });
   });
 
   testWidgets('an activity reads as who did what, in the middle', (
@@ -905,3 +1187,39 @@ void main() {
 }
 
 const _frame = Duration(milliseconds: 16);
+
+final _memberPanel = find.byKey(const ValueKey('member-panel'));
+
+// 各层 [Opacity] 和 [FadeTransition] 相乘后的不透明度。
+double _opacityOf(Finder finder) {
+  var opacity = 1.0;
+  finder.evaluate().single.visitAncestorElements((ancestor) {
+    final widget = ancestor.widget;
+    if (widget is Opacity) opacity *= widget.opacity;
+    if (widget is FadeTransition) opacity *= widget.opacity.value;
+    return true;
+  });
+  return opacity;
+}
+
+// 文字所在那一行开始逐字显出后过了几秒。
+double _cascadeOf(WidgetTester tester, Finder text) => tester
+    .widget<GlyphCascade>(
+      find.ancestor(of: text, matching: find.byType(GlyphCascade)),
+    )
+    .elapsed;
+
+// 画得出来的几处：不在不透明度为 0 的部件里。
+int _shownCount(Finder finder) => finder.evaluate().where((element) {
+  var shown = true;
+  element.visitAncestorElements((ancestor) {
+    final widget = ancestor.widget;
+    if (widget is Opacity && widget.opacity == 0) shown = false;
+    return shown;
+  });
+  return shown;
+}).length;
+
+Matcher _near(Offset point, {double within = 0.5}) => isA<Offset>()
+    .having((p) => p.dx, 'dx', closeTo(point.dx, within))
+    .having((p) => p.dy, 'dy', closeTo(point.dy, within));

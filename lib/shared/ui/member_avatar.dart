@@ -63,11 +63,7 @@ class MemberAvatar extends StatelessWidget {
           avatar,
           ClipOval(
             child: Image(
-              image: ResizeImage.resizeIfNeeded(
-                (size * MediaQuery.devicePixelRatioOf(context)).round(),
-                null,
-                AvatarImages.of(context, imageUrl),
-              ),
+              image: _imageOf(context, imageUrl, size),
               fit: BoxFit.cover,
               excludeFromSemantics: true,
               gaplessPlayback: true,
@@ -110,3 +106,22 @@ class MemberAvatar extends StatelessWidget {
           );
   }
 }
+
+ImageProvider _imageOf(BuildContext context, String url, double size) =>
+    ResizeImage.resizeIfNeeded(
+      (size * MediaQuery.devicePixelRatioOf(context)).round(),
+      null,
+      AvatarImages.of(context, url),
+    );
+
+/// 提前解码头像，之后同样大小的 [MemberAvatar] 第一帧就画出图片。没设头像的
+/// 成员取图会失败，界面显示首字，这里不报错。
+Future<void> precacheMemberAvatar(
+  BuildContext context,
+  String imageUrl,
+  double size,
+) => precacheImage(
+  _imageOf(context, imageUrl, size),
+  context,
+  onError: (_, _) {},
+);
