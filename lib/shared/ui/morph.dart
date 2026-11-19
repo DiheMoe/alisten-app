@@ -140,8 +140,12 @@ abstract class RenderMorph extends RenderProxyBox {
       );
     }
 
+    paintCover(context.canvas, offset, shape, outline);
     paintBorder(context.canvas, offset, outline, _border);
   }
+
+  /// 盖在内容上面、裁在外框里的一层，比如页面长出时入口卡片的快照。
+  void paintCover(Canvas canvas, Offset offset, Rect shape, RRect outline) {}
 
   /// 内容下面的底：阴影和底色。
   void paintSurface(Canvas canvas, Offset offset, RRect outline) {

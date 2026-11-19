@@ -100,9 +100,6 @@ abstract final class AlistenMotion {
   /// 被新页面盖住的页面叠加的黑色不透明度。
   static const double coveredDim = 0.1;
 
-  /// 没有起点的页面从屏幕这么大的中心矩形长出。
-  static const double zoomFallbackScale = 0.9;
-
   /// 向右拖动页面时，拖满一屏宽缩小这么多。
   static const double dragShrink = 0.3;
 }

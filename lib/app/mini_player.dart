@@ -132,14 +132,17 @@ class _MiniPlayerSlot extends ConsumerWidget {
           ? const SizedBox(width: double.infinity)
           : ZoomTarget(
               tag: roomZoomTag,
-              child: RoomTheme(
-                child: MiniPlayer(
-                  roomId: roomId,
-                  status: status,
-                  failure: failure,
-                  errorMessage: errorMessage,
-                  roomName: roomName,
-                  nowPlaying: nowPlaying,
+              // 房间页从迷你播放条长出来。
+              child: ZoomSource(
+                child: RoomTheme(
+                  child: MiniPlayer(
+                    roomId: roomId,
+                    status: status,
+                    failure: failure,
+                    errorMessage: errorMessage,
+                    roomName: roomName,
+                    nowPlaying: nowPlaying,
+                  ),
                 ),
               ),
             ),

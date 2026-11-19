@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui show Image;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/motion.dart';
+import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:alisten/shared/ui/zoom_frame.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' show Theme;
 import 'package:flutter/scheduler.dart';
@@ -29,6 +32,22 @@ const _taskCorner = Radius.circular(38);
 // 拖动中让路由停在差一点点满的位置：状态不是“完成”，底下的页面才继续绘制。
 const _almostShown = 0.9999;
 
+// 从入口卡片长出时，卡片的快照在外框长到这一段之前淡去，页面内容在这一段里
+// 淡入；缩回时页面内容在外框缩到这一段之前淡去，快照在这一段里淡入，落在卡片
+// 上时正好是卡片的样子。
+const _pictureGoneBy = 0.35;
+const _contentFrom = 0.05;
+const _contentSpan = 0.3;
+const _pictureBackFrom = 0.4;
+const _contentGoneBy = 0.3;
+
+// 被普通导航盖住时，底下的页面跟着向左移开这一份宽度。
+const _pushParallax = 0.3;
+
+// 普通导航推入的页面左边缘投下的阴影。
+const _pushShadowAlpha = 0.16;
+const _pushShadowBlur = 16.0;
+
 /// [fraction] 是拖动距离占宽度的比例，[velocity] 以宽度每秒计，向右为正。
 bool dragBackPops({required double fraction, required double velocity}) =>
     fraction + velocity * _popLead >= _popReach;
@@ -45,24 +64,45 @@ final class AlistenPage<T> extends Page<T> {
   const AlistenPage({
     required this.child,
     this.task = false,
+    this.push = false,
     this.returnTo,
     super.key,
     super.name,
     super.restorationId,
-  });
+  }) : assert(!(task && push), 'a task page rises, it is never pushed');
 
   final Widget child;
 
   /// 从当前页面临时打开的任务，比如房间里的点歌。
   final bool task;
 
+  /// 普通导航：从右边推入，不从被点的元素长出，比如设置和它下面的页面。不是
+  /// 从 [ZoomSource] 里点开的页面也都普通推入。
+  final bool push;
+
   /// 关闭时优先缩回的 [ZoomTarget]，比如房间收进迷你播放条。
   final String? returnTo;
 
   @override
   Route<T> createRoute(BuildContext context) {
+    // 普通导航也要取走这次点按，免得之后的页面从它长出。
     final origin = TapOrigin.take();
-    if (!task) return ZoomPageRoute<T>._(this, origin);
+    if (!task) {
+      if (push) return PushPageRoute<T>._(this);
+      final source = origin?.source;
+      // 起点太小（头像、图标）时长出来只是角落里一个点飞满屏幕，也普通推入。
+      if (origin != null &&
+          source != null &&
+          origin.rect.shortestSide >= AlistenSizes.largeTouchTarget) {
+        final pixelRatio = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
+        return ZoomPageRoute<T>._(this, origin, source.snapshot(pixelRatio));
+      }
+      // 有返回目标的页面（房间）没有入口卡片时从右边滑入，关闭时照样收进
+      // 返回目标。
+      return returnTo == null
+          ? PushPageRoute<T>._(this)
+          : ZoomPageRoute<T>._(this, null);
+    }
     final screen = MediaQuery.maybeSizeOf(context);
     final low =
         origin != null && screen != null && sitsLow(origin.rect, screen);
@@ -76,14 +116,20 @@ final class AlistenPage<T> extends Page<T> {
 /// 盖住底下。拖动另用 [_pull] 记位移；松手关闭时记下当时的进度和外框，从那里
 /// 缩回起点。
 sealed class _ZoomRoute<T> extends PageRoute<T> {
-  _ZoomRoute(AlistenPage<T> page, this._origin)
+  _ZoomRoute(AlistenPage<T> page, this._origin, [this._picture])
     : super(settings: page, fullscreenDialog: page.task);
 
   final LaunchOrigin? _origin;
 
+  /// 起飞时入口卡片的样子，见 [ZoomSource]。
+  final ui.Image? _picture;
+
   AlistenPage<T> get _page => settings as AlistenPage<T>;
 
   SpringDescription get _releaseSpring;
+
+  SpringDescription get _openSpring => AlistenSprings.zoomOpen;
+  SpringDescription get _closeSpring => AlistenSprings.zoomClose;
 
   /// 为 true 时页面用弹簧追手指，否则 1:1 跟手。
   bool get _trails;
@@ -94,11 +140,12 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
   /// 松手速度换算成每秒多少个拖动行程，向关闭方向为正。
   double _releaseSpeed(double velocity, double travel);
 
-  /// 拖动 [pull] 后外框的位移和缩放。
+  /// 拖动 [pull] 后外框的位移和缩放；跟手的另一个方向见 [_cross]。
   (Offset, double) _dragGeometry(double pull, double travel);
 
-  /// 没有起点时外框从哪长出；为 null 时从底部升起。
-  Rect? _fallback(Size screen);
+  /// 没有起点、或要缩回的元素已不在屏幕上时，外框从哪长出、缩到哪去；[page]
+  /// 是页面此刻的外框。为 null 时从底部升起。
+  Rect? _fallback(Size screen, Rect page);
 
   /// 能否缩回 [rect] 处的元素。向下拖关闭的页面不缩回上方的元素。
   bool _returnsTo(Rect rect, Size screen) => true;
@@ -108,6 +155,11 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
 
   final _pull = ValueNotifier<double>(0);
   _SpringDriver? _follower;
+
+  // 横竖都跟手的页面，另一个方向（纵向）的位移。
+  final _cross = ValueNotifier<double>(0);
+  _SpringDriver? _crossFollower;
+  double _crossDragged = 0;
   double? _shrinkFrom;
   (Offset, double)? _frozen;
   double? _nextVelocity;
@@ -121,6 +173,21 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
 
   // 被打开的任务页盖住时停掉动画：只露出遮罩下的一条，继续画是白白耗电。
   final _underTask = ValueNotifier<bool>(false);
+
+  // 上面盖着普通导航推入的页面：被盖住时跟着向左移开，不只是原地压暗。
+  final _underPush = ValueNotifier<bool>(false);
+
+  @override
+  void didChangeNext(Route<dynamic>? nextRoute) {
+    super.didChangeNext(nextRoute);
+    // 上面的页面关闭途中这里收到 null，那时还要跟着它移回来，不改。
+    if (nextRoute is PushPageRoute) {
+      _underPush.value = true;
+    } else if (nextRoute is _ZoomRoute) {
+      _underPush.value = false;
+    }
+  }
+
   bool _disposed = false;
 
   Widget _pausable(Widget child) => ValueListenableBuilder<bool>(
@@ -149,7 +216,7 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
     _nextVelocity = null;
     if (_reduced) return settledAt(target);
     return springTo(
-      forward ? AlistenSprings.zoomOpen : AlistenSprings.zoomClose,
+      forward ? _openSpring : _closeSpring,
       from: controller!.value,
       to: target,
       velocity: velocity,
@@ -190,6 +257,13 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
       write: _setPull,
     );
     _follower!.stop();
+    _crossFollower ??= _SpringDriver(
+      navigator!,
+      read: () => _cross.value,
+      write: (value) => _cross.value = value,
+    );
+    _crossFollower!.stop();
+    _crossDragged = _cross.value;
   }
 
   void _setPull(double value) {
@@ -203,9 +277,12 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
     controller!.value = math.min(1 - away, _almostShown);
   }
 
-  void _dragUpdate(double delta) {
+  /// [cross] 是另一个方向的移动，只有横竖都跟手的页面会报。
+  void _dragUpdate(double delta, {double cross = 0}) {
     _dragged += delta;
+    _crossDragged += cross;
     if (_held || !_dragging) return;
+    _cross.value = _crossDragged;
     final target = _dragged < 0
         ? -rubberBand(-_dragged, _rubberExtent(_travel))
         : _dragged;
@@ -249,6 +326,11 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
 
   /// 把拖开的页面弹回原位；[velocity] 是像素每秒，向关闭方向为正。
   void _putBack(double velocity) {
+    if (_reduced) {
+      _cross.value = 0;
+    } else if (_cross.value != 0) {
+      _crossFollower?.chase(_releaseSpring, 0);
+    }
     if (_reduced || _pull.value == 0) {
       _setPull(0);
       return;
@@ -273,29 +355,34 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
   }
 
   /// 外框此刻的起点：关闭时先找返回目标，再找起点元素现在的位置，都不在屏幕
-  /// 上就用兜底。打开时元素若已不在树上，用点按时的位置。
-  Rect? _startRect(Size screen, {required bool closing}) {
+  /// 上就用兜底。打开时元素若已不在树上，用点按时的位置。[element] 表示起点是
+  /// 屏幕上的元素，[source] 表示它就是起飞时的入口卡片。
+  ({Rect? rect, bool element, bool source}) _start(
+    Size screen, {
+    required bool closing,
+    required Rect page,
+  }) {
     final bounds = Offset.zero & screen;
     bool visible(Rect? rect) =>
         rect != null && rect.overlaps(bounds) && _returnsTo(rect, screen);
     if (closing) {
       final tag = _page.returnTo;
       final target = tag == null ? null : ZoomTarget.rectOf(tag);
-      if (visible(target)) return target;
+      if (visible(target)) return (rect: target, element: true, source: false);
     }
     final origin = _origin;
     if (origin != null) {
       final now = origin.current;
-      if (visible(now)) return now;
-      if (!closing) return origin.rect;
+      if (visible(now)) return (rect: now, element: true, source: true);
+      if (!closing) return (rect: origin.rect, element: true, source: true);
     }
-    return _fallback(screen);
+    return (rect: _fallback(screen, page), element: false, source: false);
   }
 
   double _growthOf(double shown) {
     final from = _shrinkFrom;
     if (from != null) return from <= 0 ? 0 : shown / from;
-    if (_dragging || _pull.value != 0) return 1;
+    if (_dragging || _pull.value != 0 || _cross.value != 0) return 1;
     return shown;
   }
 
@@ -310,28 +397,59 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
     final restRadius = _restRadius(context);
     final surface = Theme.of(context).colorScheme.surface;
     return AnimatedBuilder(
-      animation: Listenable.merge([animation, _pull]),
+      animation: Listenable.merge([animation, _pull, _cross]),
       child: page,
       builder: (context, page) {
         final closing =
             _shrinkFrom != null || animation.status == AnimationStatus.reverse;
         final growth = _growthOf(animation.value);
-        final from = _startRect(screen, closing: closing);
         final (offset, scale) = _frozen ?? _dragGeometry(_pull.value, travel);
-        // 从元素长出时内容淡入淡出；从底部升起时一直是实的。
-        final fades = from != null;
-        final solid = fades ? morphSolid(growth) : 1.0;
-        final shown = fades ? morphContent(growth, closing: closing) : 1.0;
+        final start = _start(
+          screen,
+          closing: closing,
+          page: Rect.fromCenter(
+            center: screen.center(offset),
+            width: screen.width * scale,
+            height: screen.height * scale,
+          ),
+        );
+        // 不回到入口卡片时（收进迷你播放条、卡片已不在屏幕上），卡片马上画
+        // 出来，不留一个空位。
+        if (closing && !start.source) _origin?.source?.show(this);
+        final picture = start.source ? _picture : null;
+        final (double solid, double shown, double pictured) = switch (start) {
+          // 从底部升起、滑进滑出时页面一直是实的。
+          (element: false, rect: _, source: _) => (1, 1, 0),
+          _ when picture == null => (
+            morphSolid(growth),
+            morphContent(growth, closing: closing),
+            0,
+          ),
+          _ when closing => (
+            1,
+            ((growth - _contentGoneBy) / _contentSpan).clamp(0.0, 1.0),
+            ((_pictureBackFrom - growth) / _pictureGoneBy).clamp(0.0, 1.0),
+          ),
+          _ => (
+            1,
+            ((growth - _contentFrom) / _contentSpan).clamp(0.0, 1.0),
+            1 - (growth / _pictureGoneBy).clamp(0.0, 1.0),
+          ),
+        };
         return ZoomFrame(
           growth: growth,
-          from: from,
+          from: start.rect,
           riseBy: screen.height,
-          fromRadius: _origin?.radius ?? restRadius.topLeft.x,
+          fromRadius: start.element
+              ? _origin?.radius ?? restRadius.topLeft.x
+              : restRadius.topLeft.x,
           toRadius: restRadius,
           clipAtRest: _clipAtRest,
           fill: surface.withValues(alpha: surface.a * solid),
           offset: offset,
           scale: scale,
+          picture: picture,
+          pictured: pictured,
           // 打开途中内容还没显出来，读屏也要立刻读到新页面。
           child: Opacity(
             opacity: shown,
@@ -347,16 +465,34 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
   void dispose() {
     _disposed = true;
     _follower?.dispose();
+    _crossFollower?.dispose();
     _pull.dispose();
+    _cross.dispose();
+    _origin?.source?.show(this);
+    _picture?.dispose();
     _underTask.dispose();
+    _underPush.dispose();
     super.dispose();
   }
 }
 
-/// 普通页面：从被点的元素长成全屏，底下的页面原地压暗；页面任何位置都能向右
-/// 拖动返回，页面里更深的横向手势（滚动、滑块、输入框）优先。
+/// 从入口卡片长出的页面：外框从卡片长成全屏，卡片的快照随之淡去、页面淡入，
+/// 底下的页面原地压暗；飞行期间卡片自己不画。关闭时缩回卡片现在的位置，卡片已
+/// 不在屏幕上就向右滑出。页面任何位置向右拖动都能返回，拖动时横竖都跟手并
+/// 缩小；页面里更深的横向手势（滚动、滑块、输入框）优先。
 final class ZoomPageRoute<T> extends _ZoomRoute<T> {
-  ZoomPageRoute._(super.page, super._origin);
+  ZoomPageRoute._(super.page, super._origin, [super._picture]);
+
+  @override
+  void install() {
+    super.install();
+    _origin?.source?.hide(this);
+    animation!.addStatusListener(_showSourceWhenClosed);
+  }
+
+  void _showSourceWhenClosed(AnimationStatus status) {
+    if (status.isDismissed) _origin?.source?.show(this);
+  }
 
   @override
   Color? get barrierColor => null;
@@ -369,7 +505,7 @@ final class ZoomPageRoute<T> extends _ZoomRoute<T> {
   SpringDescription get _releaseSpring => AlistenSprings.release;
 
   @override
-  bool get _trails => true;
+  bool get _trails => false;
 
   @override
   double _rubberExtent(double travel) => _pageRubberReach * travel;
@@ -384,16 +520,14 @@ final class ZoomPageRoute<T> extends _ZoomRoute<T> {
 
   @override
   (Offset, double) _dragGeometry(double pull, double travel) {
-    final away = (pull / travel).clamp(0.0, 1.0);
-    return (Offset(pull, 0), 1 - AlistenMotion.dragShrink * away);
+    final moved = Offset(math.max(0, pull), _cross.value);
+    final away = (moved.distance / travel).clamp(0.0, 1.0);
+    return (Offset(pull, _cross.value), 1 - AlistenMotion.dragShrink * away);
   }
 
   @override
-  Rect? _fallback(Size screen) => Rect.fromCenter(
-    center: screen.center(Offset.zero),
-    width: screen.width * AlistenMotion.zoomFallbackScale,
-    height: screen.height * AlistenMotion.zoomFallbackScale,
-  );
+  Rect? _fallback(Size screen, Rect page) =>
+      page.shift(Offset(screen.width, 0));
 
   @override
   BorderRadius _restRadius(BuildContext context) =>
@@ -408,7 +542,7 @@ final class ZoomPageRoute<T> extends _ZoomRoute<T> {
   // 被任务页盖住时原地不动，由任务页的遮罩压暗。
   @override
   bool canTransitionTo(TransitionRoute<dynamic> nextRoute) =>
-      nextRoute is ZoomPageRoute;
+      nextRoute is ZoomPageRoute || nextRoute is PushPageRoute;
 
   @override
   Widget buildTransitions(
@@ -419,9 +553,10 @@ final class ZoomPageRoute<T> extends _ZoomRoute<T> {
   ) {
     return _DismissGesture(
       route: this,
-      axis: Axis.horizontal,
+      kind: _Dismiss.anyWayBack,
       child: _Covered(
         covered: secondaryAnimation,
+        pushed: _underPush,
         child: _frame(
           context,
           animation,
@@ -429,6 +564,115 @@ final class ZoomPageRoute<T> extends _ZoomRoute<T> {
           travel: MediaQuery.sizeOf(context).width,
         ),
       ),
+    );
+  }
+}
+
+/// 普通导航：从右边推入，底下的页面略向左移并压暗；关闭时向右滑出。页面任何
+/// 位置都能向右拖动返回，页面 1:1 跟手，页面里更深的横向手势优先。
+final class PushPageRoute<T> extends _ZoomRoute<T> {
+  PushPageRoute._(AlistenPage<T> page) : super(page, null);
+
+  @override
+  Color? get barrierColor => null;
+
+  // 转场由弹簧驱动，框架不用它计时；读它的地方按停稳时间算。
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 600);
+
+  // 推入和滑出都不冲过头：页面冲过左边会露出后面的页面。
+  @override
+  SpringDescription get _openSpring => AlistenSprings.page;
+
+  @override
+  SpringDescription get _closeSpring => AlistenSprings.page;
+
+  @override
+  SpringDescription get _releaseSpring => AlistenSprings.page;
+
+  @override
+  bool get _trails => false;
+
+  @override
+  double _rubberExtent(double travel) => _pageRubberReach * travel;
+
+  @override
+  bool _dismisses(double dragged, double velocity, double travel) =>
+      dragBackPops(fraction: dragged / travel, velocity: velocity / travel);
+
+  @override
+  double _releaseSpeed(double velocity, double travel) =>
+      dragBackReleaseVelocity(velocity / travel);
+
+  @override
+  (Offset, double) _dragGeometry(double pull, double travel) =>
+      (Offset(math.max(0, pull), 0), 1);
+
+  @override
+  Rect? _fallback(Size screen, Rect page) => null;
+
+  @override
+  BorderRadius _restRadius(BuildContext context) => BorderRadius.zero;
+
+  @override
+  bool get _clipAtRest => false;
+
+  @override
+  DelegatedTransitionBuilder? get delegatedTransition => _pageMotion;
+
+  @override
+  bool canTransitionTo(TransitionRoute<dynamic> nextRoute) =>
+      nextRoute is ZoomPageRoute || nextRoute is PushPageRoute;
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return _DismissGesture(
+      route: this,
+      kind: _Dismiss.back,
+      child: _Covered(
+        covered: secondaryAnimation,
+        pushed: _underPush,
+        child: _slide(context, animation, _pausable(child)),
+      ),
+    );
+  }
+
+  // 拖动时路由进度就是没被拖开的那部分，页面的位置直接由进度给出：跟手、
+  // 松手返回、按返回键关闭都是同一条路。
+  Widget _slide(
+    BuildContext context,
+    Animation<double> animation,
+    Widget page,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    return AnimatedBuilder(
+      animation: animation,
+      child: page,
+      builder: (context, page) {
+        final away = 1 - animation.value.clamp(0.0, 1.0);
+        final width = MediaQuery.sizeOf(context).width;
+        return Transform.translate(
+          offset: Offset(width * away, 0),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              boxShadow: [
+                if (away > 0)
+                  BoxShadow(
+                    color: scheme.shadow.withValues(alpha: _pushShadowAlpha),
+                    blurRadius: _pushShadowBlur,
+                  ),
+              ],
+            ),
+            child: page,
+          ),
+        );
+      },
     );
   }
 }
@@ -471,7 +715,7 @@ final class TaskPageRoute<T> extends _ZoomRoute<T> {
       (Offset(0, pull), 1);
 
   @override
-  Rect? _fallback(Size screen) => null;
+  Rect? _fallback(Size screen, Rect page) => null;
 
   @override
   bool _returnsTo(Rect rect, Size screen) => sitsLow(rect, screen);
@@ -526,7 +770,7 @@ final class TaskPageRoute<T> extends _ZoomRoute<T> {
       padding: EdgeInsets.only(top: top),
       child: _DismissGesture(
         route: this,
-        axis: Axis.vertical,
+        kind: _Dismiss.down,
         child: _frame(
           context,
           animation,
@@ -553,22 +797,37 @@ Widget? _pageMotion(
   Widget? child,
 ) => null;
 
-/// 被上面的页面盖住时原地压暗。
+/// 被上面的页面盖住时压暗；盖上来的是普通导航推入的页面时还跟着向左移开。
 final class _Covered extends StatelessWidget {
-  const _Covered({required this.covered, required this.child});
+  const _Covered({
+    required this.covered,
+    required this.pushed,
+    required this.child,
+  });
 
   final Animation<double> covered;
+  final ValueListenable<bool> pushed;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: covered,
+      animation: Listenable.merge([covered, pushed]),
       child: child,
       builder: (context, page) => Stack(
         fit: StackFit.expand,
         children: [
-          page!,
+          Transform.translate(
+            offset: Offset(
+              pushed.value
+                  ? -_pushParallax *
+                        MediaQuery.sizeOf(context).width *
+                        covered.value.clamp(0, 1)
+                  : 0,
+              0,
+            ),
+            child: page,
+          ),
           if (covered.value > 0)
             IgnorePointer(
               child: ColoredBox(
@@ -586,15 +845,26 @@ final class _Covered extends StatelessWidget {
   }
 }
 
+enum _Dismiss {
+  /// 向右拖，只跟横向。
+  back,
+
+  /// 向右拖起，之后横竖都跟。
+  anyWayBack,
+
+  /// 向下拖。
+  down,
+}
+
 final class _DismissGesture extends StatefulWidget {
   const _DismissGesture({
     required this.route,
-    required this.axis,
+    required this.kind,
     required this.child,
   });
 
   final _ZoomRoute<dynamic> route;
-  final Axis axis;
+  final _Dismiss kind;
   final Widget child;
 
   @override
@@ -603,21 +873,27 @@ final class _DismissGesture extends StatefulWidget {
 
 final class _DismissGestureState extends State<_DismissGesture> {
   late final DragGestureRecognizer _recognizer =
-      switch (widget.axis) {
-          Axis.horizontal => _DragBackRecognizer(debugOwner: this),
-          Axis.vertical => _DragDownRecognizer(debugOwner: this),
+      switch (widget.kind) {
+          _Dismiss.back => _DragBackRecognizer(debugOwner: this),
+          _Dismiss.anyWayBack => _AnyWayBackRecognizer(debugOwner: this),
+          _Dismiss.down => _DragDownRecognizer(debugOwner: this),
         }
         ..onStart = (_) {
           final size = (context.findRenderObject()! as RenderBox).size;
           widget.route._dragStart(
-            widget.axis == Axis.horizontal ? size.width : size.height,
+            widget.kind == _Dismiss.down ? size.height : size.width,
           );
         }
         ..onUpdate = (details) {
-          widget.route._dragUpdate(details.primaryDelta ?? 0);
+          widget.route._dragUpdate(
+            details.primaryDelta ?? details.delta.dx,
+            cross: widget.kind == _Dismiss.anyWayBack ? details.delta.dy : 0,
+          );
         }
         ..onEnd = (details) {
-          widget.route._dragEnd(details.primaryVelocity ?? 0);
+          widget.route._dragEnd(
+            details.primaryVelocity ?? details.velocity.pixelsPerSecond.dx,
+          );
         }
         ..onCancel = () {
           widget.route._dragCancel();
@@ -654,6 +930,34 @@ final class _DragBackRecognizer extends HorizontalDragGestureRecognizer {
     PointerDeviceKind pointerDeviceKind,
     double? deviceTouchSlop,
   ) => globalDistanceMoved > _dragBackSlop;
+}
+
+/// 和 [_DragBackRecognizer] 一样只认向右越过 30、且横向多于纵向的拖动；认下
+/// 之后横竖两个方向都报。
+final class _AnyWayBackRecognizer extends PanGestureRecognizer {
+  _AnyWayBackRecognizer({super.debugOwner}) {
+    onlyAcceptDragOnThreshold = true;
+  }
+
+  Offset _moved = Offset.zero;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    _moved = Offset.zero;
+    super.addAllowedPointer(event);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerMoveEvent) _moved += event.delta;
+    super.handleEvent(event);
+  }
+
+  @override
+  bool hasSufficientGlobalDistanceToAccept(
+    PointerDeviceKind pointerDeviceKind,
+    double? deviceTouchSlop,
+  ) => _moved.dx > _dragBackSlop && _moved.dx > _moved.dy.abs();
 }
 
 /// 只认向下的拖动。页面里的纵向滚动更深，在它上面拖动只滚动内容。

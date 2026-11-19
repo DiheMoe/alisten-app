@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:alisten/shared/theme/motion.dart';
+import 'package:alisten/app/room_route_gate.dart';
 import 'package:alisten/app/router.dart';
 import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/index.dart';
@@ -11,6 +12,8 @@ import 'package:alisten/features/server/data/preferences_server_store.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/index.dart';
 import 'package:alisten/shared/ui/page_routes.dart';
+import 'package:alisten/shared/ui/tap_origin.dart';
+import 'package:alisten/shared/ui/zoom_frame.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -21,12 +24,17 @@ import 'package:flutter_test/flutter_test.dart';
 import '../features/admin/admin_test_doubles.dart';
 import '../features/lobby/lobby_test_doubles.dart';
 import '../features/playlists/playlists_test_doubles.dart';
+import '../features/room/room_test_doubles.dart';
 import '../features/server/server_test_doubles.dart'
     show FakeCredentialStores, serverB;
 import 'app_test_harness.dart';
 
+ModalRoute<dynamic>? _routeOf(WidgetTester tester, Finder page) =>
+    ModalRoute.of(tester.element(page));
+
 void main() {
   group('page transitions through the real router', () {
+    // 不是从入口卡片点开的页面都从右边推入。
     for (final (from, to, page) in [
       ('/', '/settings', SettingsScreen),
       ('/', '/history', HistoryScreen),
@@ -40,7 +48,7 @@ void main() {
       ('/playlists', '/playlists/pl-1', MyPlaylistScreen),
       ('/', '/s/$shareIdA', SharedPlaylistScreen),
     ]) {
-      testWidgets('$to grows in over $from and shrinks back out', (
+      testWidgets('$to slides in over $from at full size and back out', (
         tester,
       ) async {
         await pumpAlistenApp(tester);
@@ -57,6 +65,8 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 120));
         expect(tester.getTopLeft(shown()).dx, inExclusiveRange(0, width));
+        expect(_routeOf(tester, shown()), isA<PushPageRoute<dynamic>>());
+        expect(tester.getSize(shown()).width, width);
 
         await tester.pump(const Duration(seconds: 1));
         expect(tester.getTopLeft(shown()).dx, 0);
@@ -66,11 +76,54 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 120));
         expect(tester.getTopLeft(shown()).dx, inExclusiveRange(0, width));
+        expect(tester.getSize(shown()).width, width);
 
         await tester.pump(const Duration(seconds: 1));
         expect(shown(), findsNothing);
       });
     }
+
+    testWidgets('a room opened from its card in the lobby grows out of the '
+        'card, which is not drawn while the room flies', (tester) async {
+      await pumpAlistenApp(
+        tester,
+        api: FakeAlistenApi()..rooms = [roomListing(id: 'room-id')],
+        credentials: FakeCredentialStore()..tickets['room-id'] = 'ticket',
+        rooms: FakeRoomTransportFactory(),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      // 迷你播放条也写着房间名，用卡片上才有的在线人数找到这张卡片。
+      final card = find.ancestor(
+        of: find.text('3 / 16 人在线'),
+        matching: find.byType(ZoomSource),
+      );
+      final cardRect = tester.getRect(card);
+
+      await tester.tap(card);
+      // 进房先等假接口应答，之后的第一帧页面才出现；房间还在连接。
+      final room = find.byType(RoomRouteGate, skipOffstage: false);
+      for (var i = 0; i < 10 && room.evaluate().isEmpty; i++) {
+        await tester.pump();
+      }
+      expect(_routeOf(tester, room), isA<ZoomPageRoute<dynamic>>());
+      final frame = tester.renderObject<RenderZoomFrame>(
+        find
+            .ancestor(
+              of: room,
+              matching: find.byType(ZoomFrame, skipOffstage: false),
+            )
+            .first,
+      );
+      expect(frame.picture, isNotNull);
+      final shape = MatrixUtils.transformRect(
+        frame.getTransformTo(null),
+        frame.shape,
+      );
+      expect((shape.center - cardRect.center).distance, lessThan(80));
+      expect(tester.renderObject(card), paintsNothing);
+      await tester.pump(const Duration(seconds: 1));
+    });
 
     testWidgets('play history opened from the privacy settings goes back to '
         'them, not to the lobby', (tester) async {
@@ -122,8 +175,8 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
     });
 
-    testWidgets('a page above the mini player leaves the lobby in place and '
-        'darkens it', (tester) async {
+    testWidgets('a settings page pushed over another moves it left a little '
+        'and darkens it', (tester) async {
       await pumpAlistenApp(tester);
       final router = appContainer(tester).read(routerProvider);
       router.go('/settings');
@@ -135,9 +188,11 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 120));
 
+      final width =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio;
       expect(
         tester.getTopLeft(find.byType(SettingsScreen, skipOffstage: false)).dx,
-        0,
+        inExclusiveRange(-0.3 * width, 0),
       );
       final dims = tester.widgetList<ColoredBox>(
         find.byWidgetPredicate(
@@ -162,14 +217,14 @@ void main() {
 
       expect(
         ModalRoute.of(tester.element(find.byType(LobbyScreen))),
-        isA<ZoomPageRoute<dynamic>>(),
+        isA<PushPageRoute<dynamic>>(),
       );
       router.go('/settings/about/licenses');
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
       expect(
         ModalRoute.of(tester.element(find.byType(LicensesScreen))),
-        isA<ZoomPageRoute<dynamic>>(),
+        isA<PushPageRoute<dynamic>>(),
       );
     });
   });

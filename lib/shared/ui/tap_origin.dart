@@ -1,17 +1,23 @@
+import 'dart:ui' as ui show Image;
+
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 /// 一次点按：被点的元素在屏幕上的位置和圆角，是接下来打开的页面或面板的起点。
 final class LaunchOrigin {
-  LaunchOrigin._(RenderBox box, {required this.radius})
+  LaunchOrigin._(RenderBox box, {required this.radius, this.source})
     : rect = _globalRect(box),
       _box = WeakReference(box);
 
   /// 不跟随任何元素的起点。
-  LaunchOrigin.at(this.rect, {this.radius = 0}) : _box = null;
+  LaunchOrigin.at(this.rect, {this.radius = 0, this.source}) : _box = null;
 
   /// 点按时的位置。
   final Rect rect;
   final double radius;
+
+  /// 被点的是入口卡片时是它；页面只从入口卡片长出，否则普通推入。
+  final ZoomSourceHandle? source;
   final WeakReference<RenderBox>? _box;
 
   /// 元素现在的位置；元素已不在树上时为 null。
@@ -47,10 +53,12 @@ abstract final class TapOrigin {
   static LaunchOrigin? _last;
   static Duration _at = Duration.zero;
 
+  /// 点在入口卡片里时，起点是整张卡片。
   static void record(BuildContext context, {double radius = 0}) {
-    final box = context.findRenderObject();
+    final source = context.findAncestorStateOfType<_ZoomSourceState>();
+    final box = (source?.context ?? context).findRenderObject();
     if (box is! RenderBox || !box.attached || !box.hasSize) return;
-    _last = LaunchOrigin._(box, radius: radius);
+    _last = LaunchOrigin._(box, radius: radius, source: source);
     _at = now();
   }
 
@@ -115,4 +123,116 @@ class _ZoomTargetState extends State<ZoomTarget> {
 
   @override
   Widget build(BuildContext context) => widget.child;
+}
+
+/// 能长出页面的入口：被点的东西就是要打开的东西，比如房间卡片、歌单卡片。只有
+/// 从它里面点开的页面才从它长出，其余页面普通推入。
+///
+/// 页面起飞时拍下它的样子画在外框里，飞行期间它自己不画，画面上只有一份。
+class ZoomSource extends StatefulWidget {
+  const ZoomSource({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  State<ZoomSource> createState() => _ZoomSourceState();
+}
+
+/// 页面用来拍下入口卡片、在飞行期间藏起它。
+abstract interface class ZoomSourceHandle {
+  /// 它最近一次画出来的样子，按 [pixelRatio] 取像素；拍不到时为 null。
+  ui.Image? snapshot(double pixelRatio);
+
+  /// 同一张卡片可能先后被几个页面藏起，都放开才重新画出来。
+  void hide(Object by);
+  void show(Object by);
+}
+
+class _ZoomSourceState extends State<ZoomSource> implements ZoomSourceHandle {
+  final _hiding = GlobalKey();
+  final _boundary = GlobalKey();
+  final _hiders = <Object>{};
+
+  @override
+  ui.Image? snapshot(double pixelRatio) {
+    final boundary = _boundary.currentContext?.findRenderObject();
+    return boundary is _RenderSnapshot ? boundary.capture(pixelRatio) : null;
+  }
+
+  // 页面在构建阶段创建，这里只标记重绘，不重建。
+  @override
+  void hide(Object by) {
+    _hiders.add(by);
+    _sync();
+  }
+
+  @override
+  void show(Object by) {
+    _hiders.remove(by);
+    _sync();
+  }
+
+  void _sync() {
+    final hiding = _hiding.currentContext?.findRenderObject();
+    if (hiding is _RenderHiding) hiding.hidden = _hiders.isNotEmpty;
+  }
+
+  @override
+  Widget build(BuildContext context) => _Hiding(
+    key: _hiding,
+    hidden: _hiders.isNotEmpty,
+    child: _Snapshot(key: _boundary, child: widget.child),
+  );
+}
+
+class _Hiding extends SingleChildRenderObjectWidget {
+  const _Hiding({required this.hidden, super.key, super.child});
+
+  final bool hidden;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderHiding()..hidden = hidden;
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderHiding renderObject) {
+    renderObject.hidden = hidden;
+  }
+}
+
+// 藏起时只是不画：下面的图层照样保留、照样更新，拍快照不受影响；读屏和点按
+// 也照旧。
+class _RenderHiding extends RenderProxyBox {
+  bool _hidden = false;
+  set hidden(bool value) {
+    if (value == _hidden) return;
+    _hidden = value;
+    markNeedsPaint();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    if (!_hidden) super.paint(context, offset);
+  }
+}
+
+class _Snapshot extends SingleChildRenderObjectWidget {
+  const _Snapshot({super.key, super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderSnapshot();
+}
+
+// 页面在构建阶段创建，这时卡片可能正因为按下的墨迹待重绘；用它上一帧画好的
+// 图层，不等重绘。
+class _RenderSnapshot extends RenderRepaintBoundary {
+  ui.Image? capture(double pixelRatio) {
+    final layer = this.layer;
+    if (layer is! OffsetLayer || !hasSize) return null;
+    try {
+      return layer.toImageSync(Offset.zero & size, pixelRatio: pixelRatio);
+    } on Object {
+      return null;
+    }
+  }
 }

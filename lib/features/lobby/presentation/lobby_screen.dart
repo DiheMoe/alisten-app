@@ -20,6 +20,7 @@ import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/pull_refresh.dart';
 import 'package:alisten/shared/ui/section_header.dart';
+import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -625,121 +626,124 @@ class _RoomRow extends StatelessWidget {
     final colors = AlistenColors.of(context);
     final name = room.name.trim();
     final online = room.onlineCount > 0;
-    return Pressable(
-      onPressed: onPressed,
-      // 进房期间各行不可点但不变淡，由正在进入的那一行显示转圈。
-      dimWhenDisabled: false,
-      focusRadius: BorderRadius.circular(AlistenRadii.md),
-      child: Padding(
-        padding: const EdgeInsets.all(AlistenSpacing.sm),
-        child: Row(
-          children: [
-            ExcludeSemantics(
-              child: Container(
-                width: AlistenSizes.rowCover,
-                height: AlistenSizes.rowCover,
-                decoration: BoxDecoration(
-                  color: colors.onGlass.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(AlistenRadii.sm),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  name.isEmpty ? '#' : name.characters.first.toUpperCase(),
-                  // 首字跟随色块尺寸，不随系统字号缩放，否则会撑破色块。
-                  textScaler: TextScaler.noScaling,
-                  style: AlistenTypography.weighted(
-                    AlistenTypography.title,
-                    FontWeight.w800,
-                  ).copyWith(color: colors.onGlass),
+    // 房间页从这张卡片长出来。
+    return ZoomSource(
+      child: Pressable(
+        onPressed: onPressed,
+        // 进房期间各行不可点但不变淡，由正在进入的那一行显示转圈。
+        dimWhenDisabled: false,
+        focusRadius: BorderRadius.circular(AlistenRadii.md),
+        child: Padding(
+          padding: const EdgeInsets.all(AlistenSpacing.sm),
+          child: Row(
+            children: [
+              ExcludeSemantics(
+                child: Container(
+                  width: AlistenSizes.rowCover,
+                  height: AlistenSizes.rowCover,
+                  decoration: BoxDecoration(
+                    color: colors.onGlass.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(AlistenRadii.sm),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    name.isEmpty ? '#' : name.characters.first.toUpperCase(),
+                    // 首字跟随色块尺寸，不随系统字号缩放，否则会撑破色块。
+                    textScaler: TextScaler.noScaling,
+                    style: AlistenTypography.weighted(
+                      AlistenTypography.title,
+                      FontWeight.w800,
+                    ).copyWith(color: colors.onGlass),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: AlistenSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    room.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AlistenTypography.bodyStrong.copyWith(
-                      color: colors.onGlass,
-                    ),
-                  ),
-                  if (room.description.isNotEmpty)
+              const SizedBox(width: AlistenSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      room.description,
-                      maxLines: 2,
+                      room.name,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AlistenTypography.secondary.copyWith(
-                        color: colors.onGlassMuted,
+                      style: AlistenTypography.bodyStrong.copyWith(
+                        color: colors.onGlass,
                       ),
                     ),
-                  const SizedBox(height: AlistenSpacing.xs),
-                  Wrap(
-                    spacing: AlistenSpacing.sm,
-                    runSpacing: AlistenSpacing.xxs,
-                    children: [
-                      _Badge(
-                        ink: online ? colors.success : colors.onGlassMuted,
-                        label: '${room.onlineCount} / ${room.capacity} 人在线',
-                        leading: Container(
-                          width: AlistenSpacing.xs,
-                          height: AlistenSpacing.xs,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: online ? colors.success : null,
-                            border: Border.all(
-                              color: online
-                                  ? colors.success
-                                  : colors.onGlassMuted,
+                    if (room.description.isNotEmpty)
+                      Text(
+                        room.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AlistenTypography.secondary.copyWith(
+                          color: colors.onGlassMuted,
+                        ),
+                      ),
+                    const SizedBox(height: AlistenSpacing.xs),
+                    Wrap(
+                      spacing: AlistenSpacing.sm,
+                      runSpacing: AlistenSpacing.xxs,
+                      children: [
+                        _Badge(
+                          ink: online ? colors.success : colors.onGlassMuted,
+                          label: '${room.onlineCount} / ${room.capacity} 人在线',
+                          leading: Container(
+                            width: AlistenSpacing.xs,
+                            height: AlistenSpacing.xs,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: online ? colors.success : null,
+                              border: Border.all(
+                                color: online
+                                    ? colors.success
+                                    : colors.onGlassMuted,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      if (room.full)
-                        _Badge(
-                          ink: colors.warning,
-                          label: '满员',
-                          leading: Icon(
-                            AlistenIcons.users,
-                            size: AlistenSizes.inlineIcon,
-                            color: colors.warning,
+                        if (room.full)
+                          _Badge(
+                            ink: colors.warning,
+                            label: '满员',
+                            leading: Icon(
+                              AlistenIcons.users,
+                              size: AlistenSizes.inlineIcon,
+                              color: colors.warning,
+                            ),
                           ),
-                        ),
-                      if (room.hasPassword)
-                        _Badge(
-                          ink: colors.onGlassMuted,
-                          label: '需要密码',
-                          leading: Icon(
-                            AlistenIcons.lockSimpleFill,
-                            size: AlistenSizes.inlineIcon,
-                            color: colors.onGlassMuted,
+                        if (room.hasPassword)
+                          _Badge(
+                            ink: colors.onGlassMuted,
+                            label: '需要密码',
+                            leading: Icon(
+                              AlistenIcons.lockSimpleFill,
+                              size: AlistenSizes.inlineIcon,
+                              color: colors.onGlassMuted,
+                            ),
                           ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AlistenSpacing.xs),
+              SizedBox.square(
+                dimension: AlistenSizes.icon,
+                child: Center(
+                  child: joining
+                      ? const BusyIndicator(
+                          size: AlistenSizes.iconSm,
+                          semanticLabel: '正在进入',
+                        )
+                      : Icon(
+                          AlistenIcons.caretRight,
+                          size: AlistenSizes.icon,
+                          color: colors.onGlassMuted,
                         ),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: AlistenSpacing.xs),
-            SizedBox.square(
-              dimension: AlistenSizes.icon,
-              child: Center(
-                child: joining
-                    ? const BusyIndicator(
-                        size: AlistenSizes.iconSm,
-                        semanticLabel: '正在进入',
-                      )
-                    : Icon(
-                        AlistenIcons.caretRight,
-                        size: AlistenSizes.icon,
-                        color: colors.onGlassMuted,
-                      ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

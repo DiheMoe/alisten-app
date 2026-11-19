@@ -32,6 +32,7 @@ import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/section_header.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
+import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart' hide SearchController;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1112,38 +1113,40 @@ class _PlaylistTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
-    return Pressable(
-      onPressed: () => onOpen(playlist),
-      focusRadius: BorderRadius.circular(AlistenRadii.md),
-      child: LayoutBuilder(
-        builder: (context, constraints) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CoverArt(
-              url: playlist.coverUrl,
-              size: constraints.maxWidth,
-              radius: AlistenRadii.md,
-            ),
-            const SizedBox(height: AlistenSpacing.xs),
-            Text(
-              playlist.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AlistenTypography.bodyStrong.copyWith(
-                color: colors.onGlass,
+    return ZoomSource(
+      child: Pressable(
+        onPressed: () => onOpen(playlist),
+        focusRadius: BorderRadius.circular(AlistenRadii.md),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CoverArt(
+                url: playlist.coverUrl,
+                size: constraints.maxWidth,
+                radius: AlistenRadii.md,
               ),
-            ),
-            Text(
-              playlist.creator.isEmpty
-                  ? '${playlist.trackCount} 首'
-                  : '${playlist.trackCount} 首 · ${playlist.creator}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AlistenTypography.secondary.copyWith(
-                color: colors.onGlassMuted,
+              const SizedBox(height: AlistenSpacing.xs),
+              Text(
+                playlist.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AlistenTypography.bodyStrong.copyWith(
+                  color: colors.onGlass,
+                ),
               ),
-            ),
-          ],
+              Text(
+                playlist.creator.isEmpty
+                    ? '${playlist.trackCount} 首'
+                    : '${playlist.trackCount} 首 · ${playlist.creator}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AlistenTypography.secondary.copyWith(
+                  color: colors.onGlassMuted,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui show Image;
 
 import 'package:alisten/shared/ui/morph.dart';
 import 'package:flutter/widgets.dart';
@@ -22,6 +23,8 @@ class ZoomFrame extends SingleChildRenderObjectWidget {
     this.offset = Offset.zero,
     this.scale = 1,
     this.contentAnchor = Alignment.topCenter,
+    this.picture,
+    this.pictured = 0,
     super.child,
     super.key,
   });
@@ -37,6 +40,11 @@ class ZoomFrame extends SingleChildRenderObjectWidget {
   final double scale;
   final Alignment contentAnchor;
 
+  /// 盖在页面上的起点元素的样子，按外框宽度缩放、对齐外框顶边，不透明度是
+  /// [pictured]。
+  final ui.Image? picture;
+  final double pictured;
+
   @override
   RenderZoomFrame createRenderObject(BuildContext context) => RenderZoomFrame(
     growth: growth,
@@ -49,6 +57,8 @@ class ZoomFrame extends SingleChildRenderObjectWidget {
     offset: offset,
     scale: scale,
     contentAnchor: contentAnchor,
+    picture: picture,
+    pictured: pictured,
   );
 
   @override
@@ -63,7 +73,9 @@ class ZoomFrame extends SingleChildRenderObjectWidget {
       ..fill = fill
       ..offset = offset
       ..scale = scale
-      ..contentAnchor = contentAnchor;
+      ..contentAnchor = contentAnchor
+      ..picture = picture
+      ..pictured = pictured;
   }
 }
 
@@ -79,7 +91,45 @@ class RenderZoomFrame extends RenderMorph {
     required this._offset,
     required this._scale,
     required super.contentAnchor,
+    required this._picture,
+    required this._pictured,
   }) : super(border: const Color(0x00000000), shadow: null);
+
+  ui.Image? get picture => _picture;
+  ui.Image? _picture;
+  set picture(ui.Image? value) {
+    if (value == _picture) return;
+    _picture = value;
+    markNeedsPaint();
+  }
+
+  double get pictured => _pictured;
+  double _pictured;
+  set pictured(double value) {
+    if (value == _pictured) return;
+    _pictured = value;
+    markNeedsPaint();
+  }
+
+  @override
+  void paintCover(Canvas canvas, Offset offset, Rect shape, RRect outline) {
+    final picture = _picture;
+    if (picture == null || _pictured <= 0 || picture.width == 0) return;
+    final width = shape.width;
+    final height = width * picture.height / picture.width;
+    canvas
+      ..save()
+      ..clipRRect(outline.shift(offset))
+      ..drawImageRect(
+        picture,
+        Offset.zero & Size(picture.width.toDouble(), picture.height.toDouble()),
+        Rect.fromLTWH(shape.left, shape.top, width, height).shift(offset),
+        Paint()
+          ..color = Color.fromRGBO(0, 0, 0, _pictured.clamp(0, 1))
+          ..filterQuality = FilterQuality.medium,
+      )
+      ..restore();
+  }
 
   Rect? get from => _from;
   Rect? _from;

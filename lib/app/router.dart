@@ -161,7 +161,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
               GoRoute(
                 path: 'settings',
-                pageBuilder: _page(
+                pageBuilder: _pushPage(
                   (context, state) => SettingsScreen(
                     appVersion: appVersion,
                     onOpen: (section) =>
@@ -171,7 +171,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: SettingsSection.account.path,
-                    pageBuilder: _page(
+                    pageBuilder: _pushPage(
                       (context, state) => AccountSettingsScreen(
                         onProfileResult: (result) => reportMutation(
                           toasts,
@@ -190,7 +190,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                     routes: [
                       GoRoute(
                         path: 'login',
-                        pageBuilder: _page(
+                        pageBuilder: _pushPage(
                           (context, state) => LoginScreen(
                             onDone: () => context.go('/settings/account'),
                             onOpenRegister: () =>
@@ -203,7 +203,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                       ),
                       GoRoute(
                         path: 'register',
-                        pageBuilder: _page(
+                        pageBuilder: _pushPage(
                           (context, state) => RegisterScreen(
                             onDone: () {
                               toasts.show(ToastKind.success, '已注册');
@@ -214,7 +214,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                       ),
                       GoRoute(
                         path: 'pair',
-                        pageBuilder: _page((context, state) {
+                        pageBuilder: _pushPage((context, state) {
                           final extra = state.extra;
                           return PairScreen(
                             prefill: extra is PairPrefill ? extra : null,
@@ -229,20 +229,20 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     path: SettingsSection.appearance.path,
-                    pageBuilder: _page(
+                    pageBuilder: _pushPage(
                       (context, state) => const AppearanceSettingsScreen(),
                     ),
                   ),
                   GoRoute(
                     path: SettingsSection.notifications.path,
-                    pageBuilder: _page(
+                    pageBuilder: _pushPage(
                       (context, state) =>
                           NotificationSettingsScreen(onNotice: toasts.show),
                     ),
                   ),
                   GoRoute(
                     path: SettingsSection.privacy.path,
-                    pageBuilder: _page(
+                    pageBuilder: _pushPage(
                       (context, state) => PrivacySettingsScreen(
                         onNotice: toasts.show,
                         // 从这里看的播放历史返回这里，不回大厅。
@@ -251,19 +251,19 @@ final routerProvider = Provider<GoRouter>((ref) {
                       ),
                     ),
                     routes: [
-                      GoRoute(path: 'history', pageBuilder: _page(history)),
+                      GoRoute(path: 'history', pageBuilder: _pushPage(history)),
                     ],
                   ),
                   GoRoute(
                     path: SettingsSection.storage.path,
-                    pageBuilder: _page(
+                    pageBuilder: _pushPage(
                       (context, state) =>
                           StorageSettingsScreen(onNotice: toasts.show),
                     ),
                   ),
                   GoRoute(
                     path: SettingsSection.about.path,
-                    pageBuilder: _page(
+                    pageBuilder: _pushPage(
                       (context, state) => AboutSettingsScreen(
                         appVersion: appVersion,
                         protocolVersion: protocolVersion,
@@ -277,7 +277,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                     routes: [
                       GoRoute(
                         path: 'licenses',
-                        pageBuilder: _page(
+                        pageBuilder: _pushPage(
                           (context, state) => const LicensesScreen(),
                         ),
                       ),
@@ -285,7 +285,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     path: 'servers',
-                    pageBuilder: _page(
+                    pageBuilder: _pushPage(
                       (context, state) => ServerScreen(
                         onSwitched: () => context.go('/'),
                         onNotice: toasts.show,
@@ -302,7 +302,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                       ref.invalidate(siteCapabilitiesProvider);
                       return true;
                     },
-                    pageBuilder: _page(
+                    pageBuilder: _pushPage(
                       (context, state) => AdminScreen(
                         onExit: () => context.go('/settings'),
                         onOpenSection: (section) =>
@@ -314,7 +314,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                         GoRoute(
                           path: section.path,
                           parentNavigatorKey: rootNavigator,
-                          pageBuilder: _page(
+                          pageBuilder: _pushPage(
                             (context, state) => adminSectionScreen(
                               section,
                               onNotice: toasts.show,
@@ -478,15 +478,24 @@ Page<void> _roomPage(String roomRef, RoomMode mode) {
 
 // 页面都由这里给出：go_router 按 material_ui 的 MaterialApp 判断应用类型，认不出
 // flutter/material 的 MaterialApp，只给 builder 的路由会退回没有转场的页面。
-GoRouterPageBuilder _page(GoRouterWidgetBuilder builder, {bool task = false}) {
+GoRouterPageBuilder _page(
+  GoRouterWidgetBuilder builder, {
+  bool task = false,
+  bool push = false,
+}) {
   return (context, state) => AlistenPage<void>(
     key: state.pageKey,
     name: state.name ?? state.path,
     restorationId: state.pageKey.value,
     task: task,
+    push: push,
     child: Builder(builder: (context) => builder(context, state)),
   );
 }
+
+// 设置和它下面的页面是普通导航：从右边推入，不从头像或设置里的那一行长出。
+GoRouterPageBuilder _pushPage(GoRouterWidgetBuilder builder) =>
+    _page(builder, push: true);
 
 // 歌单 ID 由服务端给出，App 不假设它的格式。
 bool _isPlaylistPage(List<String> segments) =>
