@@ -480,7 +480,7 @@ class _TitleBlock extends ConsumerWidget {
           _subtitle(compact: true),
           t,
         )!.copyWith(color: colors.onGlassMuted);
-        return AnimatedSwitcher(
+        final switcher = AnimatedSwitcher(
           duration: trackDuration,
           switchInCurve: AlistenCurves.standard,
           switchOutCurve: AlistenCurves.exit,
@@ -545,6 +545,11 @@ class _TitleBlock extends ConsumerWidget {
               ),
             ],
           ),
+        );
+        return Opacity(
+          opacity: _titleShown(t),
+          alwaysIncludeSemantics: true,
+          child: switcher,
         );
       },
     );
@@ -658,6 +663,15 @@ class _ThinProgress extends ConsumerWidget {
 }
 
 enum _Part { body, cover, title, save, player, rowControls, rowProgress }
+
+/// 播放器收起或展开到这里时，标题从封面一侧换到另一侧。
+const _titleSwap = 0.5;
+
+/// 换边前后各用这么多进度淡出、淡入。
+const _titleFade = 0.2;
+
+double _titleShown(double t) =>
+    ((t - _titleSwap).abs() / _titleFade).clamp(0.0, 1.0);
 
 const _coverToTitle = AlistenSpacing.xl;
 const _titleToControls = AlistenSpacing.lg;
@@ -892,26 +906,33 @@ class _StageLayout extends MultiChildLayoutDelegate {
     layoutChild(_Part.cover, BoxConstraints.tight(cover.size));
     positionChild(_Part.cover, cover.topLeft);
 
+    // 标题从封面下面走到封面右边，直线过去会从封面上面穿过：前半程贴着封面
+    // 下沿，后半程贴着封面右侧，换边时它正好看不见，见 [_titleShown]。
     // 字号正常时按钮比标题第一行高，会伸进副标题那一行，所以整个标题块让出
     // 它的宽度。
+    final underCover = t < _titleSwap;
     final titleWidth = math.max(
       0.0,
-      lerpDouble(player.column - save.width, rowTitleEnd - rowTitleStart, t)!,
+      underCover ? player.column - save.width : rowTitleEnd - rowTitleStart,
     );
     layoutChild(
       _Part.title,
       BoxConstraints(minWidth: titleWidth, maxWidth: titleWidth),
     );
+    final rowTitleTop = rowTop + (rowHeight - rowTitleHeight) / 2;
     positionChild(
       _Part.title,
-      Offset(
-        lerpDouble(player.columnStart, rowTitleStart, t)!,
-        lerpDouble(
-          player.titleTop,
-          rowTop + (rowHeight - rowTitleHeight) / 2,
-          t,
-        )!,
-      ),
+      underCover
+          ? cover.bottomLeft +
+                Offset(
+                  player.columnStart - player.cover.left,
+                  player.titleTop - player.cover.bottom,
+                )
+          : cover.topRight +
+                Offset(
+                  rowTitleStart - rowCoverRect.right,
+                  rowTitleTop - rowCoverRect.top,
+                ),
     );
 
     if (hasChild(_Part.save)) {

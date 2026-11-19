@@ -11,6 +11,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:alisten/shared/ui/cover_art.dart';
+
 import '../../../app/app_test_harness.dart';
 import '../../../domain/room/room_fixtures.dart';
 
@@ -89,6 +91,20 @@ Future<void> _stage(
   addTearDown(() => tester.pumpWidget(const SizedBox()));
 }
 
+/// 文字此刻画出来的不透明度，算上祖先里的 [Opacity] 和 [FadeTransition]。
+double _shownOf(WidgetTester tester, Finder text) {
+  var shown = 1.0;
+  for (final element
+      in find
+          .ancestor(of: text, matching: find.byWidgetPredicate((_) => true))
+          .evaluate()) {
+    final widget = element.widget;
+    if (widget is Opacity) shown *= widget.opacity;
+    if (widget is FadeTransition) shown *= widget.opacity.value;
+  }
+  return shown;
+}
+
 void main() {
   late List<(Track, String)> asked;
 
@@ -129,6 +145,41 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     addTearDown(() => tester.pumpWidget(const SizedBox()));
   }
+
+  testWidgets('collapsing and expanding, the title and subtitle never lie '
+      'over the cover while they can be seen', (tester) async {
+    final compact = ValueNotifier(false);
+    addTearDown(compact.dispose);
+    await _stage(tester, size: const Size(360, 700), compact: compact);
+    final title = find.text('歌曲');
+    final subtitle = find.textContaining('歌手');
+    final cover = find.byType(CoverArt);
+
+    Future<int> watch() async {
+      var seen = 0;
+      for (var frame = 0; frame < 60; frame++) {
+        await tester.pump(const Duration(milliseconds: 8));
+        final art = tester.getRect(cover).deflate(1);
+        for (final text in [title, subtitle]) {
+          expect(text, findsWidgets);
+          if (_shownOf(tester, text.last) < 0.02) continue;
+          final rect = tester.getRect(text.last);
+          expect(
+            rect.overlaps(art),
+            isFalse,
+            reason: 'frame $frame: $rect over $art',
+          );
+          seen++;
+        }
+      }
+      return seen;
+    }
+
+    compact.value = true;
+    expect(await watch(), greaterThan(20));
+    compact.value = false;
+    expect(await watch(), greaterThan(20));
+  });
 
   testWidgets('the full player puts the slot at the end of the first title '
       'line, with the song playing', (tester) async {
