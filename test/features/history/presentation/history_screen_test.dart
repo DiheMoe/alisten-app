@@ -259,8 +259,12 @@ void main() {
   ) async {
     final semantics = tester.ensureSemantics();
     final api = FakeAlistenApi();
+    final atStart = Completer<List<Listen>>();
     final read = Completer<List<Listen>>();
-    api.listMyListensResults.add(read);
+    // 应用启动时在后台读的那次也还没回来。
+    api.listMyListensResults
+      ..add(atStart)
+      ..add(read);
     await _openHistory(tester, const [], api: api);
 
     expect(find.bySemanticsLabel('加载中'), findsOneWidget);
@@ -271,14 +275,21 @@ void main() {
 
     expect(find.bySemanticsLabel('加载中'), findsNothing);
     expect(find.text('晴天'), findsOneWidget);
+    atStart.complete(const []);
+    await _settle(tester);
+    expect(find.text('晴天'), findsOneWidget);
     semantics.dispose();
   });
 
   testWidgets('export and clear wait for a history to act on', (tester) async {
     final semantics = tester.ensureSemantics();
     final api = FakeAlistenApi();
+    final atStart = Completer<List<Listen>>();
     final read = Completer<List<Listen>>();
-    api.listMyListensResults.add(read);
+    // 应用启动时在后台读的那次也还没回来。
+    api.listMyListensResults
+      ..add(atStart)
+      ..add(read);
     await _openHistory(tester, const [], api: api);
     void expectDisabled() {
       for (final label in ['导出播放历史', '清空播放历史']) {
@@ -292,6 +303,7 @@ void main() {
 
     expectDisabled();
     read.complete(const []);
+    atStart.complete(const []);
     await _settle(tester);
     expect(find.text('还没有播放记录'), findsOneWidget);
     expectDisabled();

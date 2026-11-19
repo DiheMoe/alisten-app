@@ -13,6 +13,7 @@ import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/domain/room/room_route.dart';
 import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/index.dart';
+import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/playback/data/reminder_notifier.dart';
 import 'package:alisten/features/playback/index.dart';
@@ -101,8 +102,13 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
     if (WidgetsBinding.instance.lifecycleState case final launched?) {
       ref.read(appVisibleProvider.notifier).follow(launched);
     }
-    // 不等待：网络慢时不能拖住通知和链接的初始化。
-    unawaited(_restoreIdentity());
+    // 不等待：网络慢时不能拖住通知和链接的初始化。播放历史在服务器上，第一
+    // 次打开要等它读回来；身份恢复之后先在后台读好，之后由历史页自己刷新。
+    unawaited(
+      _restoreIdentity().then(
+        (_) => ref.read(historyControllerProvider.notifier).load(),
+      ),
+    );
     try {
       await ref
           .read(reminderNotifierProvider)

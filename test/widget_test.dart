@@ -110,6 +110,27 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('app start reads the play history once in the background, '
+      'after the member is restored, so the page has it when opened', (
+    tester,
+  ) async {
+    final api = FakeAlistenApi();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: await alistenAppOverrides(
+          api: api,
+          credentials: FakeCredentialStore()..memberToken = 'stored-token',
+        ),
+        child: const AlistenApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(api.getMeCalls, 1);
+    expect(api.listMyListensCalls, 1);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('main installs the Riverpod dependency scope', (tester) async {
     addTearDown(LicenseRegistry.reset);
     SharedPreferences.setMockInitialValues({});
