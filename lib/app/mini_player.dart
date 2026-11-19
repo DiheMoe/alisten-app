@@ -10,6 +10,7 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
+import 'package:alisten/shared/ui/edge_track.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
@@ -235,25 +236,27 @@ class MiniPlayer extends StatelessWidget {
         // 浮在所有页面之外，上层没有默认文字样式。
         child: DefaultTextStyle(
           style: AlistenTypography.body.copyWith(color: colors.onGlass),
-          child: Container(
-            height: heightOf(context),
-            decoration: BoxDecoration(
-              color: colors.raised,
-              borderRadius: BorderRadius.circular(AlistenRadii.md),
-              border: Border.all(color: colors.glassStroke, width: _stroke),
-              // 浅色页面上的深色条本身已足够醒目，阴影只用来托起它。
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.16),
-                  blurRadius: AlistenSpacing.lg,
-                  offset: const Offset(0, AlistenSpacing.xxs),
+          // 进度画在卡片的裁切之外，端点的光晕可以漫出卡片边缘。
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                height: heightOf(context),
+                decoration: BoxDecoration(
+                  color: colors.raised,
+                  borderRadius: BorderRadius.circular(AlistenRadii.md),
+                  border: Border.all(color: colors.glassStroke, width: _stroke),
+                  // 浅色页面上的深色条本身已足够醒目，阴影只用来托起它。
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      blurRadius: AlistenSpacing.lg,
+                      offset: const Offset(0, AlistenSpacing.xxs),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              children: [
-                Padding(
+                clipBehavior: Clip.antiAlias,
+                child: Padding(
                   padding: const EdgeInsets.fromLTRB(
                     AlistenSpacing.xs,
                     AlistenSpacing.xs,
@@ -300,16 +303,12 @@ class MiniPlayer extends StatelessWidget {
                     ],
                   ),
                 ),
-                // 只占底边的直线段，不被圆角切掉。
-                if (nowPlaying != null)
-                  const Positioned(
-                    left: AlistenRadii.md,
-                    right: AlistenRadii.md,
-                    bottom: 0,
-                    child: MiniPlayerProgress(),
-                  ),
-              ],
-            ),
+              ),
+              if (nowPlaying != null)
+                const Positioned.fill(
+                  child: IgnorePointer(child: MiniPlayerProgress()),
+                ),
+            ],
           ),
         ),
       ),
@@ -423,7 +422,6 @@ class MiniPlayerProgress extends ConsumerWidget {
     if (duration <= 0) return const SizedBox.shrink();
     final colors = AlistenColors.of(context);
     return CustomPaint(
-      size: const Size.fromHeight(AlistenSizes.progressTrack / 2),
       painter: _ProgressPainter(
         played: (position / duration).clamp(0.0, 1.0),
         ink: colors.control,
@@ -437,6 +435,10 @@ class MiniPlayerProgress extends ConsumerWidget {
 
 /// 未播放的部分只是一道淡痕，与边框一起看仍是一个整体。
 const _trackAlpha = 0.14;
+
+// 进度沿卡片上边缘、贴着边框里侧走，两端顺着上面两个圆角弯下去。
+const _lineWidth = AlistenSizes.progressTrack / 2;
+const _edgeInset = MiniPlayer._stroke + 1.5;
 
 class _ProgressPainter extends CustomPainter {
   _ProgressPainter({
@@ -455,19 +457,26 @@ class _ProgressPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = track);
-    if (played <= 0) return;
-    final width = size.width * played;
-    final filled = rtl
-        ? Rect.fromLTWH(size.width - width, 0, width, size.height)
-        : Rect.fromLTWH(0, 0, width, size.height);
-    canvas.drawRect(filled, Paint()..color = glow);
-    paintProgressHead(
-      canvas,
-      Offset(rtl ? filled.left : filled.right, size.height / 2),
-      ink: ink,
-      glow: glow,
+    final edge = EdgeTrack(
+      width: size.width,
+      radius: AlistenRadii.md,
+      inset: _edgeInset,
     );
+    // 从右往左书写时从右侧开始。
+    if (rtl) {
+      canvas
+        ..translate(size.width, 0)
+        ..scale(-1, 1);
+    }
+    final line = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = _lineWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(edge.path, line..color = track);
+    if (played <= 0) return;
+    final reached = edge.length * played;
+    canvas.drawPath(edge.upTo(reached), line..color = glow);
+    paintProgressHead(canvas, edge.pointAt(reached), ink: ink, glow: glow);
   }
 
   @override

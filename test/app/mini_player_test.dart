@@ -131,6 +131,18 @@ void main() {
         ..circle()
         ..circle(),
     );
+    // 一半的进度走到卡片上边缘的正中，贴在边框里侧。
+    final card = tester.getSize(find.byType(MiniPlayerProgress));
+    expect(
+      find.byType(MiniPlayerProgress),
+      paints..something((method, arguments) {
+        if (method != #drawCircle) return false;
+        final center = arguments.first as Offset;
+        return (center.dx - card.width / 2).abs() < 0.5 &&
+            center.dy > 0 &&
+            center.dy < 4;
+      }),
+    );
   });
 
   testWidgets('outside the room the mini player shows what the active room '
