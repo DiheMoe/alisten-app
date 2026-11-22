@@ -1,5 +1,7 @@
 import 'package:alisten/app/room/room_mode.dart';
 import 'package:alisten/app/router.dart';
+import 'package:alisten/features/lyrics/index.dart';
+import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,9 +12,19 @@ import '../features/playback/playback_test_doubles.dart' show FakeAudioEngine;
 import 'app_test_harness.dart';
 
 const _tablet = Size(1024, 1366);
+const _ipadLandscape = Size(1194, 834);
 
 /// 平板竖屏和横屏。
 final _tablets = ValueVariant({_tablet, const Size(1366, 1024)});
+
+/// 常见 iPad 横屏及分屏尺寸：2/3 分屏、经典 1024、mini、11 寸、13 寸。
+final _landscapeIpads = ValueVariant({
+  const Size(840, 600),
+  const Size(1024, 768),
+  const Size(1133, 744),
+  _ipadLandscape,
+  const Size(1366, 1024),
+});
 
 // 不查文字对比度：测试字体不绘制中文和图标，右栏切换项的区域里只剩房间深色
 // 背景的渐变，比较的是两种背景色。房间文字的对比度由颜色测试保证。
@@ -240,6 +252,135 @@ void main() {
     expect(lyrics, findsOneWidget);
     expect(tester.getRect(lyrics).left, greaterThan((760 - 640) / 2));
     expect(tester.getRect(find.byTooltip('搜歌')).right, lessThan(760 - 60));
+    semantics.dispose();
+  });
+
+  testWidgets('on a landscape iPad the room keeps the player on the left and '
+      'switches lyrics, queue, and chat in the right pane', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final size = _landscapeIpads.currentValue!;
+    final (rooms: _, :router, :settle) = await enterRoom(tester, size: size);
+
+    final player = tester.getRect(find.byType(NowPlayingHeader));
+    final lyrics = tester.getRect(find.byType(LyricsView));
+
+    expect(player.right, lessThanOrEqualTo(lyrics.left));
+    expect(
+      player.height,
+      greaterThan(player.width),
+      reason: 'the player stays vertical on the left',
+    );
+    expect(
+      lyrics.height,
+      greaterThan(size.height * 0.6),
+      reason: 'the right pane spans full height beside the player',
+    );
+    expect(find.text('歌词'), findsOneWidget);
+    expect(find.text('队列'), findsOneWidget);
+    expect(find.text('聊天'), findsOneWidget);
+    expect(find.byTooltip('搜歌'), findsOneWidget);
+    expect(find.byTooltip('从歌单点歌'), findsOneWidget);
+    expect(
+      tester.getSize(find.byType(SegmentedPills<RoomMode>)).width,
+      lessThanOrEqualTo(300),
+      reason: 'the mode switcher keeps a compact width instead of stretching',
+    );
+    await _expectAccessible(tester);
+
+    await tester.tap(find.text('队列'));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/queue');
+    expect(find.text('等待中 1 首'), findsOneWidget);
+    expect(tester.getRect(find.byType(NowPlayingHeader)), player);
+
+    await tester.tap(find.text('聊天'));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/chat');
+    expect(find.bySemanticsLabel('说点什么…'), findsOneWidget);
+    expect(tester.getRect(find.byType(NowPlayingHeader)), player);
+
+    await tester.tap(find.text('歌词'));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/lyrics');
+    expect(find.byType(LyricsView), findsOneWidget);
+    await _expectAccessible(tester);
+    semantics.dispose();
+  }, variant: _landscapeIpads);
+
+  testWidgets('on a landscape iPad swiping the right pane moves across '
+      'lyrics, queue, and chat while the player stays put', (tester) async {
+    final (rooms: _, :router, :settle) = await enterRoom(
+      tester,
+      size: _ipadLandscape,
+    );
+    final playerBefore = tester.getRect(find.byType(NowPlayingHeader));
+    RoomMode switched() => tester
+        .widget<SegmentedPills<RoomMode>>(find.byType(SegmentedPills<RoomMode>))
+        .selected;
+
+    expect(switched(), RoomMode.lyrics);
+
+    await tester.drag(find.byType(LyricsView), const Offset(-400, 0));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/queue');
+    expect(switched(), RoomMode.queue);
+    expect(find.text('等待中 1 首'), findsOneWidget);
+    expect(tester.getRect(find.byType(NowPlayingHeader)), playerBefore);
+
+    await tester.drag(find.text('等待中 1 首'), const Offset(-400, 0));
+    await settle();
+    expect(router.state.uri.path, '/r/listen/chat');
+    expect(switched(), RoomMode.chat);
+    expect(find.bySemanticsLabel('说点什么…'), findsOneWidget);
+    expect(tester.getRect(find.byType(NowPlayingHeader)), playerBefore);
+  });
+
+  testWidgets('rotating between portrait and landscape tablet keeps the '
+      'selected queue tab aligned without reloading audio', (tester) async {
+    final engine = FakeAudioEngine();
+    final (:rooms, :router, :settle) = await enterRoom(
+      tester,
+      size: _tablet,
+      engine: engine,
+      serverNow: testNowPlaying.startedAtMs + 30000,
+    );
+    final loads = engine.loadCalls;
+
+    router.go('/r/listen/queue');
+    await settle();
+    expect(find.text('等待中 1 首'), findsOneWidget);
+
+    tester.view.physicalSize = _ipadLandscape * 3;
+    await settle();
+
+    expect(find.text('等待中 1 首'), findsOneWidget);
+    expect(find.text('歌词'), findsOneWidget);
+    expect(rooms.transports, hasLength(1));
+    expect(engine.loadCalls, loads);
+
+    tester.view.physicalSize = _tablet * 3;
+    await settle();
+
+    expect(find.text('等待中 1 首'), findsOneWidget);
+    expect(find.byType(LyricsView), findsOneWidget);
+    expect(rooms.transports, hasLength(1));
+    expect(engine.loadCalls, loads);
+  });
+
+  testWidgets('landscape iPad layout adapts cleanly at 2x text scale', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await enterRoom(
+      tester,
+      size: const Size(1024, 768),
+      system: const MediaQueryData(textScaler: TextScaler.linear(2)),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.byTooltip('搜歌'), findsOneWidget);
+    expect(find.text('歌词'), findsOneWidget);
+    await _expectAccessible(tester);
     semantics.dispose();
   });
 }

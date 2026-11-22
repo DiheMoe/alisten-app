@@ -41,6 +41,9 @@ const _shortestLineChangeMs = 350;
 
 const _rowHeightEm = 1.3;
 
+// 超宽屏（如收起侧栏的平板横屏）限制歌词行宽，避免单行拉过整屏。
+const _maxLyricWidth = 560.0;
+
 /// 歌词跟随本机播放位置，只在播放中前进；拖动后在停下的位置保留
 /// [_holdAfterDrag]，再回到当前行。
 ///
@@ -431,7 +434,7 @@ class _LyricsViewState extends ConsumerState<LyricsView>
           onNotification: _onScroll,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              _resetWidth(constraints.maxWidth);
+              _resetWidth(math.min(constraints.maxWidth, _maxLyricWidth));
               _sizeSnapshots(constraints.maxHeight);
               _contentInset = constraints.hasBoundedHeight
                   ? constraints.maxHeight / 2
@@ -444,12 +447,18 @@ class _LyricsViewState extends ConsumerState<LyricsView>
                 primary: false,
                 // 上下各留半个视口，首行和末行也能滚到中央（仅限高度有界时）。
                 padding: EdgeInsets.symmetric(vertical: _contentInset),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (var index = 0; index < lines.length; index++)
-                      _row(index, constraints.maxHeight),
-                  ],
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: _maxLyricWidth),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var index = 0; index < lines.length; index++)
+                          _row(index, constraints.maxHeight),
+                      ],
+                    ),
+                  ),
                 ),
               );
             },

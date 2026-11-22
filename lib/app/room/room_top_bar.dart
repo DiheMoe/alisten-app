@@ -152,10 +152,11 @@ class _RoomTopBarState extends State<RoomTopBar> {
                     )
                   : Padding(
                       key: const ValueKey('not open'),
-                      padding: const EdgeInsetsDirectional.fromSTEB(
-                        _titleStart,
+                      padding: EdgeInsetsDirectional.fromSTEB(
+                        MediaQuery.paddingOf(context).left + _titleStart,
                         0,
-                        AlistenSpacing.page,
+                        MediaQuery.paddingOf(context).right +
+                            AlistenSpacing.page,
                         AlistenSpacing.xs,
                       ),
                       child: Align(
