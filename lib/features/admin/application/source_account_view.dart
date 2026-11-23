@@ -14,6 +14,7 @@ String afterChinese(String name) =>
   LoginSource source,
 ) {
   if (!status.saved) return (status: '未登录', details: const []);
+  if (status.signedOut) return (status: '登录已失效', details: const []);
   final account = status.account;
   if (account == null) {
     return (status: '已保存登录，没认出是哪个账号', details: const []);

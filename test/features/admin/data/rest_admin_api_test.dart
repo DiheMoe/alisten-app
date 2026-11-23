@@ -334,21 +334,37 @@ void main() {
     expect(account.vip, isNull);
     expect(account.verified, isFalse);
 
+    expect(status.signedOut, isFalse);
+
     adapter.respond(200, {
       'set': true,
       'account': {'id': '42', 'name': '小明', 'vip': true, 'verified': true},
+      'signedOut': false,
     });
     final netease = await api.getSourceAccount('t', LoginSource.netease);
     expect(adapter.requests.last.path, '/api/admin/credentials/netease');
     expect(netease.account!.name, '小明');
     expect(netease.account!.vip, isTrue);
     expect(netease.account!.verified, isTrue);
+    expect(netease.signedOut, isFalse);
 
-    adapter.respond(200, {'set': false, 'account': null});
+    adapter.respond(200, {'set': false, 'account': null, 'signedOut': false});
     final qq = await api.getSourceAccount('t', LoginSource.qq);
     expect(adapter.requests.last.path, '/api/admin/credentials/qq');
     expect(qq.saved, isFalse);
     expect(qq.account, isNull);
+  });
+
+  test('a login the platform says has expired is read as signed out', () async {
+    for (final source in [LoginSource.netease, LoginSource.qq]) {
+      adapter.respond(200, {'set': true, 'account': null, 'signedOut': true});
+
+      final status = await api.getSourceAccount('t', source);
+
+      expect(status.saved, isTrue, reason: '$source');
+      expect(status.signedOut, isTrue, reason: '$source');
+      expect(status.account, isNull, reason: '$source');
+    }
   });
 
   test('a QQ music code is asked for with the way it is scanned', () async {

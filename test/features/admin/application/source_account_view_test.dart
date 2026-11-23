@@ -12,6 +12,17 @@ void main() {
     expect(view.details, isEmpty);
   });
 
+  test('a login the platform says has expired says so, before anything '
+      'else about the account', () {
+    final view = sourceAccountView(
+      const SourceAccountStatus(saved: true, signedOut: true),
+      LoginSource.qq,
+    );
+
+    expect(view.status, '登录已失效');
+    expect(view.details, isEmpty);
+  });
+
   test('a saved sign-in without an account says it was not recognized', () {
     final view = sourceAccountView(
       const SourceAccountStatus(saved: true),

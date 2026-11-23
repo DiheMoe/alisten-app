@@ -86,12 +86,20 @@ final class SourceAccount {
 }
 
 final class SourceAccountStatus {
-  const SourceAccountStatus({required this.saved, this.account});
+  const SourceAccountStatus({
+    required this.saved,
+    this.account,
+    this.signedOut = false,
+  });
 
   final bool saved;
 
   /// 已保存登录信息、但没能识别出账号时为 null。
   final SourceAccount? account;
+
+  /// 保存了登录信息，但音乐平台说它已经失效，要重新扫码。这时 [account] 为
+  /// null。
+  final bool signedOut;
 }
 
 /// [key] 是查询扫码结果的凭据，只交给发起扫码的控制器，不得进入状态或日志。

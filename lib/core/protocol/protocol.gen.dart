@@ -5,7 +5,7 @@ import 'package:alisten/core/protocol/protocol_runtime.dart';
 export 'package:alisten/core/protocol/protocol_runtime.dart'
     show ProtocolMismatchException, WsEvent, WsRequest, WsResponse;
 
-const protocolVersion = 'b1900696599ef398';
+const protocolVersion = '77c2a450b56ba881';
 
 class APIKey {
   const APIKey({required this.key});
@@ -3236,6 +3236,7 @@ class AdminGetNeteaseCredentialResponse {
   const AdminGetNeteaseCredentialResponse({
     required this.account,
     required this.set,
+    required this.signedOut,
   });
 
   factory AdminGetNeteaseCredentialResponse.fromJson(
@@ -3256,15 +3257,21 @@ class AdminGetNeteaseCredentialResponse {
         requiredField(json, 'set', 'AdminGetNeteaseCredentialResponse'),
         'AdminGetNeteaseCredentialResponse.set',
       ),
+      signedOut: readBool(
+        requiredField(json, 'signedOut', 'AdminGetNeteaseCredentialResponse'),
+        'AdminGetNeteaseCredentialResponse.signedOut',
+      ),
     );
   }
 
   final SourceAccount? account;
   final bool set;
+  final bool signedOut;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'account': account?.toJson(),
     'set': set,
+    'signedOut': signedOut,
   };
 }
 
@@ -3272,6 +3279,7 @@ class AdminGetQqCredentialResponse {
   const AdminGetQqCredentialResponse({
     required this.account,
     required this.set,
+    required this.signedOut,
   });
 
   factory AdminGetQqCredentialResponse.fromJson(Map<String, Object?> json) {
@@ -3290,15 +3298,21 @@ class AdminGetQqCredentialResponse {
         requiredField(json, 'set', 'AdminGetQqCredentialResponse'),
         'AdminGetQqCredentialResponse.set',
       ),
+      signedOut: readBool(
+        requiredField(json, 'signedOut', 'AdminGetQqCredentialResponse'),
+        'AdminGetQqCredentialResponse.signedOut',
+      ),
     );
   }
 
   final SourceAccount? account;
   final bool set;
+  final bool signedOut;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'account': account?.toJson(),
     'set': set,
+    'signedOut': signedOut,
   };
 }
 

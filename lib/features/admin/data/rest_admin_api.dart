@@ -216,11 +216,19 @@ final class RestAdminApi implements AdminApi {
           final response = protocol.AdminGetNeteaseCredentialResponse.fromJson(
             json,
           );
-          return _accountStatus(response.set, response.account);
+          return _accountStatus(
+            response.set,
+            response.account,
+            signedOut: response.signedOut,
+          );
         },
         LoginSource.qq => (json) {
           final response = protocol.AdminGetQqCredentialResponse.fromJson(json);
-          return _accountStatus(response.set, response.account);
+          return _accountStatus(
+            response.set,
+            response.account,
+            signedOut: response.signedOut,
+          );
         },
         LoginSource.bilibili => (json) {
           final response = protocol.AdminGetBilibiliCredentialResponse.fromJson(
@@ -451,10 +459,12 @@ final class RestAdminApi implements AdminApi {
 
   static SourceAccountStatus _accountStatus(
     bool saved,
-    protocol.SourceAccount? account,
-  ) {
+    protocol.SourceAccount? account, {
+    bool signedOut = false,
+  }) {
     return SourceAccountStatus(
       saved: saved,
+      signedOut: signedOut,
       account: account == null
           ? null
           : SourceAccount(
