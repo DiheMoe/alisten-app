@@ -23,6 +23,20 @@ const _notSavedText = '没有保存，再试一次。';
 final settingsControllerProvider =
     NotifierProvider<SettingsController, SettingsState>(SettingsController.new);
 
+/// 歌词带不带翻译、带不带逐字数据。
+typedef LyricDisplay = ({bool translation, bool words});
+
+final lyricDisplayProvider = Provider<LyricDisplay>((ref) {
+  return ref.watch(
+    settingsControllerProvider.select(
+      (state) => (
+        translation: state.value.lyricTranslation,
+        words: state.value.lyricWords,
+      ),
+    ),
+  );
+});
+
 final trimSearchHistoryProvider = Provider<Future<void> Function(int limit)>((
   ref,
 ) {
@@ -134,6 +148,20 @@ final class SettingsController extends Notifier<SettingsState> {
     return _change(
       (value) => value.copyWith(recordSearch: enabled),
       (store) => store.setRecordSearch(enabled),
+    );
+  }
+
+  Future<void> setLyricTranslation(bool shown) {
+    return _change(
+      (value) => value.copyWith(lyricTranslation: shown),
+      (store) => store.setLyricTranslation(shown),
+    );
+  }
+
+  Future<void> setLyricWords(bool shown) {
+    return _change(
+      (value) => value.copyWith(lyricWords: shown),
+      (store) => store.setLyricWords(shown),
     );
   }
 

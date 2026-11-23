@@ -38,6 +38,14 @@ final class LyricLine {
 
   bool get isBlank => text.isEmpty;
 
+  /// 同一行，时间和翻译不变，只是不再按字点亮。
+  LyricLine get withoutWords => LyricLine(
+    timeMs: timeMs,
+    text: text,
+    endMs: endMs,
+    translation: translation,
+  );
+
   LyricLine _withTranslation(String translation) {
     return LyricLine(
       timeMs: timeMs,

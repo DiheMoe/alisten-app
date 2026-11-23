@@ -10,8 +10,10 @@ import 'package:alisten/core/realtime/room_transport.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/chat/index.dart';
+import 'package:alisten/domain/playback/lrc.dart';
 import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/lyrics/presentation/render_lyric_line.dart';
+import 'package:alisten/features/settings/index.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/room/index.dart';
@@ -158,6 +160,51 @@ void main() {
     expect(find.textContaining('正在重连'), findsOneWidget);
     expect(find.textContaining('秒后重试'), findsOneWidget);
     unawaited(rooms.last.stop());
+  });
+
+  testWidgets('turning off translations and word-by-word lyrics in settings '
+      'changes the lyrics on screen at once, line for line', (tester) async {
+    final song = NowPlaying(
+      entry: _sung.entry,
+      mediaUrl: _sung.mediaUrl,
+      startedAtMs: _sung.startedAtMs,
+      durationMs: _sung.durationMs,
+      gain: 1,
+      lyric: '',
+      lyricWords:
+          '[0,2000](0,1000,0)第一(1000,1000,0)行\n'
+          '[4000,2000](4000,2000,0)第二行',
+      lyricTrans: '[00:00.00]Line one\n[00:04.00]Line two',
+    );
+    final (rooms: _, :router, :settle) = await enterRoom(
+      tester,
+      nowPlaying: song,
+    );
+    router.go('/r/listen/lyrics');
+    await settle();
+    List<LyricLine> shown() => [
+      for (final row in tester.widgetList<LyricLineRow>(
+        _inRoom(find.byType(LyricLineRow)),
+      ))
+        row.line,
+    ];
+    final before = shown();
+    expect(before.map((line) => line.translation), contains('Line one'));
+    expect(before.where((line) => line.words != null), isNotEmpty);
+
+    final settings = appContainer(tester)
+        .read(settingsControllerProvider.notifier);
+    await settings.setLyricTranslation(false);
+    await settings.setLyricWords(false);
+    await settle();
+
+    final after = shown();
+    expect(after.map((line) => line.translation), everyElement(isNull));
+    expect(after.map((line) => line.words), everyElement(isNull));
+    expect(
+      [for (final line in after) (line.timeMs, line.text)],
+      [for (final line in before) (line.timeMs, line.text)],
+    );
   });
 
   testWidgets('long pressing the song title copies it, and a tap does not', (

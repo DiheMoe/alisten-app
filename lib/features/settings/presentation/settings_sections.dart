@@ -104,6 +104,8 @@ class AppearanceSettingsScreen extends ConsumerWidget {
     final theme = ref.watch(
       settingsControllerProvider.select((state) => state.value.theme),
     );
+    final lyrics = ref.watch(lyricDisplayProvider);
+    final controller = ref.read(settingsControllerProvider.notifier);
     return SectionPage(
       title: SettingsSection.appearance.title,
       children: [
@@ -115,9 +117,28 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                 label: '主题',
                 options: _themes,
                 selected: theme,
-                onChanged: ref
-                    .read(settingsControllerProvider.notifier)
-                    .setTheme,
+                onChanged: controller.setTheme,
+              ),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          title: '歌词',
+          children: [
+            SettingRow(
+              title: '显示翻译',
+              trailing: AlistenToggle(
+                value: lyrics.translation,
+                semanticLabel: '显示翻译',
+                onChanged: controller.setLyricTranslation,
+              ),
+            ),
+            SettingRow(
+              title: '逐字歌词',
+              trailing: AlistenToggle(
+                value: lyrics.words,
+                semanticLabel: '逐字歌词',
+                onChanged: controller.setLyricWords,
               ),
             ),
           ],

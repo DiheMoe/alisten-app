@@ -17,6 +17,8 @@ final class LocalSettings {
     this.volume = 75,
     this.muted = false,
     this.email = '',
+    this.lyricTranslation = true,
+    this.lyricWords = true,
   });
 
   final AppTheme theme;
@@ -30,6 +32,12 @@ final class LocalSettings {
   /// 只用来生成 Gravatar 头像，属于输入它时的成员。
   final String email;
 
+  /// 有翻译的歌在每行歌词下面显示翻译。
+  final bool lyricTranslation;
+
+  /// 有逐字时间的歌按字点亮正在唱的部分；关掉后整行高亮。
+  final bool lyricWords;
+
   LocalSettings copyWith({
     AppTheme? theme,
     bool? reminders,
@@ -39,6 +47,8 @@ final class LocalSettings {
     int? volume,
     bool? muted,
     String? email,
+    bool? lyricTranslation,
+    bool? lyricWords,
   }) {
     return LocalSettings(
       theme: theme ?? this.theme,
@@ -49,6 +59,8 @@ final class LocalSettings {
       volume: volume ?? this.volume,
       muted: muted ?? this.muted,
       email: email ?? this.email,
+      lyricTranslation: lyricTranslation ?? this.lyricTranslation,
+      lyricWords: lyricWords ?? this.lyricWords,
     );
   }
 }

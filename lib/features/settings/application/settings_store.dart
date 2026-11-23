@@ -26,4 +26,8 @@ abstract interface class SettingsStore {
   Future<void> setEmail(String email);
 
   Future<void> clearEmail();
+
+  Future<void> setLyricTranslation(bool shown);
+
+  Future<void> setLyricWords(bool shown);
 }

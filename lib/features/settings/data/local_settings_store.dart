@@ -16,6 +16,8 @@ final class LocalSettingsStore implements SettingsStore {
   static const _volume = 'alisten.volume';
   static const _muted = 'alisten.muted';
   static const _email = 'alisten.email';
+  static const _lyricTranslation = 'alisten.lyrics.translation';
+  static const _lyricWords = 'alisten.lyrics.words';
 
   final SharedPreferences _preferences;
 
@@ -41,6 +43,8 @@ final class LocalSettingsStore implements SettingsStore {
       volume: _read(_volume, defaults.volume).clamp(0, 100),
       muted: _read(_muted, defaults.muted),
       email: _read(_email, defaults.email),
+      lyricTranslation: _read(_lyricTranslation, defaults.lyricTranslation),
+      lyricWords: _read(_lyricWords, defaults.lyricWords),
     );
   }
 
@@ -92,6 +96,19 @@ final class LocalSettingsStore implements SettingsStore {
 
   @override
   Future<void> clearEmail() => setEmail('');
+
+  @override
+  Future<void> setLyricTranslation(bool shown) {
+    return _check(
+      _lyricTranslation,
+      _preferences.setBool(_lyricTranslation, shown),
+    );
+  }
+
+  @override
+  Future<void> setLyricWords(bool shown) {
+    return _check(_lyricWords, _preferences.setBool(_lyricWords, shown));
+  }
 
   T _read<T extends Object>(String key, T fallback) {
     final value = _preferences.get(key);

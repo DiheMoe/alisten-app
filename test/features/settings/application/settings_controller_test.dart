@@ -224,6 +224,23 @@ void main() {
       });
     });
 
+    test('lyric translations and word-by-word lyrics are on until turned '
+        'off, and each is written alone', () async {
+      final settings = controllerOf(container);
+      expect(stateOf(container).value.lyricTranslation, isTrue);
+      expect(stateOf(container).value.lyricWords, isTrue);
+
+      await settings.setLyricTranslation(false);
+      await settings.setLyricWords(false);
+
+      final value = stateOf(container).value;
+      expect(value.lyricTranslation, isFalse);
+      expect(value.lyricWords, isFalse);
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getBool('alisten.lyrics.translation'), isFalse);
+      expect(preferences.getBool('alisten.lyrics.words'), isFalse);
+    });
+
     test('a setting is in effect before it has been written', () async {
       final settings = controllerOf(container);
 
@@ -782,6 +799,12 @@ final class _FailingStore implements SettingsStore {
 
   @override
   Future<void> clearEmail() => _fail();
+
+  @override
+  Future<void> setLyricTranslation(bool shown) => _fail();
+
+  @override
+  Future<void> setLyricWords(bool shown) => _fail();
 
   Future<void> _fail() async => throw StateError('disk full');
 }

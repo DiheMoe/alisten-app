@@ -738,6 +738,32 @@ void main() {
     expect(preferences.getString('alisten.theme'), 'light');
   });
 
+  testWidgets('lyric translations and word-by-word lyrics are on, and each '
+      'one turned off is kept on this device', (tester) async {
+    await _openSettings(tester, at: SettingsSection.appearance);
+    Finder toggle(String label) => find.byWidgetPredicate(
+      (widget) => widget is AlistenToggle && widget.semanticLabel == label,
+    );
+    bool on(String label) => tester.widget<AlistenToggle>(toggle(label)).value;
+    await _show(tester, toggle('逐字歌词'));
+
+    expect(find.text('歌词'), findsOneWidget);
+    expect(on('显示翻译'), isTrue);
+    expect(on('逐字歌词'), isTrue);
+
+    await tester.tap(toggle('显示翻译'));
+    await tester.pumpAndSettle();
+    expect(on('显示翻译'), isFalse);
+    expect(on('逐字歌词'), isTrue);
+
+    await tester.tap(toggle('逐字歌词'));
+    await tester.pumpAndSettle();
+    expect(on('逐字歌词'), isFalse);
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getBool('alisten.lyrics.translation'), isFalse);
+    expect(preferences.getBool('alisten.lyrics.words'), isFalse);
+  });
+
   testWidgets('notifications the system refused say so and lead to the '
       'system settings', (tester) async {
     final systemSettings = FakeSystemSettings();
