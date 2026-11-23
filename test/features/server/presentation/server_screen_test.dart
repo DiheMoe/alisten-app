@@ -190,10 +190,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('加入 另一个站'), findsOneWidget);
-    expect(
-      find.text('将以下面的昵称和邮箱加入，之后可以在设置里修改。邮箱只用来显示 Gravatar 头像。'),
-      findsOneWidget,
-    );
+    expect(find.text('邮箱只用来显示 Gravatar 头像。'), findsOneWidget);
     expect(tester.widget<EditableText>(_field('昵称')).controller.text, '听众');
     expect(tester.widget<EditableText>(_field('邮箱')).controller.text, 'a@b.c');
 
@@ -434,7 +431,7 @@ void main() {
     await tester.tap(_deleteButton('删除 周末听歌会'));
     await tester.pumpAndSettle();
     expect(find.text('删除 周末听歌会？'), findsOneWidget);
-    expect(find.text('会删除这台设备在这个服务器上的身份和房间票据。'), findsOneWidget);
+    expect(find.text('删除后，这台设备在这个服务器上会变成新游客，有密码的房间要重新输入密码。'), findsOneWidget);
 
     await tester.tap(find.text('删除'));
     await tester.pumpAndSettle();

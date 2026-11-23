@@ -16,14 +16,14 @@ String afterChinese(String name) =>
   if (!status.saved) return (status: '未登录', details: const []);
   final account = status.account;
   if (account == null) {
-    return (status: '已保存登录信息，未识别到账号', details: const []);
+    return (status: '已保存登录，没认出是哪个账号', details: const []);
   }
   final name = account.name;
   final vip = account.vip;
   return (
     status: account.verified
         ? '已登录'
-        : '已保存登录信息，未经${afterChinese(platformName(source))}核实',
+        : '已保存登录，没能向${afterChinese(platformName(source))}确认',
     details: [
       if (name != null && name.isNotEmpty) '昵称：$name',
       '账号 ID：${account.id}',

@@ -15,7 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const _hint = '粘贴 cookies.txt 的内容，或请求头里 cookie 的值';
-const _unknownText = '结果未知，请确认状态后再决定是否重新填写。';
+const _unknownText = '没能确认是否保存，已重新读取';
 
 const _steps = [
   '1. 在电脑浏览器打开无痕窗口，登录用来点歌的 YouTube 账号，账号可能被 YouTube '

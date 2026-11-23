@@ -158,7 +158,6 @@ class _AccountActionsState extends ConsumerState<AccountActions> {
     if (!account.github) {
       return _ActionRow(
         title: '绑定 GitHub',
-        subtitle: '绑定之后，可以用 GitHub 登录这个账号。',
         busy: running == GithubIntent.bind,
         onPressed: running == null
             ? () => _askPassword(GithubPasswordAction.bind)
@@ -169,7 +168,7 @@ class _AccountActionsState extends ConsumerState<AccountActions> {
     final hasUsername = account.username != null;
     return _ActionRow(
       title: '解绑 GitHub',
-      subtitle: hasUsername ? '已绑定，可以用 GitHub 登录这个账号。' : '已绑定。先设置用户名和密码，才能解绑。',
+      subtitle: hasUsername ? null : '先设置用户名和密码才能解绑',
       onPressed: hasUsername && running == null
           ? () => _askPassword(GithubPasswordAction.unbind)
           : null,

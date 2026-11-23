@@ -14,9 +14,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../server/server_test_doubles.dart';
 import '../admin_test_doubles.dart';
 
-const _openText = '现在任何人都可以注册账号。关闭后不能再注册新账号，已有账号照常登录，游客照常使用。';
-const _closedText = '现在不能注册新账号。已有账号照常登录，游客照常使用。';
-
 void main() {
   late FakeAdminApi api;
   late List<(ToastKind, String)> notices;
@@ -54,36 +51,32 @@ void main() {
   AlistenToggle toggle(WidgetTester tester) =>
       tester.widget<AlistenToggle>(find.byType(AlistenToggle));
 
-  testWidgets('open registration is explained and the switch closes it', (
-    tester,
-  ) async {
+  testWidgets('open registration shows the switch on, and the switch closes '
+      'it', (tester) async {
     await open(tester);
 
-    expect(find.text(_openText), findsOneWidget);
     expect(toggle(tester).value, isTrue);
 
     await tester.tap(find.bySemanticsLabel('开放注册'));
     await tester.pumpAndSettle();
 
     expect(api.registrationCalls, [false]);
-    expect(find.text(_closedText), findsOneWidget);
     expect(toggle(tester).value, isFalse);
     expect(notices, isEmpty);
   });
 
-  testWidgets('closed registration is explained and the switch opens it', (
-    tester,
-  ) async {
+  testWidgets('closed registration shows the switch off, and the switch opens '
+      'it', (tester) async {
     api.registrationOpen = false;
     await open(tester);
 
-    expect(find.text(_closedText), findsOneWidget);
+    expect(toggle(tester).value, isFalse);
 
     await tester.tap(find.bySemanticsLabel('开放注册'));
     await tester.pumpAndSettle();
 
     expect(api.registrationCalls, [true]);
-    expect(find.text(_openText), findsOneWidget);
+    expect(toggle(tester).value, isTrue);
     expect(notices, isEmpty);
   });
 
@@ -128,7 +121,7 @@ void main() {
     await tester.tap(find.text('重试'));
     await tester.pumpAndSettle();
 
-    expect(find.text(_openText), findsOneWidget);
+    expect(toggle(tester).value, isTrue);
   });
 
   testWidgets('a switch without an answer says the result is unknown', (

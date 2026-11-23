@@ -70,7 +70,7 @@ class _AccountsGroupState extends ConsumerState<AccountsGroup> {
       case MutationFailed(:final message) || MutationNotSent(:final message):
         widget.onNotice(ToastKind.failure, message);
       case MutationUnknown():
-        widget.onNotice(ToastKind.warning, '结果未知：密码可能已经重置，请再重置一次以拿到新密码。');
+        widget.onNotice(ToastKind.warning, '没能确认是否已重置，再重置一次就能拿到新密码。');
     }
   }
 
@@ -85,13 +85,6 @@ class _AccountsGroupState extends ConsumerState<AccountsGroup> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            '按用户名查找。用户忘记密码时，可以在这里重置。',
-            style: AlistenTypography.secondary.copyWith(
-              color: colors.onGlassMuted,
-            ),
-          ),
-          const SizedBox(height: AlistenSpacing.md),
           AlistenTextField(
             controller: _username,
             label: '用户名',

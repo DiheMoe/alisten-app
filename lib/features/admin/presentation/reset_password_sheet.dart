@@ -64,10 +64,7 @@ class ResetPasswordSheet extends StatelessWidget {
           onPressed: () => unawaited(_copy()),
         ),
         const SizedBox(height: AlistenSpacing.sm),
-        const InlineMessage(
-          text: '只显示这一次，请转告用户。这个账号在所有设备上都已退出登录。',
-          tone: StatusTone.warning,
-        ),
+        const InlineMessage(text: '只显示这一次', tone: StatusTone.warning),
       ],
     );
   }

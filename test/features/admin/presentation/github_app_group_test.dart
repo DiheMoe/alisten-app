@@ -19,13 +19,11 @@ import '../admin_test_doubles.dart';
 
 const _callback = 'https://example.com:8443/api/auth/github/callback';
 const _offText =
-    '在 GitHub 的 Settings → Developer settings → OAuth Apps 新建一个 OAuth App，'
-    '填好下面的 Client ID 和 Client Secret 就会开启。';
-const _onText = '用户可以用 GitHub 登录、注册和绑定账号。';
+    '在 GitHub 的 Settings → Developer settings → OAuth Apps 新建 OAuth App，'
+    '填好 Client ID 和 Client Secret 即可开启。';
 const _closeMessage =
-    '关闭后，不能再用 GitHub 登录、注册或绑定，已经绑定的 GitHub 保持绑定。'
-    '只绑定了 GitHub 的账号，关闭之后就无法用 GitHub 登录，重新开启之前也无法在'
-    '其他设备上登录。';
+    '关闭后不能再用 GitHub 登录、注册或绑定。只绑定了 GitHub 的账号，重新开启前'
+    '没法在新设备上登录。';
 const _notLoadedText = '暂时无法获取 GitHub 登录的配置。';
 const _enabled = GithubAppStatus(
   clientId: 'Iv1.abc',
@@ -149,7 +147,7 @@ void main() {
     await open(tester);
 
     expect(find.text('已开启'), findsOneWidget);
-    expect(find.text(_onText), findsOneWidget);
+    expect(find.text(_offText), findsNothing);
     expect(find.widgetWithText(PillButton, '修改'), findsOneWidget);
     expect(find.widgetWithText(PillButton, '关闭 GitHub 登录'), findsOneWidget);
   });
@@ -178,7 +176,7 @@ void main() {
     await open(tester);
     await tap(tester, find.widgetWithText(PillButton, '开启'));
     expect(find.text('GitHub OAuth App'), findsOneWidget);
-    expect(find.text('保存后不会再显示。'), findsOneWidget);
+    expect(find.text('保存后不再显示'), findsOneWidget);
     // 组里的“开启”在前，面板里的在后。
     final submit = find.widgetWithText(PillButton, '开启').last;
     bool enabled() => tester.widget<PillButton>(submit).onPressed != null;
@@ -214,7 +212,7 @@ void main() {
       tester.widget<EditableText>(_field('Client ID')).controller.text,
       'Iv1.abc',
     );
-    expect(find.text('已设置。已保存的不会显示，保存时要和 Client ID 一起重新填写。'), findsOneWidget);
+    expect(find.text('修改时要重新填写'), findsOneWidget);
     await tester.enterText(_field('Client Secret'), 'secret-2');
     await tester.pump();
     // 后台首页的品牌名也有“保存”按钮，面板中的在其之后。

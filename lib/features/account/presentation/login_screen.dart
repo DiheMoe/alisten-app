@@ -100,7 +100,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         children: [
           if (inRoom) ...[
-            Text('登录后会重新进入当前房间；有密码的房间需要再输入一次房间密码。', style: note),
+            Text('登录后会重新进入房间，有密码的房间要再输一次密码。', style: note),
             const SizedBox(height: AlistenSpacing.md),
           ],
           GlassPanel(

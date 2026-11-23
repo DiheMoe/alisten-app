@@ -377,7 +377,7 @@ void main() {
     expect(api.savedCookies, hasLength(1));
     expect(api.getYoutubeCookieCalls, read + 1);
     expect(_cookieField, findsNothing);
-    expect(notices, [(ToastKind.warning, '结果未知，请确认状态后再决定是否重新填写。')]);
+    expect(notices, [(ToastKind.warning, '没能确认是否保存，已重新读取')]);
   });
 
   testWidgets('cookies being saved keep the sheet open until the answer', (
@@ -508,7 +508,7 @@ void main() {
     await tap(tester, find.text('清除'));
     await tap(tester, find.text('清除').last);
 
-    expect(notices, [(ToastKind.warning, '结果未知，请确认状态后再决定是否重试。')]);
+    expect(notices, [(ToastKind.warning, '没能确认是否已清除，已重新读取')]);
   });
 
   testWidgets('a clear the server could not finish asks for the status to be '
@@ -526,7 +526,7 @@ void main() {
     await tap(tester, find.text('清除'));
     await tap(tester, find.text('清除').last);
 
-    expect(notices, [(ToastKind.warning, '结果未知，请确认状态后再决定是否重试。')]);
+    expect(notices, [(ToastKind.warning, '没能确认是否已清除，已重新读取')]);
     expect(api.deleteYoutubeCookieCalls, 1);
     expect(api.getYoutubeCookieCalls, read + 1);
   });

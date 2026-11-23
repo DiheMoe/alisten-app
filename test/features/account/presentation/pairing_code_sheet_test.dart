@@ -105,7 +105,7 @@ void main() {
       tester.getSemantics(find.text('5:00 后失效')),
       isSemantics(isLiveRegion: false),
     );
-    expect(find.text('在新设备上扫描二维码，或者在登录页点“输入配对码”。配对码只能用一次。'), findsOneWidget);
+    expect(find.text('用新设备扫码，或在登录页点“输入配对码”。只能用一次。'), findsOneWidget);
 
     now += 1000;
     await tester.pump(const Duration(seconds: 1));

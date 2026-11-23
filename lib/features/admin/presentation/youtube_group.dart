@@ -16,7 +16,7 @@ import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const _clearUnknownText = '结果未知，请确认状态后再决定是否重试。';
+const _clearUnknownText = '没能确认是否已清除，已重新读取';
 
 class YoutubeGroup extends ConsumerStatefulWidget {
   const YoutubeGroup({required this.onNotice, super.key});

@@ -17,15 +17,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const _offText =
-    '在 GitHub 的 Settings → Developer settings → OAuth Apps 新建一个 OAuth App，'
-    '填好下面的 Client ID 和 Client Secret 就会开启。';
-const _onText = '用户可以用 GitHub 登录、注册和绑定账号。';
+    '在 GitHub 的 Settings → Developer settings → OAuth Apps 新建 OAuth App，'
+    '填好 Client ID 和 Client Secret 即可开启。';
 const _callbackNote = 'OAuth App 的 Authorization callback URL 填这个地址。';
 const _closeMessage =
-    '关闭后，不能再用 GitHub 登录、注册或绑定，已经绑定的 GitHub 保持绑定。'
-    '只绑定了 GitHub 的账号，关闭之后就无法用 GitHub 登录，重新开启之前也无法在'
-    '其他设备上登录。';
-const _closeUnknownText = '结果未知，请确认状态后再决定是否重试。';
+    '关闭后不能再用 GitHub 登录、注册或绑定。只绑定了 GitHub 的账号，重新开启前'
+    '没法在新设备上登录。';
+const _closeUnknownText = '没能确认是否已关闭，已重新读取';
 
 class GithubAppGroup extends ConsumerStatefulWidget {
   const GithubAppGroup({required this.onNotice, super.key});
@@ -128,8 +126,10 @@ class _GithubAppGroupState extends ConsumerState<GithubAppGroup>
                 ),
               ),
             ),
-            const SizedBox(height: AlistenSpacing.xxs),
-            Text(status.enabled ? _onText : _offText, style: note),
+            if (!status.enabled) ...[
+              const SizedBox(height: AlistenSpacing.xxs),
+              Text(_offText, style: note),
+            ],
             const SizedBox(height: AlistenSpacing.md),
             Row(
               children: [

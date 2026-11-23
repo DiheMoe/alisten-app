@@ -15,7 +15,7 @@ import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const _unknownText = '结果未知，请确认状态后再决定是否重新填写。';
+const _unknownText = '没能确认是否保存，已重新读取';
 
 Future<void> showGithubAppSheet(
   BuildContext context, {
@@ -157,10 +157,7 @@ class _GithubAppSheetState extends ConsumerState<GithubAppSheet> {
             onSubmitted: (_) => unawaited(_save()),
           ),
           const SizedBox(height: AlistenSpacing.xxs),
-          Text(
-            secretSet ? '已设置。已保存的不会显示，保存时要和 Client ID 一起重新填写。' : '保存后不会再显示。',
-            style: note,
-          ),
+          Text(secretSet ? '修改时要重新填写' : '保存后不再显示', style: note),
           if (problem != null) ...[
             const SizedBox(height: AlistenSpacing.sm),
             InlineMessage(text: problem),

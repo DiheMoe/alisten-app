@@ -15,7 +15,6 @@ import 'package:alisten/features/settings/index.dart';
 import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
-import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/alisten_toggle.dart';
@@ -264,34 +263,12 @@ void main() {
     );
     await _show(tester, _recordToggle);
     expect(_recordSwitch(tester).value, isFalse);
-    expect(find.text('保存在服务器上'), findsOneWidget);
 
     await tester.tap(_recordToggle);
     await tester.pumpAndSettle();
 
     expect(api.listenRecordingWrites, [true]);
     expect(_recordSwitch(tester).value, isTrue);
-  });
-
-  testWidgets('the play history switch of an account says the devices of the '
-      'account share it', (tester) async {
-    await _openSettings(
-      tester,
-      at: SettingsSection.privacy,
-      api: FakeAlistenApi()
-        ..account = const Account(username: 'mao', github: false),
-      credentials: FakeCredentialStore()..memberToken = 'account-token',
-    );
-    await _show(tester, _recordToggle);
-
-    final description = find.text('存在服务器上，同一账号的设备共用');
-    expect(description, findsOneWidget);
-    expect(find.text('保存在服务器上'), findsNothing);
-    // 一行放得下，不在行尾单独剩下一个字。
-    expect(
-      tester.getSize(description).height,
-      lessThan(2 * AlistenTypography.secondary.fontSize!),
-    );
   });
 
   testWidgets('a play history switch the server refuses goes back and says '
@@ -339,7 +316,7 @@ void main() {
     await tester.tap(_recordToggle);
     await tester.pumpAndSettle();
 
-    expect(find.text('结果未知，已重新读取这项设置。'), findsOneWidget);
+    expect(find.text('没能确认是否保存，已重新读取'), findsOneWidget);
     expect(_recordSwitch(tester).value, isFalse);
   });
 
@@ -383,7 +360,6 @@ void main() {
 
     expect(_recordSwitch(tester).value, isTrue);
     expect(_recordSwitch(tester).onChanged, isNotNull);
-    expect(find.text('保存在服务器上'), findsOneWidget);
     expect(find.text('没有读到这项设置'), findsNothing);
     expect(find.text('重试'), findsNothing);
     expect(api.createMemberCalls, 0);
@@ -471,7 +447,7 @@ void main() {
     api.getMeResult!.complete(FakeAlistenApi.member);
     await tester.pumpAndSettle();
 
-    expect(find.text('保存在服务器上'), findsOneWidget);
+    expect(find.text('正在读取…'), findsNothing);
     expect(_recordSwitch(tester).value, isFalse);
     expect(_recordSwitch(tester).onChanged, isNotNull);
   });

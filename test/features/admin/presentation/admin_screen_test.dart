@@ -162,7 +162,6 @@ void main() {
 
     expect(find.text('站点管理'), findsOneWidget);
     expect(find.text('livehouse.dihe.moe'), findsOneWidget);
-    expect(find.text('管理 token 只保存在内存中，退出后台后需要重新输入。'), findsOneWidget);
     final field = tester.widget<EditableText>(_field('管理 token'));
     expect(field.obscureText, isTrue);
     expect(field.autofillHints, isNull);
@@ -455,7 +454,7 @@ void main() {
     );
 
     expect(tester.widget<EditableText>(field).controller.text, '16');
-    expect(find.text('只影响之后新建的临时房间，已经建好的保持原来的人数。'), findsOneWidget);
+    expect(find.text('只对之后新建的临时房间生效'), findsOneWidget);
 
     await tester.enterText(field, '200');
     await tester.ensureVisible(save);

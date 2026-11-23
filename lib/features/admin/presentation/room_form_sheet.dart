@@ -20,9 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const _everyoneVerifiesAgainText = '房间里的所有人都需要重新验证。';
-const _youDisconnectTooText = '你也会断开，需要重新输入密码。';
-const _unknownText = '结果未知，请查看列表确认后再决定是否重试。';
+const _unknownText = '没能确认是否保存，已重新读取';
 
 /// [room] 为 null 时新建常驻房间，人数上限从 [capacity] 开始。
 Future<void> showRoomFormSheet(
@@ -202,7 +200,7 @@ class _RoomFormSheetState extends ConsumerState<RoomFormSheet> {
               }
               return Text(
                 slug.isEmpty
-                    ? '不填别名时，邀请链接使用房间 ID'
+                    ? '不填就用房间 ID'
                     : '邀请链接：${config.inviteLinkFor(slug)}',
                 style: muted,
               );
@@ -228,9 +226,7 @@ class _RoomFormSheetState extends ConsumerState<RoomFormSheet> {
                 return InlineMessage(text: problem);
               }
               return Text(
-                room == null
-                    ? '$roomCapacityMin 到 $roomCapacityMax 人，同一个人开几台设备只算一人'
-                    : '改了立即生效。调低时不会让已经在房间里的人断开，新来的人要等人数降下来才进得来。',
+                '$roomCapacityMin 到 $roomCapacityMax 人',
                 style: muted,
               );
             },
@@ -317,9 +313,7 @@ class _RoomFormSheetState extends ConsumerState<RoomFormSheet> {
         const SizedBox(height: AlistenSpacing.sm),
         InlineMessage(
           tone: StatusTone.warning,
-          text: here
-              ? '$_everyoneVerifiesAgainText$_youDisconnectTooText'
-              : _everyoneVerifiesAgainText,
+          text: here ? '房间里的人都要重新输入密码，包括你' : '房间里的人都要重新输入密码',
         ),
       ],
     ];

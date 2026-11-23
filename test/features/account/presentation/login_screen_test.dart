@@ -172,7 +172,7 @@ void main() {
     tester,
   ) async {
     await pumpLogin(tester, inRoom: true);
-    expect(find.text('登录后会重新进入当前房间；有密码的房间需要再输入一次房间密码。'), findsOneWidget);
+    expect(find.text('登录后会重新进入房间，有密码的房间要再输一次密码。'), findsOneWidget);
   });
 
   group('the register entry', () {

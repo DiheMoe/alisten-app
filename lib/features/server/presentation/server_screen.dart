@@ -84,7 +84,7 @@ class _ServerScreenState extends ConsumerState<ServerScreen> {
     final confirmed = await showConfirmSheet(
       context,
       title: '删除 $name？',
-      message: '会删除这台设备在这个服务器上的身份和房间票据。',
+      message: '删除后，这台设备在这个服务器上会变成新游客，有密码的房间要重新输入密码。',
       confirmLabel: '删除',
       confirmIcon: AlistenIcons.trash,
     );

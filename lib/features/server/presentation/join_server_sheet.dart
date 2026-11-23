@@ -76,7 +76,7 @@ class _JoinServerSheetState extends State<_JoinServerSheet> {
         ),
         const SizedBox(height: AlistenSpacing.xs),
         Text(
-          '将以下面的昵称和邮箱加入，之后可以在设置里修改。邮箱只用来显示 Gravatar 头像。',
+          '邮箱只用来显示 Gravatar 头像。',
           style: AlistenTypography.body.copyWith(color: colors.onGlassMuted),
         ),
         const SizedBox(height: AlistenSpacing.lg),

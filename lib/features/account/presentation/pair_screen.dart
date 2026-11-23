@@ -136,7 +136,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
             Text('这台设备已经登录了账号。要换成其他账号，先在设置里退出登录。', style: note)
           else ...[
             if (inRoom) ...[
-              Text('登录后会重新进入当前房间；有密码的房间需要再输入一次房间密码。', style: note),
+              Text('登录后会重新进入房间，有密码的房间要再输一次密码。', style: note),
               const SizedBox(height: AlistenSpacing.md),
             ],
             GlassPanel(
@@ -150,8 +150,8 @@ class _PairScreenState extends ConsumerState<PairScreen> {
             ),
             const SizedBox(height: AlistenSpacing.md),
             Text(
-              '在已登录的设备上打开设置，点“在新设备上登录”就能看到配对码。'
-              '只输入你自己生成的配对码：登录之后，这台设备上的操作都属于那个账号。',
+              '配对码在已登录设备的“设置 → 账号 → 在新设备上登录”里。'
+              '别输入别人给你的配对码。',
               style: note,
             ),
           ],

@@ -184,7 +184,7 @@ void main() {
     expect(find.text('设置用户名和密码'), findsOneWidget);
     expect(find.text('修改密码'), findsNothing);
     expect(find.text('解绑 GitHub'), findsOneWidget);
-    expect(find.text('已绑定。先设置用户名和密码，才能解绑。'), findsOneWidget);
+    expect(find.text('先设置用户名和密码才能解绑'), findsOneWidget);
     expect(
       tester.getSemantics(find.text('解绑 GitHub')),
       isSemantics(hasEnabledState: true, isEnabled: false),
@@ -300,7 +300,6 @@ void main() {
           tester.getTopLeft(find.text(title)).dy,
       ];
       expect(tops, [...tops]..sort());
-      expect(find.text('绑定之后，可以用 GitHub 登录这个账号。'), findsOneWidget);
     });
 
     testWidgets('a bound account with a username can unbind', (tester) async {
@@ -309,7 +308,6 @@ void main() {
       await signedIn(const Account(username: 'mao', github: true));
       await pumpActions(tester);
 
-      expect(find.text('已绑定，可以用 GitHub 登录这个账号。'), findsOneWidget);
       expect(
         tester.getSemantics(find.text('解绑 GitHub')),
         isSemantics(hasEnabledState: true, isEnabled: true),

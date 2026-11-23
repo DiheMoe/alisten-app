@@ -181,7 +181,7 @@ void main() {
       expect(_inRow(LoginSource.netease, '未登录'), findsOneWidget);
       expect(_inRow(LoginSource.netease, '扫码登录'), findsOneWidget);
       expect(_inRow(LoginSource.qq, 'QQ 音乐'), findsOneWidget);
-      expect(_inRow(LoginSource.qq, '已保存登录信息，未经 QQ 音乐核实'), findsOneWidget);
+      expect(_inRow(LoginSource.qq, '已保存登录，没能向 QQ 音乐确认'), findsOneWidget);
       expect(_inRow(LoginSource.qq, '账号 ID：7'), findsOneWidget);
       expect(_inRow(LoginSource.qq, '重新登录'), findsOneWidget);
       expect(_inRow(LoginSource.bilibili, 'B 站'), findsOneWidget);

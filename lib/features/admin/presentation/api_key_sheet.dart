@@ -22,13 +22,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 const _notFound = 'NOT_FOUND';
 // 服务端重置 Key 后会通知断开用旧 Key 打开的事件流；通知发送失败时回复失败，
 // 这些事件流仍然连着。
-const _resetLostText =
-    'Key 已重置，但没有收到新 Key，请再重置一次。旧 Key 已不能发起新请求，'
-    '但已经连上的 bot 可能还没有断开。';
-const _generateLostText = 'Key 已生成，但没有收到它，请再生成一次。';
+const _resetLostText = 'Key 已重置，但新 Key 没有送到，请再重置一次。';
+const _generateLostText = 'Key 已生成，但没有送到，请再生成一次。';
 const _mayBeInvalidText = '旧 Key 可能已经失效。';
-const _resetUnknownText = '结果未知，旧 Key 可能已经失效。请确认生成时间后再决定是否重置。';
-const _generateUnknownText = '结果未知，请确认状态后再决定是否生成。';
+const _resetUnknownText = '没能确认是否已重置，已重新读取';
+const _generateUnknownText = '没能确认是否已生成，已重新读取';
 const _resetMaybeTakenText = 'Key 可能已经重置，旧 Key 可能已失效。';
 const _generateMaybeTakenText = 'Key 可能已经生成，需要时请再生成一次。';
 const _closeUncopiedText = '还没有复制 Key，关闭后不能再查看。确定关闭？';
@@ -84,9 +82,7 @@ class _ApiKeySheetState extends ConsumerState<ApiKeySheet> {
     final confirmed = await showConfirmSheet(
       context,
       title: generated ? '重置 API Key？' : '生成 API Key？',
-      message: generated
-          ? '重置后旧 Key 立即失效，正在使用它的 bot 需要换成新 Key。'
-          : '新 Key 只显示一次，生成后请立即复制。',
+      message: generated ? '重置后旧 Key 立即失效。' : '新 Key 只显示一次。',
       confirmLabel: generated ? '重置' : '生成',
       confirmIcon: AlistenIcons.key,
     );

@@ -32,12 +32,10 @@ const _internal = ApiException(
   status: 500,
 );
 
-const _resetLost =
-    'Key 已重置，但没有收到新 Key，请再重置一次。旧 Key 已不能发起新请求，'
-    '但已经连上的 bot 可能还没有断开。';
+const _resetLost = 'Key 已重置，但新 Key 没有送到，请再重置一次。';
 
-const _everyoneVerifiesAgain = '房间里的所有人都需要重新验证。';
-const _youDisconnectToo = '你也会断开，需要重新输入密码。';
+const _everyoneVerifiesAgain = '房间里的人都要重新输入密码';
+const _youDisconnectToo = '包括你';
 
 // 后台首页的品牌名也有“保存”按钮，面板中的在其之后。
 final _save = find.text('保存').last;
@@ -315,7 +313,7 @@ void main() {
       await open(tester);
 
       await tap(tester, find.text('新建常驻房间'));
-      expect(find.text('不填别名时，邀请链接使用房间 ID'), findsOneWidget);
+      expect(find.text('不填就用房间 ID'), findsOneWidget);
 
       await tester.enterText(_field('别名（可选）'), 'late-night');
       await tester.pump();
@@ -323,7 +321,7 @@ void main() {
         find.text('邀请链接：https://livehouse.dihe.moe/r/late-night'),
         findsOneWidget,
       );
-      expect(find.text('不填别名时，邀请链接使用房间 ID'), findsNothing);
+      expect(find.text('不填就用房间 ID'), findsNothing);
     });
 
     testWidgets('a new room is created with the password given, and the '
@@ -356,7 +354,7 @@ void main() {
       String capacity() =>
           tester.widget<EditableText>(_formCapacity).controller.text;
       expect(capacity(), '32');
-      expect(find.text('2 到 128 人，同一个人开几台设备只算一人'), findsOneWidget);
+      expect(find.text('2 到 128 人'), findsOneWidget);
       await tester.enterText(_field('房间名称'), '小厅');
       await tester.enterText(_formCapacity, '200');
       expect(capacity(), '200');
@@ -373,16 +371,14 @@ void main() {
       expect(find.text('在线 0 / 24 人'), findsOneWidget);
     });
 
-    testWidgets('a capacity changed says it applies at once and lets nobody '
-        'go', (tester) async {
+    testWidgets('a capacity changed is sent and shown in the list', (
+      tester,
+    ) async {
       await open(tester);
       await act(tester, '编辑');
 
       expect(tester.widget<EditableText>(_formCapacity).controller.text, '16');
-      expect(
-        find.text('改了立即生效。调低时不会让已经在房间里的人断开，新来的人要等人数降下来才进得来。'),
-        findsOneWidget,
-      );
+      expect(find.text('2 到 128 人'), findsOneWidget);
       await tester.enterText(_formCapacity, '8');
       await tap(tester, _save);
 
@@ -491,7 +487,7 @@ void main() {
 
       expect(api.updates, hasLength(1));
       expect(find.text('编辑常驻房间'), findsNothing);
-      expect(notices, [(ToastKind.warning, '结果未知，请查看列表确认后再决定是否重试。')]);
+      expect(notices, [(ToastKind.warning, '没能确认是否保存，已重新读取')]);
     });
 
     testWidgets('a room turned away for coming too often says so in the '
@@ -611,7 +607,7 @@ void main() {
 
     expect(api.createdDrafts, hasLength(1));
     expect(_field('房间名称'), findsNothing);
-    expect(notices, [(ToastKind.warning, '结果未知，请查看列表确认后再决定是否重试。')]);
+    expect(notices, [(ToastKind.warning, '没能确认是否保存，已重新读取')]);
   });
 
   testWidgets('a deletion without an answer asks for the list to be checked', (
@@ -623,7 +619,7 @@ void main() {
     await act(tester, '删除');
     await tap(tester, find.text('删除'));
 
-    expect(notices, [(ToastKind.warning, '结果未知，请查看列表确认房间是否已删除。')]);
+    expect(notices, [(ToastKind.warning, '没能确认是否已删除，已重新读取')]);
   });
 
   testWidgets('deleting again a room already gone says it is deleted and the '
@@ -831,7 +827,7 @@ void main() {
 
       await reset(tester, label: '重置');
 
-      expect(find.text('结果未知，旧 Key 可能已经失效。请确认生成时间后再决定是否重置。'), findsOneWidget);
+      expect(find.text('没能确认是否已重置，已重新读取'), findsOneWidget);
       expect(find.textContaining('服务器出错了'), findsNothing);
     });
 
@@ -881,7 +877,7 @@ void main() {
       await tap(tester, find.text('生成 API Key'));
       await tap(tester, find.text('生成'));
 
-      expect(find.text('Key 已生成，但没有收到它，请再生成一次。'), findsOneWidget);
+      expect(find.text('Key 已生成，但没有送到，请再生成一次。'), findsOneWidget);
       expect(find.textContaining('旧 Key'), findsNothing);
     });
 
@@ -915,7 +911,7 @@ void main() {
 
       await tap(tester, find.text('重置 API Key'));
       expect(find.text('重置 API Key？'), findsOneWidget);
-      expect(find.text('重置后旧 Key 立即失效，正在使用它的 bot 需要换成新 Key。'), findsOneWidget);
+      expect(find.text('重置后旧 Key 立即失效。'), findsOneWidget);
       await tap(tester, find.text('重置'));
 
       expect(find.text('k-new'), findsOneWidget);
@@ -949,7 +945,7 @@ void main() {
 
       await tap(tester, find.text('生成 API Key'));
       expect(find.text('生成 API Key？'), findsOneWidget);
-      expect(find.text('新 Key 只显示一次，生成后请立即复制。'), findsOneWidget);
+      expect(find.text('新 Key 只显示一次。'), findsOneWidget);
       await tap(tester, find.text('生成'));
 
       expect(api.resetApiKeyCalls, 1);
@@ -985,7 +981,7 @@ void main() {
       await tap(tester, find.text('重置 API Key'));
       await tap(tester, find.text('重置'));
 
-      expect(find.text('结果未知，旧 Key 可能已经失效。请确认生成时间后再决定是否重置。'), findsOneWidget);
+      expect(find.text('没能确认是否已重置，已重新读取'), findsOneWidget);
       expect(api.getApiKeyStatusCalls, read + 1);
       expect(find.text('k-new'), findsNothing);
     });

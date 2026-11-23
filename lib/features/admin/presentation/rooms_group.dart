@@ -23,7 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const _unknownText = '结果未知，请查看列表确认房间是否已删除。';
+const _unknownText = '没能确认是否已删除，已重新读取';
 
 class RoomsGroup extends ConsumerStatefulWidget {
   const RoomsGroup({

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:alisten/features/admin/application/admin_session.dart';
 import 'package:alisten/features/admin/application/admin_sign_in_controller.dart';
 import 'package:alisten/features/server/index.dart';
-import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
@@ -42,7 +41,6 @@ class _AdminTokenPageState extends ConsumerState<AdminTokenPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = AlistenColors.of(context);
     final signIn = ref.watch(adminSignInControllerProvider);
     final notice = ref.watch(
       adminSessionProvider.select((session) => session.notice),
@@ -73,13 +71,6 @@ class _AdminTokenPageState extends ConsumerState<AdminTokenPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  '管理 token 只保存在内存中，退出后台后需要重新输入。',
-                  style: AlistenTypography.secondary.copyWith(
-                    color: colors.onGlassMuted,
-                  ),
-                ),
-                const SizedBox(height: AlistenSpacing.md),
                 AlistenTextField(
                   controller: _token,
                   label: '管理 token',

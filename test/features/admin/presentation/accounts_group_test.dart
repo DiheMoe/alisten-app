@@ -14,7 +14,7 @@ import '../../server/server_test_doubles.dart';
 import '../admin_test_doubles.dart';
 
 const _password = 'reset-secret-password';
-const _once = '只显示这一次，请转告用户。这个账号在所有设备上都已退出登录。';
+const _once = '只显示这一次';
 
 void main() {
   late FakeAdminApi api;
@@ -198,6 +198,6 @@ void main() {
     await tap(tester, find.text('重置密码'));
     await tap(tester, find.text('重置密码').last);
 
-    expect(notices, [(ToastKind.warning, '结果未知：密码可能已经重置，请再重置一次以拿到新密码。')]);
+    expect(notices, [(ToastKind.warning, '没能确认是否已重置，再重置一次就能拿到新密码。')]);
   });
 }

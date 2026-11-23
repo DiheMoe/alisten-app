@@ -174,7 +174,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
           children: [
             SettingRow(
               title: '开播提醒',
-              description: '自己点的歌等待至少 30 秒后开播时提醒',
+              description: '点的歌轮到时提醒',
               trailing: AlistenToggle(
                 value: settings.reminders,
                 semanticLabel: '开播提醒',
@@ -266,7 +266,7 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
       case MutationFailed(:final message) || MutationNotSent(:final message):
         widget.onNotice(ToastKind.failure, message);
       case MutationUnknown():
-        widget.onNotice(ToastKind.warning, '结果未知，已重新读取这项设置。');
+        widget.onNotice(ToastKind.warning, '没能确认是否保存，已重新读取');
     }
   }
 
@@ -304,7 +304,6 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
             if (settings.recordSearch)
               SettingRow(
                 title: '最近搜索保留条数',
-                description: '只存在这台设备上',
                 trailing: SelectMenuButton<int>(
                   label: '最近搜索保留条数',
                   options: [
@@ -344,7 +343,6 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
     }
     return SettingRow(
       title: title,
-      description: identity.account == null ? '保存在服务器上' : '存在服务器上，同一账号的设备共用',
       trailing: AlistenToggle(
         value: _recordListens ?? identity.recordListens,
         semanticLabel: title,
@@ -696,7 +694,6 @@ class _Permission extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = AlistenColors.of(context);
     final (label, icon, tone) = switch (permission) {
       NotificationPermission.granted => (
         '已允许',
@@ -736,15 +733,6 @@ class _Permission extends StatelessWidget {
               ),
             ],
           ),
-          if (permission == NotificationPermission.denied) ...[
-            const SizedBox(height: AlistenSpacing.xxs),
-            Text(
-              '系统拒绝后，要在系统设置里重新允许。',
-              style: AlistenTypography.secondary.copyWith(
-                color: colors.onGlassMuted,
-              ),
-            ),
-          ],
           if (permission != NotificationPermission.granted) ...[
             const SizedBox(height: AlistenSpacing.sm),
             PillButton(

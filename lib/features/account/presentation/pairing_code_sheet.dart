@@ -161,7 +161,7 @@ class _PairingCodeSheetState extends ConsumerState<PairingCodeSheet> {
         style: note,
       ),
       const SizedBox(height: AlistenSpacing.md),
-      Text('在新设备上扫描二维码，或者在登录页点“输入配对码”。配对码只能用一次。', style: note),
+      Text('用新设备扫码，或在登录页点“输入配对码”。只能用一次。', style: note),
     ];
   }
 

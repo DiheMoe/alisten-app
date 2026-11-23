@@ -18,7 +18,7 @@ void main() {
       LoginSource.qq,
     );
 
-    expect(view.status, '已保存登录信息，未识别到账号');
+    expect(view.status, '已保存登录，没认出是哪个账号');
     expect(view.details, isEmpty);
   });
 
@@ -43,9 +43,9 @@ void main() {
       source,
     ).status;
 
-    expect(status(LoginSource.qq), '已保存登录信息，未经 QQ 音乐核实');
-    expect(status(LoginSource.bilibili), '已保存登录信息，未经 B 站核实');
-    expect(status(LoginSource.netease), '已保存登录信息，未经网易云音乐核实');
+    expect(status(LoginSource.qq), '已保存登录，没能向 QQ 音乐确认');
+    expect(status(LoginSource.bilibili), '已保存登录，没能向 B 站确认');
+    expect(status(LoginSource.netease), '已保存登录，没能向网易云音乐确认');
     expect(
       sourceAccountView(
         const SourceAccountStatus(saved: true, account: account),

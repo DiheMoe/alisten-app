@@ -68,7 +68,6 @@ class _LicensesScreenState extends ConsumerState<LicensesScreen> {
             (package: package, license: index),
       ],
     ];
-    final colors = AlistenColors.of(context);
     return CustomScrollView(
       slivers: [
         SliverPadding(
@@ -79,23 +78,9 @@ class _LicensesScreenState extends ConsumerState<LicensesScreen> {
             MediaQuery.paddingOf(context).bottom + AlistenSpacing.xl,
           ),
           sliver: SliverList.builder(
-            itemCount: rows.length + 1,
+            itemCount: rows.length,
             itemBuilder: (context, index) {
-              if (index == 0) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AlistenSpacing.xxs,
-                    vertical: AlistenSpacing.xs,
-                  ),
-                  child: Text(
-                    'Alisten 使用了下列开源软件和字体，点按名称查看许可全文。',
-                    style: AlistenTypography.secondary.copyWith(
-                      color: colors.onGlassMuted,
-                    ),
-                  ),
-                );
-              }
-              final (:package, :license) = rows[index - 1];
+              final (:package, :license) = rows[index];
               if (license == null) {
                 return _PackageHeader(
                   key: ValueKey('package ${package.package}'),

@@ -15,9 +15,6 @@ import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const _openText = '现在任何人都可以注册账号。关闭后不能再注册新账号，已有账号照常登录，游客照常使用。';
-const _closedText = '现在不能注册新账号。已有账号照常登录，游客照常使用。';
-
 class RegistrationGroup extends ConsumerStatefulWidget {
   const RegistrationGroup({required this.onNotice, super.key});
 
@@ -87,7 +84,6 @@ class _RegistrationGroupState extends ConsumerState<RegistrationGroup> {
         if (open != null)
           SettingRow(
             title: '开放注册',
-            description: open ? _openText : _closedText,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

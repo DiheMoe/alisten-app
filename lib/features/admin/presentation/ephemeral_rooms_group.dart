@@ -69,7 +69,7 @@ class _EphemeralRoomsGroupState extends ConsumerState<EphemeralRoomsGroup> {
       case MutationFailed(:final message) || MutationNotSent(:final message):
         setState(() => _problem = message);
       case MutationUnknown():
-        widget.onNotice(ToastKind.warning, '结果未知，请确认最多人数后再决定是否重试。');
+        widget.onNotice(ToastKind.warning, '没能确认是否保存，已重新读取');
     }
   }
 
@@ -108,7 +108,7 @@ class _EphemeralRoomsGroupState extends ConsumerState<EphemeralRoomsGroup> {
           ),
           const SizedBox(height: AlistenSpacing.xs),
           Text(
-            '只影响之后新建的临时房间，已经建好的保持原来的人数。',
+            '只对之后新建的临时房间生效',
             style: AlistenTypography.secondary.copyWith(
               color: colors.onGlassMuted,
             ),
