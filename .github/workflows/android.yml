@@ -1,0 +1,106 @@
+name: android
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+    secrets:
+      ANDROID_KEYSTORE_BASE64:
+        required: true
+      ANDROID_KEYSTORE_PASSWORD:
+        required: true
+      ANDROID_KEY_ALIAS:
+        required: true
+      ANDROID_KEY_PASSWORD:
+        required: true
+    outputs:
+      cert-sha256:
+        value: ${{ jobs.build.outputs.cert-sha256 }}
+
+env:
+  RELEASE_CERT_SHA256: 60a8c967ced85bacd55db1cefc1c3ffcb6515dc1a1701a10147747e8b0df6894
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: release
+    outputs:
+      cert-sha256: ${{ env.RELEASE_CERT_SHA256 }}
+    env:
+      VERSION: ${{ inputs.version }}
+      APK_ARM64: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+      APK_ARMV7: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: .fvmrc
+          cache: true
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      # 由 ci.yml 的 android-cache 在 master 上存下，键和路径要与它一致。
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/android-sdk-extra
+          key: android-${{ runner.os }}-${{ hashFiles('.fvmrc', 'pubspec.lock', 'android/**/*.gradle*', 'android/gradle.properties', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: android-${{ runner.os }}-
+      - name: Install cached Android SDK packages
+        run: |
+          if [ -d ~/android-sdk-extra ]; then
+            cp -a ~/android-sdk-extra/. "$ANDROID_HOME"/
+          fi
+      - run: flutter pub get --enforce-lockfile
+      - name: Build signed APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          keystore="$RUNNER_TEMP/release.jks"
+          trap 'rm -f "$keystore" android/key.properties' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          {
+            echo "storeFile=$keystore"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+          flutter build apk --release --split-per-abi \
+            --target-platform android-arm,android-arm64 \
+            --split-debug-info=build/symbols
+      - name: Check APK certificate
+        run: |
+          latest_build_tools="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)"
+          apksigner="${latest_build_tools}apksigner"
+          for apk in "$APK_ARM64" "$APK_ARMV7"; do
+            digests="$("$apksigner" verify --print-certs "$apk" \
+              | sed -n 's/^.*Signer.* certificate SHA-256 digest: //p' | sort -u)"
+            if [ "$digests" != "$RELEASE_CERT_SHA256" ]; then
+              echo "$apk is not signed with the release certificate only" >&2
+              exit 1
+            fi
+          done
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist/symbols
+          cp "$APK_ARM64" "dist/Alisten-$VERSION-arm64-v8a.apk"
+          cp "$APK_ARMV7" "dist/Alisten-$VERSION-armeabi-v7a.apk"
+          cp build/symbols/app.android-arm.symbols dist/symbols/
+          cp build/symbols/app.android-arm64.symbols dist/symbols/
+          cp build/app/outputs/mapping/release/mapping.txt dist/symbols/android-mapping.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-android
+          path: dist/
+          if-no-files-found: error
+          retention-days: 3

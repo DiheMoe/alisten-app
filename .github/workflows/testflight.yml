@@ -1,22 +1,28 @@
 name: testflight
 
-# Optional TestFlight publishing: skipped automatically when the ASC secrets
-# are not configured, so it does not affect other maintainers.
-# Trigger: manual run only.
 on:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-concurrency:
-  group: testflight-${{ github.ref }}
-  cancel-in-progress: false
+  workflow_call:
+    secrets:
+      APPLE_CERT_P12:
+        required: false
+      APPLE_CERT_PASSWORD:
+        required: false
+      APPLE_PROFILE:
+        required: false
+      ASC_KEY_ID:
+        required: false
+      ASC_ISSUER_ID:
+        required: false
+      ASC_KEY_P8:
+        required: false
+      ASC_TEAM:
+        required: false
 
 jobs:
-  testflight:
+  upload:
     runs-on: macos-26
     timeout-minutes: 30
+    environment: release
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
@@ -122,9 +128,10 @@ jobs:
         env:
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+          KEY_P8: ${{ secrets.ASC_KEY_P8 }}
         run: |
           mkdir -p private_keys
-          printf '%s' "${{ secrets.ASC_KEY_P8 }}" > "private_keys/AuthKey_${KEY_ID}.p8"
+          printf '%s' "$KEY_P8" > "private_keys/AuthKey_${KEY_ID}.p8"
           xcrun altool --upload-app --type ios \
             -f build/ios/ipa/*.ipa \
             --apiKey "$KEY_ID" --apiIssuer "$ISSUER"
