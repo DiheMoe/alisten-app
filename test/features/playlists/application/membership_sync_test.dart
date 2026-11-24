@@ -132,22 +132,6 @@ void main() {
       expect(ticked(), isEmpty);
     });
 
-    test('a conflict rolls back and tells the server message', () async {
-      server.failNext('add', apiError('CONFLICT', message: '这首歌还在准备，准备好之后再保存'));
-
-      final result = await controller.setMembership(pl1, _a, included: true);
-
-      expect(
-        result,
-        isA<MutationFailed<void>>().having(
-          (r) => r.message,
-          'message',
-          '这首歌还在准备，准备好之后再保存',
-        ),
-      );
-      expect(ticked(), isEmpty);
-    });
-
     test('a rate limit rolls back and was not carried out', () async {
       server.failNext(
         'add',

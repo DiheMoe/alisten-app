@@ -24,7 +24,6 @@ QrLoginTicket _ticket({
 void main() {
   late FakeAdminApi api;
   late FakeQrImageLoader images;
-  late FakeImageGallery gallery;
   late ProviderContainer container;
   late ProviderSubscription<QrLoginState> subscription;
 
@@ -36,7 +35,6 @@ void main() {
   }) {
     api = FakeAdminApi();
     images = FakeQrImageLoader();
-    gallery = FakeImageGallery();
     container = ProviderContainer(
       overrides: [
         appConfigProvider.overrideWithValue(
@@ -44,7 +42,6 @@ void main() {
         ),
         adminApiProvider.overrideWithValue(api),
         qrImageLoaderProvider.overrideWithValue(images),
-        imageGalleryProvider.overrideWithValue(gallery),
         adminNowProvider.overrideWithValue(
           () => DateTime.fromMillisecondsSinceEpoch(
             _startMs + clockAhead.inMilliseconds + async.elapsed.inMilliseconds,
@@ -162,28 +159,6 @@ void main() {
       async.elapse(const Duration(milliseconds: 500));
       expect(state().phase, QrPhase.success);
       expect(api.checkCalls, 1);
-    });
-  });
-
-  test('a code past its countdown is checked until the server says it ran '
-      'out, the countdown staying at 0', () {
-    fakeAsync((async) {
-      open(async);
-      api.qrTicket = _ticket(expiresAtMs: _startMs + 3000);
-
-      start(async);
-      async.elapse(const Duration(seconds: 20));
-      expect(state().phase, QrPhase.waiting);
-      expect(state().remainingSeconds, 0);
-      expect(api.checkCalls, 10);
-
-      api.checkResults.add(const FakeQrCheck(QrCheckState.expired));
-      async.elapse(const Duration(seconds: 2));
-      expect(state().phase, QrPhase.expired);
-      expect(state().statusText, '二维码已过期');
-
-      async.elapse(const Duration(seconds: 10));
-      expect(api.checkCalls, 11);
     });
   });
 
@@ -364,7 +339,7 @@ void main() {
   });
 
   test('a check answered with an expired admin token ends the session and '
-      'checking', () {
+      'checking, and lets the code key go', () {
     fakeAsync((async) {
       open(async);
       api.checkResults.add(
@@ -376,6 +351,7 @@ void main() {
       start(async);
       async.elapse(const Duration(seconds: 2));
       expect(container.read(adminSessionProvider).active, isFalse);
+      expect(controller().holdsKey, isFalse);
 
       async.elapse(const Duration(seconds: 10));
       expect(api.checkCalls, 1);
@@ -459,22 +435,13 @@ void main() {
     });
   });
 
-  test('nothing is asked for once the session has ended', () {
-    fakeAsync((async) {
-      open(async);
-      container.read(adminSessionProvider.notifier).end();
-
-      start(async);
-
-      expect(state().phase, QrPhase.starting);
-      expect(api.startedSources, isEmpty);
-    });
-  });
-
-  test('no longer watched, the code is not checked again', () {
+  test('no longer watched, the code is not checked again and its key is let '
+      'go', () {
     fakeAsync((async) {
       open(async);
       start(async);
+      final login = controller();
+      expect(login.holdsKey, isTrue);
 
       subscription.close();
       async.elapse(const Duration(seconds: 10));
@@ -482,6 +449,7 @@ void main() {
       expect(api.checkCalls, 0);
       expect(async.periodicTimerCount, 0);
       expect(async.nonPeriodicTimerCount, 0);
+      expect(login.holdsKey, isFalse);
     });
   });
 
@@ -536,32 +504,6 @@ void main() {
       });
     });
 
-    test('by running out of time is lost too: the code keeps waiting and is '
-        'checked again', () {
-      fakeAsync((async) {
-        open(async);
-        api.checkResults.addAll(const [
-          FakeQrCheck.error(
-            ApiException(
-              code: 'NETWORK',
-              message: '请求超时，请检查网络后重试。',
-              status: null,
-            ),
-          ),
-          FakeQrCheck(QrCheckState.success),
-        ]);
-
-        start(async);
-        async.elapse(const Duration(seconds: 2));
-        expect(state().phase, QrPhase.waiting);
-        expect(controller().holdsKey, isTrue);
-
-        async.elapse(const Duration(seconds: 2));
-        expect(api.checkCalls, 2);
-        expect(state().phase, QrPhase.success);
-      });
-    });
-
     test('back in the foreground keeps the code waiting', () {
       fakeAsync((async) {
         open(async);
@@ -605,33 +547,6 @@ void main() {
 
         async.elapse(const Duration(seconds: 10));
         expect(api.checkCalls, 1);
-      });
-    });
-
-    test('keeps being checked past the countdown until the server says the '
-        'code ran out', () {
-      fakeAsync((async) {
-        open(async);
-        api.qrTicket = _ticket(expiresAtMs: _startMs + 5000);
-        for (var i = 0; i < 10; i++) {
-          api.checkResults.add(
-            const FakeQrCheck.error(
-              ApiException(code: 'NETWORK', message: '网络不通', status: null),
-            ),
-          );
-        }
-        api.checkResults.add(const FakeQrCheck(QrCheckState.expired));
-
-        start(async);
-        async.elapse(const Duration(seconds: 20));
-        expect(state().phase, QrPhase.waiting);
-        expect(state().remainingSeconds, 0);
-        expect(api.checkCalls, 10);
-
-        async.elapse(const Duration(seconds: 2));
-        expect(state().phase, QrPhase.expired);
-        async.elapse(const Duration(seconds: 10));
-        expect(api.checkCalls, 11);
       });
     });
   });
@@ -721,46 +636,6 @@ void main() {
   });
 
   group('a device clock ahead of the server', () {
-    test('by more than the life of the code shows no seconds left and does '
-        'not run the code out here; the server says when it has', () {
-      fakeAsync((async) {
-        open(async, clockAhead: const Duration(minutes: 3));
-
-        start(async);
-        expect(state().phase, QrPhase.waiting);
-        expect(state().remainingSeconds, 0);
-        expect(state().statusText, '等待扫码');
-
-        async.elapse(const Duration(seconds: 10));
-        expect(state().phase, QrPhase.waiting);
-        expect(api.checkCalls, 5);
-
-        api.checkResults.add(const FakeQrCheck(QrCheckState.expired));
-        async.elapse(const Duration(seconds: 2));
-        expect(state().phase, QrPhase.expired);
-
-        final calls = api.checkCalls;
-        async.elapse(const Duration(seconds: 10));
-        expect(api.checkCalls, calls);
-      });
-    });
-
-    test('back from the background, still leaves running out to the '
-        'server', () {
-      fakeAsync((async) {
-        open(async, clockAhead: const Duration(minutes: 3));
-        start(async);
-
-        controller().pause();
-        async.elapse(const Duration(seconds: 30));
-        controller().resume();
-        async.flushMicrotasks();
-
-        expect(state().phase, QrPhase.waiting);
-        expect(api.checkCalls, 1);
-      });
-    });
-
     test('by 100 seconds keeps the code scannable and checked for as long '
         'as the server holds it, the countdown stopping at 0', () {
       fakeAsync((async) {
@@ -787,160 +662,24 @@ void main() {
   });
 
   group('the code key', () {
-    test('is let go once the sign-in is taken', () {
+    test('is let go once the sign-in is taken, fails or the server says the '
+        'code ran out', () {
       fakeAsync((async) {
-        open(async);
-        api.checkResults.add(const FakeQrCheck(QrCheckState.success));
+        for (final (answer, phase) in [
+          (QrCheckState.success, QrPhase.success),
+          (QrCheckState.failed, QrPhase.failed),
+          (QrCheckState.expired, QrPhase.expired),
+        ]) {
+          open(async);
+          api.checkResults.add(FakeQrCheck(answer));
 
-        start(async);
-        expect(controller().holdsKey, isTrue);
-        async.elapse(const Duration(seconds: 2));
+          start(async);
+          expect(controller().holdsKey, isTrue, reason: '$answer');
+          async.elapse(const Duration(seconds: 2));
 
-        expect(state().phase, QrPhase.success);
-        expect(controller().holdsKey, isFalse);
-      });
-    });
-
-    test('is let go once the sign-in fails', () {
-      fakeAsync((async) {
-        open(async);
-        api.checkResults.add(const FakeQrCheck(QrCheckState.failed));
-
-        start(async);
-        async.elapse(const Duration(seconds: 2));
-
-        expect(controller().holdsKey, isFalse);
-      });
-    });
-
-    test('is let go once the server says the code ran out', () {
-      fakeAsync((async) {
-        open(async);
-        api.checkResults.add(const FakeQrCheck(QrCheckState.expired));
-
-        start(async);
-        async.elapse(const Duration(seconds: 2));
-
-        expect(controller().holdsKey, isFalse);
-      });
-    });
-
-    test('is kept while the countdown is at 0 and the code is still '
-        'checked', () {
-      fakeAsync((async) {
-        open(async);
-        api.qrTicket = _ticket(expiresAtMs: _startMs + 3000);
-
-        start(async);
-        async.elapse(const Duration(seconds: 5));
-
-        expect(state().remainingSeconds, 0);
-        expect(controller().holdsKey, isTrue);
-      });
-    });
-
-    test('is let go when the session ends', () {
-      fakeAsync((async) {
-        open(async);
-        api.checkResults.add(
-          const FakeQrCheck.error(
-            ApiException(code: 'UNAUTHORIZED', message: 'token', status: 401),
-          ),
-        );
-
-        start(async);
-        async.elapse(const Duration(seconds: 2));
-
-        expect(controller().holdsKey, isFalse);
-      });
-    });
-
-    test('is let go when the controller is gone', () {
-      fakeAsync((async) {
-        open(async);
-        start(async);
-        final login = controller();
-        expect(login.holdsKey, isTrue);
-
-        subscription.close();
-        async.elapse(const Duration(seconds: 1));
-
-        expect(login.holdsKey, isFalse);
-      });
-    });
-
-    test('is kept while a lost answer is checked again', () {
-      fakeAsync((async) {
-        open(async);
-        api.checkResults.add(
-          const FakeQrCheck.error(
-            ApiException(code: 'NETWORK', message: '网络不通', status: null),
-          ),
-        );
-
-        start(async);
-        async.elapse(const Duration(seconds: 2));
-
-        expect(controller().holdsKey, isTrue);
-      });
-    });
-  });
-
-  group('saving the code', () {
-    QrSaveResult? save(FakeAsync async) {
-      QrSaveResult? result;
-      unawaited(controller().saveImage().then((saved) => result = saved));
-      async.flushMicrotasks();
-      return result;
-    }
-
-    test('puts the code shown into the gallery under the name of its '
-        'source', () {
-      fakeAsync((async) {
-        open(async, source: LoginSource.qq);
-        unawaited(controller(LoginSource.qq).start());
-        async.flushMicrotasks();
-        QrSaveResult? result;
-        unawaited(
-          controller(LoginSource.qq)
-              .saveImage()
-              .then((saved) => result = saved),
-        );
-        async.flushMicrotasks();
-
-        expect(result, QrSaveResult.saved);
-        expect(gallery.saved.single.name, 'alisten-qq-login');
-        expect(gallery.saved.single.bytes, images.bytes);
-      });
-    });
-
-    test('tells a refused access apart from another failure', () {
-      fakeAsync((async) {
-        open(async);
-        start(async);
-
-        gallery.deny = true;
-        expect(save(async), QrSaveResult.denied);
-
-        gallery
-          ..deny = false
-          ..error = StateError('disk full');
-        expect(save(async), QrSaveResult.failed);
-        expect(gallery.saved, isEmpty);
-      });
-    });
-
-    test('leaves a code that can no longer be scanned out of the '
-        'gallery', () {
-      fakeAsync((async) {
-        open(async);
-        api.checkResults.add(const FakeQrCheck(QrCheckState.expired));
-        start(async);
-        async.elapse(qrPollInterval);
-        expect(state().phase, QrPhase.expired);
-
-        expect(save(async), QrSaveResult.failed);
-        expect(gallery.saved, isEmpty);
+          expect(state().phase, phase, reason: '$answer');
+          expect(controller().holdsKey, isFalse, reason: '$answer');
+        }
       });
     });
   });

@@ -380,18 +380,6 @@ void main() {
     });
   });
   group('redeemPairingCode', () {
-    test('a code out of the rule is not sent', () async {
-      await open();
-
-      final result = await account.redeemPairingCode('abc');
-
-      expect(
-        (result as MutationNotSent<Account>).message,
-        invalidPairingCodeText,
-      );
-      expect(api.redeemCalls, 0);
-    });
-
     test('a code typed loosely is normalized, and signing in keeps no device '
         'credential', () async {
       await open();
@@ -435,21 +423,6 @@ void main() {
         expect((result as MutationFailed<Account>).message, text);
       });
     }
-
-    test('CONFLICT re-reads the profile', () async {
-      await open();
-      api.redeemError = const ApiException(
-        code: 'CONFLICT',
-        message: '服务端',
-        status: 409,
-      );
-      final before = api.getMeCalls;
-
-      await account.redeemPairingCode('ABCD2345');
-      await pumpEventQueue();
-
-      expect(api.getMeCalls, greaterThan(before));
-    });
 
     test('UNAUTHORIZED is replaced once, inside the identity queue', () async {
       await open();

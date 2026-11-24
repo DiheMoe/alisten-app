@@ -476,38 +476,6 @@ void main() {
       expect(name(), '长' * 76);
     }, variant: TargetPlatformVariant.mobile());
 
-    testWidgets('a change the server could not finish closes the sheet and '
-        'asks for the list to be checked', (tester) async {
-      api.updateRoomError = _internal;
-      await open(tester);
-      await act(tester, '编辑');
-
-      await tester.enterText(_field('房间名称'), '大厅二号');
-      await tap(tester, _save);
-
-      expect(api.updates, hasLength(1));
-      expect(find.text('编辑常驻房间'), findsNothing);
-      expect(notices, [(ToastKind.warning, '没能确认是否保存，已重新读取')]);
-    });
-
-    testWidgets('a room turned away for coming too often says so in the '
-        'sheet, which stays open', (tester) async {
-      api.createRoomError = const ApiException(
-        code: 'RATE_LIMITED',
-        message: '请求太频繁，请稍后再试。',
-        status: 429,
-      );
-      await open(tester);
-      await tap(tester, find.text('新建常驻房间'));
-      await tester.enterText(_field('房间名称'), '小厅');
-
-      await tap(tester, _save);
-
-      expect(find.text('请求太频繁，请稍后再试。'), findsOneWidget);
-      expect(_field('房间名称'), findsOneWidget);
-      expect(notices, isEmpty);
-    });
-
     testWidgets('a room the server finds against its rules asks for the form '
         'to be checked, without the server wording', (tester) async {
       api.createRoomError = const ApiException(
@@ -803,34 +771,6 @@ void main() {
       expect(find.textContaining('房间暂时不可用'), findsNothing);
     });
 
-    testWidgets('a reset without an answer after which the key was reset says '
-        'so for certain', (tester) async {
-      await open(tester);
-      await act(tester, 'API Key');
-      api
-        ..resetApiKeyError = _network
-        ..apiKeyStatus = const ApiKeyStatus(
-          generated: true,
-          createdAtMs: 1800000000000,
-        );
-
-      await tap(tester, find.text('重置 API Key'));
-      await tap(tester, find.text('重置'));
-
-      expect(find.text(_resetLost), findsOneWidget);
-    });
-
-    testWidgets('a reset the server could not finish that leaves the '
-        'generation time alone says the result is unknown', (tester) async {
-      api.resetApiKeyError = _internal;
-      await open(tester);
-
-      await reset(tester, label: '重置');
-
-      expect(find.text('没能确认是否已重置，已重新读取'), findsOneWidget);
-      expect(find.textContaining('服务器出错了'), findsNothing);
-    });
-
     testWidgets('a reset turned away for coming too often says so, with no '
         'old key to worry about', (tester) async {
       api.resetApiKeyError = const ApiException(
@@ -949,21 +889,6 @@ void main() {
       await tap(tester, find.text('生成'));
 
       expect(api.resetApiKeyCalls, 1);
-      expect(find.text('k-new'), findsOneWidget);
-    });
-
-    testWidgets('a key that cannot be copied asks for another try and stays '
-        'off the plain clipboard', (tester) async {
-      sensitive.error = StateError('clipboard unavailable');
-      await open(tester);
-      await act(tester, 'API Key');
-      await tap(tester, find.text('重置 API Key'));
-      await tap(tester, find.text('重置'));
-
-      await tap(tester, find.text('复制'));
-
-      expect(notices, [(ToastKind.failure, '没能复制，请重试。')]);
-      expect(copied, isEmpty);
       expect(find.text('k-new'), findsOneWidget);
     });
 

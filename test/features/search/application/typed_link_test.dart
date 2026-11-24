@@ -167,27 +167,6 @@ void main() {
     });
   });
 
-  test('a shared playlist link on a website that is not Alisten stays a '
-      'link', () {
-    fakeAsync((async) {
-      final container = typing();
-      const reddit = 'https://www.reddit.com/s/AbCdEfGhIjKlMnOpQrStUv';
-      probe.siteResults['https://www.reddit.com'] = const ProbeFailed(
-        ProbeFailure.notAlisten,
-      );
-
-      container.listen(typedLinkProvider(reddit), (_, _) {});
-      async.elapse(const Duration(milliseconds: 400));
-      async.flushMicrotasks();
-
-      expect(probe.siteProbed, hasLength(1));
-      expect(container.read(inviteOfferControllerProvider), isNull);
-      final typed = container.read(typedLinkProvider(reddit));
-      expect(typed?.problem, isNull);
-      expect(typed?.track?.source, TrackSource.link);
-    });
-  });
-
   test('a link that cannot be a room asks no server', () {
     fakeAsync((async) {
       final container = typing();

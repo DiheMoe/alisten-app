@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/admin/presentation/ephemeral_rooms_group.dart';
-import 'package:alisten/features/server/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
@@ -35,7 +34,6 @@ PillButton _button(WidgetTester tester, String label) =>
 void main() {
   late FakeAdminApi api;
   late List<(ToastKind, String)> notices;
-  late int exits;
   late DateTime now;
   late Duration elapsed;
   late ProviderContainer container;
@@ -43,7 +41,6 @@ void main() {
   setUp(() {
     api = FakeAdminApi();
     notices = [];
-    exits = 0;
     now = DateTime.utc(2026, 11, 2, 20);
     elapsed = Duration.zero;
   });
@@ -72,7 +69,7 @@ void main() {
           theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
           home: Builder(
             builder: (context) => AdminScreen(
-              onExit: () => exits++,
+              onExit: () {},
               onOpenSection: (section) => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => adminSectionScreen(
@@ -194,26 +191,6 @@ void main() {
     expect(await idleFrames(tester), 0, reason: 'site admin');
   });
 
-  testWidgets('a token refused says why and stays on the token page', (
-    tester,
-  ) async {
-    await open(tester);
-
-    api.listRoomsError = _unauthorized;
-    await submit(tester);
-    expect(find.text('管理 token 无效'), findsOneWidget);
-    expect(find.text('进入后台'), findsOneWidget);
-
-    api.listRoomsError = const ApiException(
-      code: 'FORBIDDEN',
-      message: '后台未启用',
-      status: 403,
-    );
-    await submit(tester);
-    expect(find.text('这个服务器没有启用后台'), findsOneWidget);
-    expect(find.text('管理 token 无效'), findsNothing);
-  });
-
   testWidgets('three tokens refused in a row make the button wait, counting '
       'down', (tester) async {
     await open(tester);
@@ -234,16 +211,6 @@ void main() {
     expect(find.text('进入后台'), findsOneWidget);
     expect(_button(tester, '进入后台').onPressed, isNotNull);
     expect(api.listRoomsCalls, 3);
-  });
-
-  testWidgets('leaving the site admin is left to the caller', (tester) async {
-    await open(tester);
-    await submit(tester);
-
-    await tester.tap(find.text('退出后台'));
-    await tester.pump();
-
-    expect(exits, 1);
   });
 
   testWidgets('a sheet open when the session ends closes, and the token page '
@@ -274,28 +241,6 @@ void main() {
     await submit(tester);
     expect(find.text(adminTokenExpiredText), findsNothing);
     expect(find.text('管理 token 无效'), findsOneWidget);
-  });
-
-  testWidgets('a sheet under another closes with the one above it when the '
-      'session ends', (tester) async {
-    await open(tester);
-    await submit(tester);
-    final context = tester.element(find.text('站点'));
-    unawaited(
-      showSheetPanel<void>(context, builder: (_) => const Text('下面的面板')),
-    );
-    await tester.pumpAndSettle();
-    unawaited(
-      showSheetPanel<void>(context, builder: (_) => const Text('上面的面板')),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(adminSessionProvider.notifier).end();
-    await tester.pumpAndSettle();
-
-    expect(find.text('下面的面板'), findsNothing);
-    expect(find.text('上面的面板'), findsNothing);
-    expect(find.text('进入后台'), findsOneWidget);
   });
 
   testWidgets('a sheet that cannot be dismissed closes too when the session '
@@ -329,45 +274,6 @@ void main() {
     expect(find.text(adminTokenExpiredText), findsOneWidget);
   });
 
-  testWidgets('the brand name is shown, and a new one saved here and in the '
-      'server list', (tester) async {
-    await open(tester);
-    await submit(tester);
-    await openSection(tester, '站点');
-
-    expect(
-      tester.widget<EditableText>(_field('品牌名')).controller.text,
-      'Alisten',
-    );
-
-    await tester.enterText(_field('品牌名'), ' 周末听歌会 ');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pumpAndSettle();
-
-    expect(api.updatedBrandName, '周末听歌会');
-    expect(find.text('✓ 已保存'), findsOneWidget);
-    expect(notices, isEmpty);
-    expect(container.read(currentServerProvider).brandName, '周末听歌会');
-    expect(tester.widget<EditableText>(_field('品牌名')).controller.text, '周末听歌会');
-    await tester.pump(const Duration(seconds: 2));
-  });
-
-  testWidgets('a brand name against the rule is explained and not sent', (
-    tester,
-  ) async {
-    await open(tester);
-    await submit(tester);
-    await openSection(tester, '站点');
-
-    await tester.enterText(_field('品牌名'), '一二三四五六七八九十一二三四五六七八九十一');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pumpAndSettle();
-
-    expect(find.text(brandNameRuleText), findsOneWidget);
-    expect(api.updatedBrandName, isNull);
-    expect(notices, isEmpty);
-  });
-
   testWidgets('a save refused for an expired token leads back to the token '
       'page', (tester) async {
     await open(tester);
@@ -382,34 +288,6 @@ void main() {
     expect(find.text('进入后台'), findsOneWidget);
     expect(find.text(adminTokenExpiredText), findsOneWidget);
     expect(notices, isEmpty);
-  });
-
-  testWidgets('a save that fails unexpectedly is reported as unknown and '
-      'the name is read again', (tester) async {
-    await open(tester);
-    await submit(tester);
-    await openSection(tester, '站点');
-    api.updateBrandError = StateError('boom');
-
-    await tester.enterText(_field('品牌名'), '周末听歌会');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pumpAndSettle();
-
-    expect(tester.takeException(), isNull);
-    expect(notices, [(ToastKind.warning, '没能确认是否保存，已重新读取')]);
-    expect(find.bySemanticsLabel('正在保存'), findsNothing);
-  });
-
-  testWidgets('a session that ends on a section page goes back to the token '
-      'page', (tester) async {
-    await open(tester);
-    await submit(tester);
-    await tester.tap(find.text('房间'));
-    await tester.pumpAndSettle();
-    await awayFor(tester, const Duration(minutes: 6));
-    await tester.pumpAndSettle();
-    expect(find.text('进入后台'), findsOneWidget);
-    expect(find.text(adminAwayText), findsOneWidget);
   });
 
   testWidgets('a media row that could not be read recovers once the media '

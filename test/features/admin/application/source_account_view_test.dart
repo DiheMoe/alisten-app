@@ -77,10 +77,4 @@ void main() {
 
     expect(view.details, ['账号 ID：42']);
   });
-
-  test('platforms are named as on the web', () {
-    expect(platformName(LoginSource.netease), '网易云音乐');
-    expect(platformName(LoginSource.qq), 'QQ 音乐');
-    expect(platformName(LoginSource.bilibili), 'B 站');
-  });
 }

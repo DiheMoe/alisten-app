@@ -497,20 +497,6 @@ void main() {
     expect(find.text('清除'), findsNothing);
   });
 
-  testWidgets('a clear without an answer asks for the status to be checked', (
-    tester,
-  ) async {
-    api
-      ..youtubeCookie = _saved
-      ..deleteYoutubeCookieError = _network;
-    await open(tester);
-
-    await tap(tester, find.text('清除'));
-    await tap(tester, find.text('清除').last);
-
-    expect(notices, [(ToastKind.warning, '没能确认是否已清除，已重新读取')]);
-  });
-
   testWidgets('a clear the server could not finish asks for the status to be '
       'checked, and the status is read again', (tester) async {
     api

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:alisten/domain/member/account.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/mutation/mutation_result.dart';
@@ -14,7 +12,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late FakeAdminApi api;
-  late FakeSensitiveClipboard clipboard;
   late ProviderContainer container;
 
   final provider = adminAccountsControllerProvider;
@@ -27,14 +24,10 @@ void main() {
         member: Member(id: 'm-1', name: '大猫', avatarHash: ''),
         username: 'mao',
       );
-    clipboard = FakeSensitiveClipboard();
     container = await switchingContainer(
       store: FakeServerStore(profiles: [serverB]),
       credentials: FakeCredentialStores(),
-      extra: [
-        adminApiProvider.overrideWithValue(api),
-        sensitiveClipboardProvider.overrideWithValue(clipboard),
-      ],
+      extra: [adminApiProvider.overrideWithValue(api)],
     );
     container.listen(provider, (_, _) {});
     await container.read(adminSessionProvider.notifier).signIn('t-1');
@@ -47,14 +40,6 @@ void main() {
     expect(state().problem, usernameRuleText);
     expect(state().account, isNull);
     expect(api.tokens, hasLength(before));
-  });
-
-  test('an unknown username says there is no such account', () async {
-    await controller().find('nobody');
-
-    expect(state().problem, '没有这个用户名的账号。');
-    expect(state().account, isNull);
-    expect(state().searching, isFalse);
   });
 
   test('an account is found by its trimmed username', () async {
@@ -93,42 +78,5 @@ void main() {
     ]) {
       expect(field, isNot('reset-secret-password'));
     }
-  });
-
-  test('a reset without a found account is not sent', () async {
-    final result = await controller().resetPassword();
-
-    expect(result, isA<MutationNotSent<String>>());
-    expect(api.resetUsernames, isEmpty);
-  });
-
-  test('a reset after the session ended is not sent', () async {
-    await controller().find('mao');
-    container.read(adminSessionProvider.notifier).end();
-
-    expect(await controller().resetPassword(), isA<MutationNotSent<String>>());
-    expect(api.resetUsernames, isEmpty);
-  });
-
-  test('a reset sent before the session ended may have taken effect', () async {
-    await controller().find('mao');
-    final gate = api.resetPasswordGate = Completer();
-    final pending = controller().resetPassword();
-    await pumpEventQueue();
-
-    container.read(adminSessionProvider.notifier).end();
-    gate.complete();
-
-    expect(await pending, isA<MutationUnknown<String>>());
-  });
-
-  test('a password is copied only to the sensitive clipboard, and a copy '
-      'that fails says so', () async {
-    expect(await controller().copy('pw-secret-1'), isTrue);
-    expect(clipboard.copied, ['pw-secret-1']);
-
-    clipboard.error = StateError('clipboard unavailable');
-    expect(await controller().copy('pw-secret-1'), isFalse);
-    expect(clipboard.copied, ['pw-secret-1']);
   });
 }

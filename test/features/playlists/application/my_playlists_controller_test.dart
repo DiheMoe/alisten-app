@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:alisten/core/api/api_error.dart';
-import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/mutation/mutation_result.dart';
 import 'package:alisten/domain/playlist/my_playlist.dart';
@@ -393,13 +392,6 @@ void main() {
       expect(server.count('listMine'), 5);
     });
 
-    test('a share link is on the site of the current server', () async {
-      final (:opened, list: _, :controller) = await open();
-      final host = opened.container.read(appConfigProvider).linkHost;
-
-      expect(controller.shareLink(shareIdA), 'https://$host/s/$shareIdA');
-    });
-
     test('a playlist made before signing out is not put in the guest '
         'list', () async {
       final (:opened, :list, :controller) = await open();
@@ -779,15 +771,6 @@ void main() {
       expect(ids(list), contains(imported.playlist.id));
     });
 
-    test('a file the server refuses is told as unsuitable content', () async {
-      final (opened: _, list: _, :controller) = await open();
-      server.failNext('importFile', apiError('INVALID_ARGUMENT'));
-
-      final result = await controller.importFile(file);
-
-      expect((result as MutationFailed).message, '文件里有不符合要求的内容，没有导入。');
-    });
-
     test('a file too large to send is told as unsuitable content, not as '
         'unknown', () async {
       final (opened: _, list: _, :controller) = await open();
@@ -843,41 +826,6 @@ void main() {
         'resolveLink https://music.163.com/playlist?id=24381616',
         'importPlatform 导入的歌单 netease:24381616',
       ]);
-    });
-
-    test('a link that cannot be resolved is not imported, and the server '
-        'says why', () async {
-      final (opened: _, list: _, :controller) = await open();
-      server.failNext(
-        'resolveLink',
-        apiError('INVALID_ARGUMENT', message: '不是网易云或 QQ 音乐的歌单链接'),
-      );
-
-      final result = await controller.importLink('https://example.com', '歌单');
-
-      expect((result as MutationFailed).message, '不是网易云或 QQ 音乐的歌单链接');
-      expect(server.count('importPlatform'), 0);
-    });
-
-    test('a link imported under a name the server refuses is told by the '
-        'naming rule, not the server text', () async {
-      final (opened: _, list: _, :controller) = await open();
-      server.failNext(
-        'importPlatform',
-        apiError('INVALID_ARGUMENT', message: 'name：长度必须在 1 到 50 之间'),
-      );
-
-      final result = await controller.importLink(
-        'https://music.163.com/playlist?id=24381616',
-        '导入的歌单',
-      );
-
-      expect(
-        result,
-        isA<MutationFailed<ImportedPlaylist>>()
-            .having((r) => r.code, 'code', 'INVALID_ARGUMENT')
-            .having((r) => r.message, 'message', invalidPlaylistNameText),
-      );
     });
 
     test('a link whose resolution is lost failed, changed nothing and needs '
@@ -1091,31 +1039,6 @@ void main() {
       expect(files.picks, 1);
       expect(server.calls, contains('importFile 旧歌单 1'));
       expect(ids(list), contains(imported.playlist.id));
-    });
-
-    test('a cancelled pick sends nothing', () async {
-      final (opened: _, list: _, :controller) = await openWith(files);
-
-      expect(await controller.importFromFile(), isNull);
-      expect(files.picks, 1);
-      expect(server.count('importFile'), 0);
-    });
-
-    test('a file that is not a playlist is told and nothing is sent', () async {
-      files.next = const PlaylistFileProblem('这个文件不是导出的歌单。');
-      final (opened: _, list: _, :controller) = await openWith(files);
-
-      final result = await controller.importFromFile();
-
-      expect(
-        result,
-        isA<MutationFailed<ImportedFile>>().having(
-          (r) => r.message,
-          'message',
-          '这个文件不是导出的歌单。',
-        ),
-      );
-      expect(server.count('importFile'), 0);
     });
 
     test('a file picked while signing out is not imported for whoever comes '

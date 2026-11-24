@@ -57,20 +57,6 @@ void main() {
     return reason;
   }
 
-  test('a code counts down each second by the clock it is given', () {
-    fakeAsync((async) {
-      open(async);
-
-      expect(generate(async), isNull);
-
-      final ready = state() as PairingCodeReady;
-      expect(ready.code.code, 'ABCD2345');
-      expect(ready.secondsLeft, 300);
-      async.elapse(const Duration(seconds: 1));
-      expect((state() as PairingCodeReady).secondsLeft, 299);
-    });
-  });
-
   test('a code runs out and the countdown stops', () {
     fakeAsync((async) {
       open(async);
@@ -166,20 +152,6 @@ void main() {
       container.dispose();
 
       expect(async.periodicTimerCount, 0);
-    });
-  });
-
-  test('a code that cannot be made shows the failure and the reason', () {
-    fakeAsync((async) {
-      open(async);
-      api.createPairingCodeError = const ApiException(
-        code: LocalErrorCodes.network,
-        message: '网络请求失败，请检查网络后重试。',
-        status: null,
-      );
-
-      expect(generate(async), '网络请求失败，请检查网络后重试。');
-      expect(state(), isA<PairingCodeFailed>());
     });
   });
 

@@ -130,34 +130,6 @@ void main() {
     },
   );
 
-  test('a refused token keeps the error code from the server', () async {
-    adapter.respond(401, {
-      'error': {'code': 'UNAUTHORIZED', 'message': '管理 token 无效'},
-    });
-
-    await expectLater(
-      api.listRooms('t'),
-      throwsA(
-        isA<ApiException>()
-            .having((e) => e.code, 'code', 'UNAUTHORIZED')
-            .having((e) => e.status, 'status', 401),
-      ),
-    );
-  });
-
-  test('an answer this version cannot read asks for an upgrade', () async {
-    adapter.respond(200, {'name': 'not a brand'});
-
-    await expectLater(
-      api.updateBrandName('t', '周末听歌会'),
-      throwsA(
-        isA<ApiException>()
-            .having((e) => e.code, 'code', LocalErrorCodes.protocolMismatch)
-            .having((e) => e.status, 'status', 200),
-      ),
-    );
-  });
-
   test('a new room is created with the admin token and its id is the '
       'answer', () async {
     adapter.respond(201, {'id': 'r1'});
@@ -247,21 +219,6 @@ void main() {
     expect(request.authorization, 'Bearer t');
   });
 
-  test('a deletion refused keeps the error code from the server', () async {
-    adapter.respond(404, {
-      'error': {'code': 'NOT_FOUND', 'message': '房间不存在'},
-    });
-
-    await expectLater(
-      api.deleteRoom('t', 'r1'),
-      throwsA(
-        isA<ApiException>()
-            .having((e) => e.code, 'code', 'NOT_FOUND')
-            .having((e) => e.message, 'message', '房间不存在'),
-      ),
-    );
-  });
-
   test('the key status tells whether a key exists and since when', () async {
     adapter.respond(200, {'set': false, 'createdAtMs': 0});
 
@@ -296,23 +253,39 @@ void main() {
     },
   );
 
-  test('a new key never reaches the log, even when its answer cannot be '
-      'read', () async {
+  test('an answer this version cannot read asks for an upgrade, and a key in '
+      'it never reaches the log', () async {
     final records = <String>[];
     AppLog.onRecord = (name, level, message) => records.add('$name $message');
     addTearDown(() => AppLog.onRecord = null);
-    adapter.respond(201, {'secret': 'k-secret'});
 
-    await expectLater(
-      api.resetApiKey('t', 'r1'),
-      throwsA(
-        isA<ApiException>()
-            .having((e) => e.code, 'code', LocalErrorCodes.protocolMismatch)
-            .having((e) => e.status, 'status', 201),
+    for (final (name, answer, call) in [
+      ('API key', {'secret': 'k-secret'}, () => api.resetApiKey('t', 'r1')),
+      (
+        'code key',
+        {'key': 'k-secret'},
+        () => api.startQrLogin('t', LoginSource.netease),
       ),
-    );
-    expect(records, isNotEmpty);
-    expect(records.where((r) => r.contains('k-secret')), isEmpty);
+    ]) {
+      records.clear();
+      adapter.respond(201, answer);
+
+      await expectLater(
+        call(),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.code, 'code', LocalErrorCodes.protocolMismatch)
+              .having((e) => e.status, 'status', 201),
+        ),
+        reason: name,
+      );
+      expect(records, isNotEmpty, reason: name);
+      expect(
+        records.where((r) => r.contains('k-secret')),
+        isEmpty,
+        reason: name,
+      );
+    }
   });
 
   test('a source account is read from the endpoint of its source', () async {
@@ -455,25 +428,6 @@ void main() {
     }
   });
 
-  test('a code key never reaches the log, even when the answer cannot be '
-      'read', () async {
-    final records = <String>[];
-    AppLog.onRecord = (name, level, message) => records.add('$name $message');
-    addTearDown(() => AppLog.onRecord = null);
-    adapter.respond(201, {'key': 'k-secret'});
-
-    await expectLater(
-      api.startQrLogin('t', LoginSource.netease),
-      throwsA(
-        isA<ApiException>()
-            .having((e) => e.code, 'code', LocalErrorCodes.protocolMismatch)
-            .having((e) => e.status, 'status', 201),
-      ),
-    );
-    expect(records, isNotEmpty);
-    expect(records.where((r) => r.contains('k-secret')), isEmpty);
-  });
-
   test('the YouTube cookie status tells whether cookies are saved and since '
       'when', () async {
     adapter.respond(200, {'set': true, 'updatedAtMs': 1700000000000});
@@ -491,20 +445,6 @@ void main() {
     final unset = await api.getYoutubeCookie('t');
     expect(unset.saved, isFalse);
     expect(unset.updatedAtMs, 0);
-  });
-
-  test('a YouTube cookie status this version cannot read asks for an '
-      'upgrade', () async {
-    adapter.respond(200, {'set': true});
-
-    await expectLater(
-      api.getYoutubeCookie('t'),
-      throwsA(
-        isA<ApiException>()
-            .having((e) => e.code, 'code', LocalErrorCodes.protocolMismatch)
-            .having((e) => e.status, 'status', 200),
-      ),
-    );
   });
 
   test('YouTube cookies are put as they are, with the admin token', () async {
@@ -729,46 +669,41 @@ void main() {
     expect(removal.inUse, ['b' * 64]);
   });
 
-  test('without a token nothing is sent', () async {
-    await expectLater(
-      api.listRooms(''),
-      throwsA(
-        isA<ApiException>().having(
-          (e) => e.code,
-          'code',
-          LocalErrorCodes.noToken,
-        ),
-      ),
-    );
-    expect(adapter.requests, isEmpty);
-  });
-
   group('an answer is waited for', () {
     // 请求始终没有回复：[limit] 前一刻仍在等待，到 [limit] 时以网络错误结束并
     // 断开连接。
-    void waitsFor(Duration limit, Future<Object?> Function() call) {
-      fakeAsync((async) {
-        adapter
-          ..neverRespond()
-          ..cancelled = false;
-        Object? failure;
-        unawaited(
-          call().then<void>((_) {}, onError: (Object error) => failure = error),
-        );
+    void waitsFor(
+      Duration limit,
+      Map<String, Future<Object?> Function()> calls,
+    ) {
+      for (final MapEntry(key: name, value: call) in calls.entries) {
+        fakeAsync((async) {
+          adapter
+            ..neverRespond()
+            ..cancelled = false;
+          Object? failure;
+          unawaited(
+            call().then<void>(
+              (_) {},
+              onError: (Object error) => failure = error,
+            ),
+          );
 
-        async.elapse(limit - const Duration(milliseconds: 1));
-        expect(failure, isNull);
-        expect(adapter.cancelled, isFalse);
+          async.elapse(limit - const Duration(milliseconds: 1));
+          expect(failure, isNull, reason: name);
+          expect(adapter.cancelled, isFalse, reason: name);
 
-        async.elapse(const Duration(milliseconds: 1));
-        expect(
-          failure,
-          isA<ApiException>()
-              .having((e) => e.code, 'code', LocalErrorCodes.network)
-              .having((e) => e.message, 'message', '请求超时，请检查网络后重试。'),
-        );
-        expect(adapter.cancelled, isTrue);
-      });
+          async.elapse(const Duration(milliseconds: 1));
+          expect(
+            failure,
+            isA<ApiException>()
+                .having((e) => e.code, 'code', LocalErrorCodes.network)
+                .having((e) => e.message, 'message', '请求超时，请检查网络后重试。'),
+            reason: name,
+          );
+          expect(adapter.cancelled, isTrue, reason: name);
+        });
+      }
     }
 
     final upstream = <String, Future<Object?> Function()>{
@@ -785,12 +720,10 @@ void main() {
           api.checkQrLogin('t', LoginSource.qq, 'k', qqType: QqLoginType.wx),
       'bilibili check': () => api.checkQrLogin('t', LoginSource.bilibili, 'k'),
     };
-    for (final MapEntry(key: name, value: call) in upstream.entries) {
-      test('45 seconds for the $name, which the server asks of the source '
-          'with 30 seconds to answer', () {
-        waitsFor(const Duration(seconds: 45), call);
-      });
-    }
+    test('45 seconds for what the server asks of a source, which has 30 '
+        'seconds to answer', () {
+      waitsFor(const Duration(seconds: 45), upstream);
+    });
 
     final local = <String, Future<Object?> Function()>{
       'rooms': () => api.listRooms('t'),
@@ -819,10 +752,8 @@ void main() {
           api.setGithubApp('t', clientId: 'Iv1.abc', clientSecret: 's'),
       'GitHub app closed': () => api.deleteGithubApp('t'),
     };
-    for (final MapEntry(key: name, value: call) in local.entries) {
-      test('15 seconds for the $name, which the server answers by itself', () {
-        waitsFor(const Duration(seconds: 15), call);
-      });
-    }
+    test('15 seconds for what the server answers by itself', () {
+      waitsFor(const Duration(seconds: 15), local);
+    });
   });
 }

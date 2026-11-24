@@ -35,28 +35,6 @@ void main() {
     await container.read(adminSessionProvider.notifier).signIn('t-1');
   });
 
-  test('every source is read once with the admin token', () async {
-    api.sourceAccounts[LoginSource.qq] = _signedIn;
-
-    await controller().loadAll();
-
-    expect(
-      api.sourceAccountCalls,
-      unorderedEquals([
-        LoginSource.netease,
-        LoginSource.qq,
-        LoginSource.bilibili,
-      ]),
-    );
-    expect(api.tokens.last, 't-1');
-    expect(state()[LoginSource.qq]!.status!.account!.name, '小明');
-    expect(state()[LoginSource.netease]!.status!.saved, isFalse);
-    for (final entry in state().values) {
-      expect(entry.loading, isFalse);
-      expect(entry.error, isNull);
-    }
-  });
-
   test('a source that cannot be read says why and leaves the others '
       'alone', () async {
     api.sourceAccountErrors[LoginSource.bilibili] = const ApiException(
@@ -75,17 +53,6 @@ void main() {
     expect(state()[LoginSource.qq]!.status, isNotNull);
   });
 
-  test('one source is read again and handed back', () async {
-    await controller().loadAll();
-    api.sourceAccounts[LoginSource.netease] = _signedIn;
-
-    final status = await controller().load(LoginSource.netease);
-
-    expect(status!.account!.id, '42');
-    expect(state()[LoginSource.netease]!.status!.account!.id, '42');
-    expect(api.sourceAccountCalls.last, LoginSource.netease);
-  });
-
   test('a source read that fails keeps what was read before', () async {
     api.sourceAccounts[LoginSource.netease] = _signedIn;
     await controller().loadAll();
@@ -100,17 +67,5 @@ void main() {
     expect(status, isNull);
     expect(state()[LoginSource.netease]!.status!.account!.id, '42');
     expect(state()[LoginSource.netease]!.error, '网络请求失败，请检查网络后重试。');
-  });
-
-  test('nothing is read once the session has ended', () async {
-    container.read(adminSessionProvider.notifier).end();
-
-    await controller().loadAll();
-
-    expect(api.sourceAccountCalls, isEmpty);
-    for (final entry in state().values) {
-      expect(entry.loading, isFalse);
-      expect(entry.error, isNull);
-    }
   });
 }

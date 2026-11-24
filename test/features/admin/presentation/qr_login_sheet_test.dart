@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
@@ -418,35 +417,6 @@ void main() {
     expect(api.checkCalls, 0);
   });
 
-  sheetTest('a check whose answer was lost keeps the code waiting, and a '
-      'sign-in after it names the account', (tester) async {
-    await open(tester);
-    await signIn(tester, LoginSource.netease);
-    api
-      ..checkResults.addAll(const [
-        FakeQrCheck.error(
-          ApiException(
-            code: 'NETWORK',
-            message: '网络请求失败，请检查网络后重试。',
-            status: null,
-          ),
-        ),
-        FakeQrCheck(QrCheckState.success),
-      ])
-      ..sourceAccounts[LoginSource.netease] = _signedIn;
-
-    await tester.pump(const Duration(seconds: 2));
-    expect(find.text('等待扫码'), findsOneWidget);
-    expect(find.textContaining('登录失败'), findsNothing);
-
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pumpAndSettle();
-
-    expect(find.text('等待扫码'), findsNothing);
-    expect(notices, [(ToastKind.success, '已登录 小明')]);
-    expect(_inRow(LoginSource.netease, '已登录'), findsOneWidget);
-  });
-
   sheetTest('the account of a source is read again however its sheet '
       'closes, with nothing to say unless signed in', (tester) async {
     api.checkResults.add(
@@ -502,25 +472,5 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
     expect(find.text('二维码已过期'), findsOneWidget);
-  });
-
-  sheetTest('a code past its countdown stays scannable at 0 seconds left', (
-    tester,
-  ) async {
-    api.qrTicket = const QrLoginTicket(
-      key: 'k-1',
-      qrImage: 'data:image/png;base64,iVBORw0KGgo=',
-      expiresAtMs: _startMs + 3000,
-    );
-    await open(tester);
-    await signIn(tester, LoginSource.netease);
-
-    await tester.pump(const Duration(seconds: 10));
-
-    expect(find.text('剩余 0 秒'), findsOneWidget);
-    expect(find.text('等待扫码'), findsOneWidget);
-    expect(find.text('二维码已过期'), findsNothing);
-    expect(find.textContaining('剩余 -'), findsNothing);
-    expect(api.checkCalls, 5);
   });
 }

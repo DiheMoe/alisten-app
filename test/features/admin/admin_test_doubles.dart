@@ -30,7 +30,6 @@ final class FakeAdminApi implements AdminApi {
   int listRoomsCalls = 0;
   String brandName = 'Alisten';
   Object? getBrandError;
-  int getBrandCalls = 0;
   Object? updateBrandError;
   Completer<void>? updateBrandGate;
   String? updatedBrandName;
@@ -53,7 +52,6 @@ final class FakeAdminApi implements AdminApi {
   final List<String> resetUsernames = [];
   String resetPassword = 'reset-secret-password';
   Object? resetPasswordError;
-  Completer<void>? resetPasswordGate;
 
   final List<RoomDraft> createdDrafts = [];
   Object? createRoomError;
@@ -141,7 +139,6 @@ final class FakeAdminApi implements AdminApi {
 
   @override
   Future<String> getBrandName() async {
-    getBrandCalls++;
     if (getBrandError case final error?) return Future.error(error);
     return brandName;
   }
@@ -203,7 +200,6 @@ final class FakeAdminApi implements AdminApi {
   Future<String> resetAccountPassword(String token, String username) async {
     tokens.add(token);
     resetUsernames.add(username);
-    await resetPasswordGate?.future;
     if (resetPasswordError case final error?) return Future.error(error);
     return resetPassword;
   }

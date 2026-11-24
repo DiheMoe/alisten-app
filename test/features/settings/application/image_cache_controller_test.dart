@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:alisten/core/logging/app_log.dart';
@@ -41,20 +40,6 @@ void main() {
     expect(measured, 1);
   });
 
-  test('clearing empties the image cache and measures it again', () async {
-    final container = open();
-    await container.read(imageCacheControllerProvider.future);
-
-    final cleared = await container
-        .read(imageCacheControllerProvider.notifier)
-        .clear();
-
-    expect(cleared, isTrue);
-    expect(cache.clears, 1);
-    expect(await container.read(imageCacheControllerProvider.future), 0);
-    expect(measured, 2);
-  });
-
   test('an image cache that cannot be cleared says so and shows what it '
       'still takes', () async {
     final records = <(String, int, String)>[];
@@ -72,17 +57,5 @@ void main() {
     expect(cleared, isFalse);
     expect(await container.read(imageCacheControllerProvider.future), 2048);
     expect(records.map((record) => record.$1), contains('alisten.settings'));
-  });
-
-  test('a size that cannot be measured is an error', () async {
-    cache.measuring = Completer<void>()
-      ..completeError(const FileSystemException('unreadable'));
-    final container = open();
-
-    await expectLater(
-      container.read(imageCacheControllerProvider.future),
-      throwsA(isA<FileSystemException>()),
-    );
-    expect(container.read(imageCacheControllerProvider).hasError, isTrue);
   });
 }

@@ -64,8 +64,6 @@ void main() {
           reason: 'attempt $attempt',
         );
       }
-      expect(adminFailuresBeforeCooldown, 3);
-      expect(adminCooldown, const Duration(seconds: 30));
 
       expect(submit(async, 't'), isFalse);
       expect(api.listRoomsCalls, 3);

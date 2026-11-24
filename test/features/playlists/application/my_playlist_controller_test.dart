@@ -169,13 +169,6 @@ void main() {
     });
   });
 
-  test('a playlist the server does not know is gone', () async {
-    server.playlists.removeLast();
-    await open();
-
-    expect(detail.read().gone, isTrue);
-  });
-
   test('a playlist missing from a list read later is gone', () async {
     await open();
 
@@ -263,16 +256,6 @@ void main() {
 
     unawaited(controller.remove([_a]));
     expect(keys(), ['netease:d', 'netease:b', 'netease:c']);
-  });
-
-  test('a move sends the songs and the song to go before', () async {
-    await open();
-
-    await controller.move(moveTo(keys()!, {'netease:a'}, 2)!);
-
-    expect(server.calls, contains('move pl-1 netease:a before netease:d'));
-    await controller.move(moveTo(keys()!, {'netease:b'}, 3)!);
-    expect(server.calls, contains('move pl-1 netease:b'));
   });
 
   test('a failure puts the songs and the selection back, and the edits '

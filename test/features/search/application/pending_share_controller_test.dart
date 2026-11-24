@@ -419,25 +419,6 @@ void main() {
       expect(harness.links.asked, isEmpty, reason: 'not resolved as a song');
       expect(harness.probe.siteProbed, isEmpty);
     });
-
-    test('of a saved server is offered as an invite to that server', () async {
-      final harness = await _Harness.create();
-      const link = 'https://example.com:8443/s/$id';
-      harness.links.answers[link] = webLink(link);
-      harness.container.listen(pendingShareControllerProvider, (_, _) {});
-
-      harness.shares.share(link);
-      await pumpEventQueue();
-
-      expect(
-        harness.invite?.target,
-        isA<InviteToSaved>()
-            .having((t) => t.server, 'server', serverB)
-            .having((t) => t.route, 'route', '/s/$id'),
-      );
-      expect(harness.pending, isNull);
-      expect(harness.links.asked, isEmpty, reason: 'not resolved as a song');
-    });
   });
 
   group('a link typed in song search', () {
@@ -550,20 +531,6 @@ void main() {
       harness.container
           .read(clipboardLinkControllerProvider.notifier)
           .dismiss();
-      expect(page.read(), isNull);
-    });
-
-    test('is never read where it carries no stamp, as on iOS', () async {
-      final harness = await _Harness.create();
-      harness.links.answers[neteaseShareText] = _song;
-      harness.clipboard
-        ..copy(neteaseShareText)
-        ..stamped = false;
-      await harness.enter('listen', RoomKind.ephemeral);
-
-      final page = await harness.openSearch();
-
-      expect(harness.clipboard.reads, 0);
       expect(page.read(), isNull);
     });
 

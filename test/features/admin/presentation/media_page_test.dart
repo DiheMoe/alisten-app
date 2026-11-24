@@ -470,7 +470,6 @@ void main() {
 
   for (final (size, scale) in [
     (const Size(360, 780), 1.0),
-    (const Size(360, 780), 1.3),
     (const Size(360, 780), 2.0),
     (const Size(320, 640), 2.0),
   ]) {

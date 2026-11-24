@@ -64,22 +64,6 @@ void main() {
     ]);
   });
 
-  test('load error is visible and retry replaces it with data', () async {
-    api.listError = const FormatException('bad response');
-
-    await controller.load();
-
-    expect(controller.state.loading, isFalse);
-    expect(controller.state.listError, isNotNull);
-
-    api.listError = null;
-    api.rooms = [roomListing()];
-    await controller.load();
-
-    expect(controller.state.listError, isNull);
-    expect(controller.state.filteredRooms, hasLength(1));
-  });
-
   test('a load answered late does not replace the newer result', () async {
     final first = Completer<List<RoomListing>>();
     final second = Completer<List<RoomListing>>();

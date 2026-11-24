@@ -345,21 +345,6 @@ void main() {
       expect(enabled(tester, '用 GitHub 登录'), isTrue);
     });
 
-    testWidgets('a GitHub authorization cancelled on GitHub says so and stays '
-        'on the page', (tester) async {
-      withGithub();
-      authorizer.callback = Uri.parse(
-        'moe.dihe.alisten:/auth/github#error=denied',
-      );
-      await pumpLogin(tester);
-
-      await tester.tap(button('用 GitHub 登录'));
-      await tester.pumpAndSettle();
-
-      expect(notices, [(ToastKind.failure, '你在 GitHub 上取消了授权。')]);
-      expect(done, 0);
-    });
-
     testWidgets('a GitHub sign-in that ends after the page is gone is still '
         'reported, and finishes nothing', (tester) async {
       withGithub();

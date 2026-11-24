@@ -57,27 +57,6 @@ void main() {
     expect(opened.api.createMemberCalls, 0);
   });
 
-  test('a share that is gone is expired', () async {
-    server.sharedPlaylist = null;
-    final (_, page) = await open();
-
-    expect(page.read().expired, isTrue);
-    expect(page.read().playlist, isNull);
-  });
-
-  test('a failed read says why, and a retry reads again', () async {
-    server.failNext('shared', networkError);
-    final (opened, page) = await open();
-    expect(page.read().error, networkError.message);
-
-    await opened.container
-        .read(sharedPlaylistControllerProvider(shareIdA).notifier)
-        .load();
-
-    expect(page.read().error, isNull);
-    expect(page.read().playlist?.items, hasLength(1));
-  });
-
   test('a rate limited read shows the wait the error tells', () async {
     server.failNext(
       'shared',

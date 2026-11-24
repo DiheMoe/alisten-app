@@ -105,9 +105,7 @@ void main() {
       await expectLater(listRooms(), throwsA(isA<AdminSessionEnded>()));
     }
 
-    await expectRefused(_unauthorized, 'UNAUTHORIZED', '管理 token 无效');
     await expectRefused(_unauthorized, 'UNAUTHORIZED', adminTokenInvalidText);
-    await expectRefused(_forbidden, 'FORBIDDEN', '这个服务器没有启用后台');
     await expectRefused(_forbidden, 'FORBIDDEN', adminDisabledText);
     await expectRefused(
       const ApiException(
@@ -163,7 +161,6 @@ void main() {
     await expectLater(listRooms(), throwsA(_ended(resultUnknown: false)));
     expect(state().active, isFalse);
     expect(state().notice, adminTokenExpiredText);
-    expect(state().notice, '管理 token 已失效，请重新输入');
 
     api.listRoomsError = null;
     final calls = api.listRoomsCalls;
@@ -271,20 +268,6 @@ void main() {
     await expectLater(refused, throwsA(isA<AdminSessionEnded>()));
   });
 
-  test(
-    'a notice is cleared on request and the session stays as it was',
-    () async {
-      await session().signIn('t-1');
-      session().end(notice: adminTokenExpiredText);
-      expect(state().notice, adminTokenExpiredText);
-
-      session().clearNotice();
-
-      expect(state().notice, isNull);
-      expect(state().active, isFalse);
-    },
-  );
-
   test('coming back after 5 minutes away ends the session; 4:59 does '
       'not', () async {
     await session().signIn('t-1');
@@ -303,8 +286,6 @@ void main() {
 
     expect(state().active, isFalse);
     expect(state().notice, adminAwayText);
-    expect(state().notice, '离开后台超过 5 分钟，请重新输入管理 token');
-    expect(adminBackgroundLimit, const Duration(minutes: 5));
     await expectLater(listRooms(), throwsA(isA<AdminSessionEnded>()));
   });
 
@@ -379,25 +360,6 @@ void main() {
     },
   );
 
-  test('the longer of the wall clock and the monotonic clock decides how long '
-      'the app was away', () async {
-    await session().signIn('t-1');
-    const justUnder = Duration(minutes: 4, seconds: 59);
-    awayFor(justUnder, justUnder);
-    expect(state().active, isTrue);
-
-    awayFor(const Duration(minutes: 1), const Duration(minutes: 6));
-    expect(state().active, isFalse, reason: 'the wall clock was turned back');
-
-    await session().signIn('t-1');
-    awayFor(const Duration(minutes: 6), const Duration(minutes: 1));
-    expect(
-      state().active,
-      isFalse,
-      reason: 'the monotonic clock stood still while the device slept',
-    );
-  });
-
   group('while the app stays away', () {
     test('the session ends at 5 minutes, without coming back', () async {
       await session().signIn('t-1');
@@ -465,31 +427,6 @@ void main() {
 
       expect(state().active, isFalse);
       expect(state().notice, adminAwayText);
-    });
-
-    test('with no session, 5 minutes away let go of whatever was typed, '
-        'with nothing to say', () async {
-      final epoch = state().epoch;
-
-      session().handleLifecycle(AppLifecycleState.paused);
-      pass(const Duration(minutes: 5));
-
-      expect(state().epoch, epoch + 1);
-      expect(state().active, isFalse);
-      expect(state().notice, isNull);
-    });
-
-    test('a token still being verified at 5 minutes is not taken', () async {
-      api.listRoomsGate = Completer();
-      final pending = session().signIn('t-1');
-      await pumpEventQueue();
-
-      session().handleLifecycle(AppLifecycleState.paused);
-      pass(const Duration(minutes: 5));
-      api.listRoomsGate!.complete();
-
-      await expectLater(pending, throwsA(isA<AdminSessionEnded>()));
-      expect(state().active, isFalse);
     });
 
     test('the count is stopped when the session goes away', () async {

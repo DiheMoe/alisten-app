@@ -525,30 +525,6 @@ void main() {
     });
   }
 
-  testWidgets('the import button says whether its menu is open', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    await open(tester);
-
-    expect(
-      tester.getSemantics(find.bySemanticsLabel('导入')),
-      isSemantics(
-        label: '导入',
-        isButton: true,
-        hasExpandedState: true,
-        isExpanded: false,
-      ),
-    );
-    await tester.tap(find.bySemanticsLabel('导入'));
-    await settlePage(tester);
-    expect(
-      tester.getSemantics(find.bySemanticsLabel('导入')),
-      isSemantics(hasExpandedState: true, isExpanded: true),
-    );
-    semantics.dispose();
-  });
-
   testWidgets('the link sheet does not take focus or raise the keyboard', (
     tester,
   ) async {

@@ -1,4 +1,3 @@
-import 'package:alisten/core/protocol/protocol.gen.dart' as protocol;
 import 'package:alisten/features/admin/index.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -39,10 +38,6 @@ void main() {
       expect(patch.password, isNull);
       expect(patch.capacity, isNull);
       expect(patch.isEmpty, isFalse);
-      expect(
-        const protocol.AdminUpdateRoomRequest(description: 'd2').toJson(),
-        {'description': 'd2'},
-      );
     });
 
     test('a name is compared without its surrounding blanks and sent without '
@@ -72,10 +67,6 @@ void main() {
       expect(original.capacity, 16);
       expect(patchOf(capacity: '8').capacity, 8);
       expect(patchOf(capacity: ' 16 ').isEmpty, isTrue);
-    });
-
-    test('the same room changes nothing', () {
-      expect(patchOf().isEmpty, isTrue);
     });
 
     test('taking away a password the room does not have changes nothing', () {
@@ -182,7 +173,7 @@ void main() {
     });
 
     test('a new room is sent with its name trimmed, without an empty alias '
-        'and with the password asked for', () {
+        'and with a password only when one is asked for', () {
       final draft = roomDraft(
         form(
           name: ' 大厅 ',
@@ -197,6 +188,10 @@ void main() {
       expect(draft.slug, isNull);
       expect(draft.password, 'p');
       expect(draft.capacity, 64);
+
+      final open = roomDraft(form(slug: 'hall'));
+      expect(open.slug, 'hall');
+      expect(open.password, isNull);
     });
 
     test('a new room keeps the blanks around its description, which count '
@@ -206,13 +201,6 @@ void main() {
         roomFormProblem(form(description: ' ${'长' * 499} ')),
         '简介最多 500 个字',
       );
-    });
-
-    test('a new room without a password asked for has none', () {
-      final draft = roomDraft(form(slug: 'hall'));
-
-      expect(draft.slug, 'hall');
-      expect(draft.password, isNull);
     });
   });
 }

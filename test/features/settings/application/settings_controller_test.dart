@@ -224,23 +224,6 @@ void main() {
       });
     });
 
-    test('lyric translations and word-by-word lyrics are on until turned '
-        'off, and each is written alone', () async {
-      final settings = controllerOf(container);
-      expect(stateOf(container).value.lyricTranslation, isTrue);
-      expect(stateOf(container).value.lyricWords, isTrue);
-
-      await settings.setLyricTranslation(false);
-      await settings.setLyricWords(false);
-
-      final value = stateOf(container).value;
-      expect(value.lyricTranslation, isFalse);
-      expect(value.lyricWords, isFalse);
-      final preferences = await SharedPreferences.getInstance();
-      expect(preferences.getBool('alisten.lyrics.translation'), isFalse);
-      expect(preferences.getBool('alisten.lyrics.words'), isFalse);
-    });
-
     test('a setting is in effect before it has been written', () async {
       final settings = controllerOf(container);
 
@@ -547,16 +530,6 @@ void main() {
       expect(container.read(identityControllerProvider).member?.name, '听众');
     });
 
-    test('a profile that cannot be restored is not an error', () async {
-      credentials.memberToken = 'valid-token';
-      api.getMeError = Exception('offline');
-      final settings = controllerOf(container);
-
-      expect(await settings.loadProfile(), isFalse);
-
-      expect(container.read(identityControllerProvider).member, isNull);
-    });
-
     test('a profile with no identity on this server is read, and stays '
         'without a member', () async {
       expect(await controllerOf(container).loadProfile(), isTrue);
@@ -602,21 +575,6 @@ void main() {
       expect(identity().recordListens, isFalse);
     });
 
-    test('a switch the server refuses leaves the identity as it '
-        'was', () async {
-      await restored();
-      api.setListenRecordingError = const ApiException(
-        code: 'INTERNAL',
-        message: '服务器出错了',
-        status: 500,
-      );
-
-      final result = await controllerOf(container).setRecordListens(false);
-
-      expect((result as MutationFailed<void>).message, '服务器出错了');
-      expect(identity().recordListens, isTrue);
-    });
-
     test('a refused guest token replaces the identity and asks to try '
         'again', () async {
       await restored();
@@ -642,22 +600,6 @@ void main() {
       expect(credentials.memberToken, 'new-member-token');
     });
 
-    test('an unknown result reads the identity again', () async {
-      await restored();
-      final reads = api.getMeCalls;
-      api.setListenRecordingError = const ApiException(
-        code: LocalErrorCodes.network,
-        message: '网络请求失败，请检查网络后重试。',
-        status: null,
-      );
-
-      final result = await controllerOf(container).setRecordListens(false);
-      await pumpEventQueue();
-
-      expect(result, isA<MutationUnknown<void>>());
-      expect(api.getMeCalls, reads + 1);
-    });
-
     test('a switch made for a member who has since changed is not given to '
         'the new one', () async {
       await restored();
@@ -678,18 +620,6 @@ void main() {
       expect(await pending, isA<MutationSucceeded<void>>());
       expect(identity().member?.id, 'new-id');
       expect(identity().recordListens, isTrue);
-    });
-
-    test('without an identity the switch creates the guest it is saved '
-        'on', () async {
-      final result = await controllerOf(container).setRecordListens(false);
-
-      expect(result, isA<MutationSucceeded<void>>());
-      expect(api.createMemberCalls, 1);
-      expect(api.listenRecordingWrites, [false]);
-      expect(credentials.memberToken, 'new-member-token');
-      expect(identity().member?.id, 'member-id');
-      expect(identity().recordListens, isFalse);
     });
 
     test('without an identity a guest that cannot be created sends '

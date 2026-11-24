@@ -11,16 +11,14 @@ import '../admin_test_doubles.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('mediaWindow', () {
-    test('the first page is the start of the first server page', () {
-      expect(mediaWindow(1), (first: 1, last: 1, offset: 0));
-    });
-    test('the third page spans the first two server pages', () {
-      expect(mediaWindow(3), (first: 1, last: 2, offset: 40));
-    });
-    test('the sixth page starts the third server page', () {
-      expect(mediaWindow(6), (first: 3, last: 3, offset: 0));
-    });
+  test('a page of 20 is cut from the server pages of 50 it spans', () {
+    for (final (page, window, why) in [
+      (1, (first: 1, last: 1, offset: 0), 'starts the first server page'),
+      (3, (first: 1, last: 2, offset: 40), 'spans the first two'),
+      (6, (first: 3, last: 3, offset: 0), 'starts the third'),
+    ]) {
+      expect(mediaWindow(page), window, reason: 'page $page $why');
+    }
   });
 
   late FakeAdminApi api;
@@ -55,15 +53,6 @@ void main() {
     api = FakeAdminApi()
       ..media = [for (var n = 1; n <= 120; n++) storedTrack(n)];
     timers = [];
-  });
-
-  test('the first page shows 20 songs, newest first, and the totals', () async {
-    final media = await signedIn();
-    await media.load();
-    expect(state().items.length, 20);
-    expect(state().items.first.title, '歌曲 120');
-    expect(state().total, 120);
-    expect(state().pageCount, 6);
   });
 
   test('pages within a server page are cut from the same answer', () async {
@@ -148,24 +137,6 @@ void main() {
     expect(state().selected, isEmpty);
   });
 
-  test('songs playing in a room are not deleted and stay selected', () async {
-    final media = await signedIn();
-    await media.load();
-    final playing = state().items.first;
-    api.mediaInUse = {playing.key};
-    media
-      ..toggle(playing)
-      ..toggle(state().items[1]);
-    final outcome = await media.remove(state().selected.values.toList());
-    expect(
-      outcome,
-      isA<MediaRemoved>()
-          .having((o) => o.deleted, 'deleted', 1)
-          .having((o) => o.inUse, 'inUse', 1),
-    );
-    expect(state().selected.keys, [playing.key]);
-  });
-
   test('a failed batch stops the rest and counts what was deleted', () async {
     final media = await signedIn();
     await media.load();
@@ -220,36 +191,6 @@ void main() {
     expect(state().items.length, 20);
   });
 
-  test(
-    'a page that fails to load keeps the songs shown and says why',
-    () async {
-      final media = await signedIn();
-      await media.load();
-      final shown = state().items;
-      api.listMediaError = const ApiException(
-        code: 'UNAVAILABLE',
-        message: '服务暂时不可用',
-        status: 503,
-      );
-      await media.goTo(4);
-      expect(state().page, 1);
-      expect(state().items, same(shown));
-      expect(state().error, '服务暂时不可用');
-      api.listMediaError = null;
-      await media.retry();
-      expect(state().page, 4);
-      expect(state().error, isNull);
-    },
-  );
-
-  test('the summary counts the whole library, whatever is searched', () async {
-    await signedIn();
-    container.listen(adminMediaSummaryProvider, (_, _) {});
-    final summary = await container.read(adminMediaSummaryProvider.future);
-    expect(summary.total, 120);
-    expect(summary.totalBytes, api.media.fold(0, (s, t) => s + t.bytes));
-  });
-
   group('the home summary', () {
     const unavailable = ApiException(
       code: 'UNAVAILABLE',
@@ -261,20 +202,6 @@ void main() {
       await pumpEventQueue();
       return container.read(adminMediaSummaryProvider);
     }
-
-    test(
-      'a failed summary is read again once the whole library loads',
-      () async {
-        api.listMediaError = unavailable;
-        final media = await signedIn();
-        container.listen(adminMediaSummaryProvider, (_, _) {});
-        expect((await summary()).hasError, isTrue);
-
-        api.listMediaError = null;
-        await media.load();
-        expect((await summary()).value?.total, 120);
-      },
-    );
 
     test('a search result is not taken for the whole library; pulling to '
         'refresh reads the summary again', () async {

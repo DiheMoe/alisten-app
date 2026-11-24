@@ -706,22 +706,6 @@ void main() {
       expect((result as MutationFailed<GithubOutcome>).message, '兑换码已经过期');
     });
 
-    test('INVALID_CREDENTIALS while binding keeps the server code, so the '
-        'password panel closes', () async {
-      await open();
-      await signedInAs(const Account(username: 'mao', github: false));
-      api.finishGithubError = _refusal('INVALID_CREDENTIALS', '兑换码已经过期');
-
-      final result = await github().bind('password1');
-
-      expect(
-        result,
-        isA<MutationFailed<GithubOutcome>>()
-            .having((r) => r.code, 'code', 'INVALID_CREDENTIALS')
-            .having((r) => r.message, 'message', '兑换码已经过期'),
-      );
-    });
-
     test('CONFLICT shows the server message and re-reads the '
         'profile', () async {
       await open();

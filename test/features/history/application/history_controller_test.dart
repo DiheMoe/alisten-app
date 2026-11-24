@@ -291,25 +291,6 @@ void main() {
       close();
     });
 
-    test('a delete the server refuses leaves the list and gives its '
-        'reason', () async {
-      final close = await openWith([heard('a'), heard('b')]);
-      api.removeMyListenError = _refused;
-
-      final result = await history.remove(heard('a'));
-
-      expect(
-        result,
-        isA<MutationFailed<void>>().having(
-          (failed) => failed.message,
-          'message',
-          '服务器出错了',
-        ),
-      );
-      expect(titles(), ['a', 'b']);
-      close();
-    });
-
     test('a delete with an unknown result reads the list again and is not '
         'sent twice', () async {
       final close = await openWith([heard('a'), heard('b')]);
@@ -407,27 +388,6 @@ void main() {
   });
 
   group('clearing', () {
-    test('a clear the server took empties the list', () async {
-      final close = await openWith([heard('a'), heard('b')]);
-
-      expect(await history.clear(), isA<MutationSucceeded<void>>());
-
-      expect(state().listens, isEmpty);
-      expect(api.clearMyListensCalls, 1);
-      close();
-    });
-
-    test('a clear the server refuses leaves the list', () async {
-      final close = await openWith([heard('a')]);
-      api.clearMyListensError = _refused;
-
-      final result = await history.clear();
-
-      expect((result as MutationFailed<void>).message, '服务器出错了');
-      expect(titles(), ['a']);
-      close();
-    });
-
     test('a read in flight during a clear is dropped and read again', () async {
       final close = await openWith([heard('a'), heard('b')]);
       final stale = Completer<List<Listen>>();

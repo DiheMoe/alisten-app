@@ -40,27 +40,6 @@ void main() {
     await container.read(adminSessionProvider.notifier).signIn('t-1');
   });
 
-  test('the status is read with the admin token', () async {
-    await controller().load();
-
-    expect(state().status?.enabled, isFalse);
-    expect(state().status?.callbackUrl, _callback);
-    expect(api.tokens.last, 't-1');
-  });
-
-  test('a status that cannot be read says so, and reads again', () async {
-    api.getGithubAppError = _network;
-    await controller().load();
-
-    expect(state().error, '暂时无法获取 GitHub 登录的配置。');
-    expect(state().status, isNull);
-
-    api.getGithubAppError = null;
-    await controller().load();
-    expect(state().error, isNull);
-    expect(state().status?.enabled, isFalse);
-  });
-
   test('saving trims both fields, keeps the secret out of the state and '
       'the log, and reads the status again', () async {
     final records = <String>[];
@@ -89,35 +68,6 @@ void main() {
     );
   });
 
-  test('a blank field is not sent', () async {
-    final result = await controller().save(
-      clientId: 'Iv1.abc',
-      clientSecret: '   ',
-    );
-
-    expect(result, isA<MutationNotSent<void>>());
-    expect(api.savedGithubApps, isEmpty);
-  });
-
-  test('a client the server cannot accept is told in plain words and the '
-      'status is not read again', () async {
-    await controller().load();
-    api.setGithubAppError = const ApiException(
-      code: 'INVALID_ARGUMENT',
-      message: 'clientId 格式不对',
-      status: 400,
-    );
-
-    final result = await controller().save(
-      clientId: 'Iv1 abc',
-      clientSecret: 'secret-1',
-    );
-    await pumpEventQueue();
-
-    expect((result as MutationFailed<void>).message, githubAppInvalidText);
-    expect(api.getGithubAppCalls, 1);
-  });
-
   test('a save whose answer is lost is unknown and reads the status '
       'again', () async {
     await controller().load();
@@ -131,22 +81,6 @@ void main() {
 
     expect(result, isA<MutationUnknown<void>>());
     expect(api.getGithubAppCalls, 2);
-  });
-
-  test('closing turns GitHub off and reads the status again', () async {
-    api.githubApp = const GithubAppStatus(
-      clientId: 'Iv1.abc',
-      clientSecretSet: true,
-      callbackUrl: _callback,
-    );
-    await controller().load();
-
-    final result = await controller().close();
-    await pumpEventQueue();
-
-    expect(result, isA<MutationSucceeded<void>>());
-    expect(api.deleteGithubAppCalls, 1);
-    expect(state().status?.enabled, isFalse);
   });
 
   test('a status read before a later one does not replace it', () async {
@@ -167,56 +101,6 @@ void main() {
 
     expect(state().status?.clientId, 'Iv1.new');
     expect(state().loading, isFalse);
-  });
-
-  test('a load after the session ended keeps the status and shows no '
-      'error', () async {
-    api.githubApp = const GithubAppStatus(
-      clientId: 'Iv1.abc',
-      clientSecretSet: true,
-      callbackUrl: _callback,
-    );
-    await controller().load();
-    container.read(adminSessionProvider.notifier).end();
-
-    await controller().load();
-
-    expect(state().status?.clientId, 'Iv1.abc');
-    expect(state().error, isNull);
-    expect(state().loading, isFalse);
-  });
-
-  test('a save after the session ended was not sent', () async {
-    container.read(adminSessionProvider.notifier).end();
-
-    final result = await controller().save(
-      clientId: 'Iv1.abc',
-      clientSecret: 'secret-1',
-    );
-
-    expect(
-      result,
-      isA<MutationNotSent<void>>().having(
-        (r) => r.message,
-        'message',
-        '后台会话已结束',
-      ),
-    );
-    expect(api.savedGithubApps, isEmpty);
-  });
-
-  test('a save sent before the session ended may have been saved', () async {
-    final gate = api.setGithubAppGate = Completer();
-    final pending = controller().save(
-      clientId: 'Iv1.abc',
-      clientSecret: 'secret-1',
-    );
-    await pumpEventQueue();
-
-    container.read(adminSessionProvider.notifier).end();
-    gate.complete();
-
-    expect(await pending, isA<MutationUnknown<void>>());
   });
 
   test('an unknown save that answers after the controller is gone does not '

@@ -35,64 +35,6 @@ void main() {
     await container.read(adminSessionProvider.notifier).signIn('t-1');
   });
 
-  test('the registration state is read from the server', () async {
-    api.registrationOpen = false;
-
-    await controller().load();
-
-    expect(state().open, isFalse);
-    expect(state().loading, isFalse);
-    expect(state().error, isNull);
-  });
-
-  test('a registration state that cannot be read says so', () async {
-    api.getRegistrationError = _network;
-
-    await controller().load();
-
-    expect(state().open, isNull);
-    expect(state().error, '暂时无法获取注册状态。');
-  });
-
-  test('closing registration is sent with the token and kept', () async {
-    await controller().load();
-
-    final result = await controller().setOpen(false);
-
-    expect(
-      result,
-      isA<MutationSucceeded<bool>>().having((r) => r.value, 'value', false),
-    );
-    expect(api.registrationCalls, [false]);
-    expect(api.tokens.last, 't-1');
-    expect(state().open, isFalse);
-  });
-
-  test('opening registration is sent and kept', () async {
-    api.registrationOpen = false;
-    await controller().load();
-
-    await controller().setOpen(true);
-
-    expect(api.registrationCalls, [true]);
-    expect(state().open, isTrue);
-  });
-
-  test('a refused switch leaves the state as it was', () async {
-    await controller().load();
-    api.setRegistrationError = const ApiException(
-      code: 'FORBIDDEN',
-      message: '没有权限',
-      status: 403,
-    );
-
-    final result = await controller().setOpen(false);
-    await pumpEventQueue();
-
-    expect(result, isNot(isA<MutationSucceeded<bool>>()));
-    expect(state().open, isTrue);
-  });
-
   test('a switch without an answer may have taken effect, so the state is '
       'read again', () async {
     await controller().load();

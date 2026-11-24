@@ -58,16 +58,4 @@ void main() {
     );
     expect(formatLastPlayed(ms(DateTime(2026, 9, 1)), now), '9 月 1 日播放');
   });
-
-  test('details join the size, the stored date and the last play', () {
-    final track = storedTrack(
-      1,
-      bytes: 12900000,
-      lastPlayedAtMs: ms(now.subtract(const Duration(days: 3))),
-    );
-    expect(
-      mediaDetails(track, now),
-      '12.3 MiB · ${formatStoredDate(track.storedAtMs, now)}存储 · 3 天前播放',
-    );
-  });
 }

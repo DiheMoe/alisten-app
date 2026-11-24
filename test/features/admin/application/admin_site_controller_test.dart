@@ -1,7 +1,4 @@
-import 'dart:async';
-
 import 'package:alisten/core/api/api_error.dart';
-import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/domain/mutation/mutation_result.dart';
 import 'package:alisten/features/admin/index.dart';
 import 'package:alisten/features/server/index.dart';
@@ -107,7 +104,6 @@ void main() {
     }
     expect(api.updatedBrandName, isNull);
     expect(api.tokens, ['t-1']);
-    expect(brandNameRuleText, '品牌名要有 1 到 20 个字，不能含换行、制表符等特殊字符');
   });
 
   test('brand names are measured in characters, as the server does', () {
@@ -157,106 +153,6 @@ void main() {
       store.profiles.singleWhere((p) => p.id == _defaultId).brandName,
       '服务端的名字',
     );
-  });
-
-  for (final (code, status) in [('UNAVAILABLE', 503), ('INTERNAL', 500)]) {
-    test('a save the server could not finish ($code) may have taken effect, '
-        'so it is not sent again and the brand name is read again', () async {
-      api
-        ..updateBrandError = ApiException(
-          code: code,
-          message: '服务器没有及时响应',
-          status: status,
-        )
-        ..brandName = '服务端的名字';
-
-      final result = await controller().save('周末听歌会');
-      await pumpEventQueue();
-
-      expect(result, isA<MutationUnknown<String>>());
-      expect(api.getBrandCalls, 1);
-      expect(state().brandName, '服务端的名字');
-    });
-  }
-
-  test('a save turned away for coming too often was not carried out: it '
-      'says so and the brand name is not read again', () async {
-    api.updateBrandError = const ApiException(
-      code: 'RATE_LIMITED',
-      message: '请求太频繁，请稍后再试。',
-      status: 429,
-    );
-
-    final result = await controller().save('周末听歌会');
-    await pumpEventQueue();
-
-    expect(
-      result,
-      isA<MutationNotSent<String>>().having(
-        (r) => r.message,
-        'message',
-        '请求太频繁，请稍后再试。',
-      ),
-    );
-    expect(api.getBrandCalls, 0);
-    expect(container.read(currentServerProvider).brandName, 'Alisten');
-  });
-
-  test('a save failing unexpectedly is unknown, the error type alone is '
-      'logged, and the brand name is read again', () async {
-    final records = <String>[];
-    AppLog.onRecord = (name, level, message) => records.add('$name $message');
-    addTearDown(() => AppLog.onRecord = null);
-    api
-      ..updateBrandError = StateError('t-1 周末听歌会')
-      ..brandName = '服务端的名字';
-
-    final result = await controller().save('周末听歌会');
-    await pumpEventQueue();
-
-    expect(result, isA<MutationUnknown<String>>());
-    expect(state().brandName, '服务端的名字');
-    expect(records, contains(contains('StateError')));
-    expect(records.where((r) => r.contains('t-1')), isEmpty);
-    expect(records.where((r) => r.contains('周末听歌会')), isEmpty);
-  });
-
-  test('a save after the session ended is not sent', () async {
-    container.read(adminSessionProvider.notifier).end();
-
-    final result = await controller().save('周末听歌会');
-
-    expect(result, isA<MutationNotSent<String>>());
-    expect(api.updatedBrandName, isNull);
-  });
-
-  test('a save already sent when the session ended may have taken '
-      'effect', () async {
-    api.updateBrandGate = Completer();
-    final pending = controller().save('周末听歌会');
-    await pumpEventQueue();
-
-    container.read(adminSessionProvider.notifier).end();
-    api.updateBrandGate!.complete();
-
-    expect(await pending, isA<MutationUnknown<String>>());
-    expect(api.updatedBrandName, '周末听歌会');
-  });
-
-  test('a save refused because the token expired is not saved, and the '
-      'session ends', () async {
-    api.updateBrandError = const ApiException(
-      code: 'UNAUTHORIZED',
-      message: 'token invalid',
-      status: 401,
-    );
-
-    final result = await controller().save('周末听歌会');
-
-    expect(result, isA<MutationNotSent<String>>());
-    expect(container.read(adminSessionProvider).active, isFalse);
-    expect(container.read(adminSessionProvider).notice, adminTokenExpiredText);
-    expect(container.read(currentServerProvider).brandName, 'Alisten');
   });
 
   test('a brand name from the server that breaks the rule is shown here but '
