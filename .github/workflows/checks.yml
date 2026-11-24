@@ -7,9 +7,9 @@ permissions:
   contents: read
 
 jobs:
-  checks:
+  static:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -22,4 +22,27 @@ jobs:
       - run: dart run tool/check_imports.dart
       - run: dart format --output=none --set-exit-if-changed .
       - run: flutter analyze --fatal-warnings --fatal-infos
-      - run: flutter test -j 4
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: .fvmrc
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      # --total-shards 按测试分片，每个分片仍要编译全部测试文件，所以按文件分。
+      - name: Run tests
+        env:
+          SHARD: ${{ strategy.job-index }}
+          SHARDS: ${{ strategy.job-total }}
+        run: |
+          find test -name '*_test.dart' | sort \
+            | awk -v shard="$SHARD" -v shards="$SHARDS" 'NR % shards == shard' \
+            | xargs flutter test

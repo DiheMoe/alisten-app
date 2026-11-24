@@ -18,97 +18,12 @@ jobs:
   checks:
     uses: ./.github/workflows/checks.yml
 
-  # tag 上的发版只能读默认分支的缓存。键和路径要与 android.yml 一致。
-  android-cache:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - id: cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-            ~/android-sdk-extra
-          key: android-${{ runner.os }}-${{ hashFiles('.fvmrc', 'pubspec.lock', 'android/**/*.gradle*', 'android/gradle.properties', 'android/gradle/wrapper/gradle-wrapper.properties') }}
-          lookup-only: true
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        if: steps.cache.outputs.cache-hit != 'true'
-        with:
-          channel: stable
-          flutter-version-file: .fvmrc
-          cache: true
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        if: steps.cache.outputs.cache-hit != 'true'
-        with:
-          distribution: temurin
-          java-version: '17'
-      - run: flutter pub get --enforce-lockfile
-        if: steps.cache.outputs.cache-hit != 'true'
-      - name: Download Gradle dependencies and SDK packages
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          list_sdk_packages() {
-            find "$ANDROID_HOME" -mindepth 2 -maxdepth 2 -type d -not -path '*/.*' | sort
-          }
-          list_sdk_packages > "$RUNNER_TEMP/sdk-before"
-          flutter build apk --release --split-per-abi \
-            --target-platform android-arm,android-arm64
-          list_sdk_packages > "$RUNNER_TEMP/sdk-after"
-          mkdir -p ~/android-sdk-extra
-          comm -13 "$RUNNER_TEMP/sdk-before" "$RUNNER_TEMP/sdk-after" | while read -r dir; do
-            package="${dir#"$ANDROID_HOME"/}"
-            echo "Caching $package"
-            mkdir -p ~/android-sdk-extra/"$(dirname "$package")"
-            cp -a "$dir" ~/android-sdk-extra/"$package"
-          done
-      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: steps.cache.outputs.cache-hit != 'true'
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-            ~/android-sdk-extra
-          key: ${{ steps.cache.outputs.cache-primary-key }}
-
   android:
-    if: github.event_name == 'workflow_dispatch'
-    needs: checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          channel: stable
-          flutter-version-file: .fvmrc
-          cache: true
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
-          cache-dependency-path: |
-            android/**/*.gradle*
-            android/gradle/wrapper/gradle-wrapper.properties
-      - run: flutter pub get --enforce-lockfile
-      - run: flutter build apk --release
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/android.yml
 
   ios:
     if: github.event_name == 'workflow_dispatch'
-    needs: checks
-    runs-on: macos-26
-    timeout-minutes: 30
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          channel: stable
-          flutter-version-file: .fvmrc
-          cache: true
-      - run: flutter pub get --enforce-lockfile
-      - run: flutter build ios --no-codesign
+    uses: ./.github/workflows/ios.yml
+    with:
+      version: ${{ github.sha }}

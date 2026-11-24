@@ -7,6 +7,8 @@ on:
 permissions:
   contents: read
 
+cache-mode: read
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -37,6 +39,7 @@ jobs:
     needs: version
     uses: ./.github/workflows/android.yml
     with:
+      sign: true
       version: ${{ needs.version.outputs.version }}
     secrets:
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
