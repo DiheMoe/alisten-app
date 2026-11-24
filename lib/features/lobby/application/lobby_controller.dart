@@ -112,29 +112,37 @@ base class LobbyController extends Notifier<LobbyState> {
 
   @override
   LobbyState build() {
-    ref.listen<({String id, int online})?>(
+    ref.listen<({String id, int online, int afterLeaving})?>(
       roomControllerProvider.select(_liveCount),
       _followRoom,
     );
     return const LobbyState();
   }
 
-  static ({String id, int online})? _liveCount(RoomState room) {
+  // 在线人数按人算，在线列表按连接算：同一个人在别的设备上还在这个房间时，
+  // 这台设备退出后人数不变。
+  static ({String id, int online, int afterLeaving})? _liveCount(
+    RoomState room,
+  ) {
     final id = room.activeRoomId;
-    final online = room.snapshot?.onlineCount;
-    return id == null || online == null ? null : (id: id, online: online);
+    final snapshot = room.snapshot;
+    if (id == null || snapshot == null) return null;
+    final me = room.member?.id;
+    final mine = snapshot.members.where((member) => member.id == me).length;
+    final online = snapshot.onlineCount;
+    return (id: id, online: online, afterLeaving: online - (mine > 1 ? 0 : 1));
   }
 
-  // 所在房间的人数随房间的实时状态变，不必回大厅刷新。退出时自己不再算在内；
-  // 列表接口这时可能还没把自己减掉，所以不靠重新读取。
+  // 所在房间的人数随房间的实时状态变，不必回大厅刷新。退出后按离开前的状态
+  // 算；列表接口这时可能还没把自己减掉，所以不靠重新读取。
   void _followRoom(
-    ({String id, int online})? previous,
-    ({String id, int online})? next,
+    ({String id, int online, int afterLeaving})? previous,
+    ({String id, int online, int afterLeaving})? next,
   ) {
     if (next != null) {
       _setOnline(next.id, next.online);
     } else if (previous != null) {
-      _setOnline(previous.id, previous.online - 1);
+      _setOnline(previous.id, previous.afterLeaving);
     }
   }
 

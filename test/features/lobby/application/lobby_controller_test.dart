@@ -5,6 +5,7 @@ import 'package:alisten/core/api/api_error.dart';
 import 'package:alisten/core/api/credential_store.dart';
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/core/realtime/room_transport.dart';
+import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/identity/index.dart';
 import 'package:alisten/features/lobby/application/lobby_controller.dart';
@@ -115,6 +116,51 @@ void main() {
     await pumpEventQueue();
     expect(listed('room-id'), 4);
     expect(listed('other'), 4);
+  });
+
+  test('a room left on this device keeps its count while the same person '
+      'still listens there on another', () async {
+    api.rooms = [roomListing(onlineCount: 1)];
+    await controller.load();
+    int listed() => controller.state.rooms.single.onlineCount;
+    const friend = Member(id: 'friend', name: '朋友', avatarHash: '');
+
+    await controller.join('room-id');
+    factory.last.emitHello(
+      testRoomSnapshot().copyWith(
+        term: 1,
+        seq: 1,
+        members: [testMember, testMember, friend],
+        onlineCount: 2,
+      ),
+    );
+    await pumpEventQueue();
+    expect(listed(), 2);
+
+    await container.read(roomControllerProvider.notifier).leaveRoom();
+    await pumpEventQueue();
+    expect(listed(), 2);
+  });
+
+  test('a room left by the only device of its last listener shows nobody '
+      'there', () async {
+    api.rooms = [roomListing(onlineCount: 1)];
+    await controller.load();
+
+    await controller.join('room-id');
+    factory.last.emitHello(
+      testRoomSnapshot().copyWith(
+        term: 1,
+        seq: 1,
+        members: [testMember],
+        onlineCount: 1,
+      ),
+    );
+    await pumpEventQueue();
+
+    await container.read(roomControllerProvider.notifier).leaveRoom();
+    await pumpEventQueue();
+    expect(controller.state.rooms.single.onlineCount, 0);
   });
 
   test('join enters the room through the room owner', () async {
