@@ -3,9 +3,6 @@ import 'dart:ui' show lerpDouble;
 import 'package:alisten/shared/theme/motion.dart';
 import 'package:flutter/widgets.dart';
 
-// 旧内容在前 30% 的时间里淡出，新内容等它淡完再放大淡入，两者不同时出现。
-const _outShare = 0.3;
-
 /// 用作 `AnimatedSwitcher.transitionBuilder`，配合 [AlistenMotion.fadeThrough]
 /// 的时长，用于加载中、列表、结果这类整块替换。淡出途中的内容不接收触摸也不被
 /// 读出，已经离开的按钮不会被再点一次。
@@ -30,14 +27,15 @@ Widget _fadeThrough(
       final double opacity;
       final double scale;
       if (leaving) {
-        final out = ((1 - animation.value) / _outShare).clamp(0.0, 1.0);
+        final out = ((1 - animation.value) / AlistenMotion.fadeThroughOutShare)
+            .clamp(0.0, 1.0);
         opacity = 1 - AlistenMotion.fadeOut.transform(out);
         scale = 1;
       } else {
-        final into = ((animation.value - _outShare) / (1 - _outShare)).clamp(
-          0.0,
-          1.0,
-        );
+        final into =
+            ((animation.value - AlistenMotion.fadeThroughOutShare) /
+                    (1 - AlistenMotion.fadeThroughOutShare))
+                .clamp(0.0, 1.0);
         final eased = AlistenMotion.fadeIn.transform(into);
         opacity = eased;
         scale = lerpDouble(AlistenMotion.fadeThroughFrom, 1, eased)!;

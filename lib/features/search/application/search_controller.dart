@@ -1,10 +1,10 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:alisten/core/logging/app_log.dart';
 import 'package:alisten/core/realtime/room_commands.dart';
 import 'package:alisten/core/realtime/room_transport.dart';
 import 'package:alisten/domain/history/search_record.dart';
-import 'package:alisten/domain/track/search_page.dart';
 import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/application/search_history_store.dart';
@@ -28,12 +28,15 @@ final class SearchController extends Notifier<SearchState> {
     : _now = now ?? (() => DateTime.now().millisecondsSinceEpoch);
 
   final int Function() _now;
-  // 最久没显示的结果排在最前；只对填入时所在的房间有效。
+  // 歌曲页、歌单页和推荐分开存，总览由歌曲和歌单的第一页拼成。最久没显示的
+  // 排在最前；只对填入时所在的房间有效。
   final Map<String, ({SearchResults results, int at})> _cache = {};
+  // 翻到过空页的搜索，记下它真正的最后一页。
+  final Map<String, int> _lastPages = {};
   String? _roomId;
   int _requestId = 0;
-  // 屏幕上的查询正在等待房间连接打开。
-  bool _deferred = false;
+  // 屏幕上的查询正在等待房间连接打开；[fresh] 表示它不能用缓存。
+  ({bool fresh})? _deferred;
 
   @override
   SearchState build() {
@@ -80,39 +83,53 @@ final class SearchController extends Notifier<SearchState> {
     return submit(state.keyword, view: view);
   }
 
-  Future<void> loadMore() async {
+  /// 换到第 [page] 页。取这一页期间仍显示当前页。
+  Future<PageTurnOutcome> turnTo(int page) async {
     final current = state;
-    if (!current.hasMore || current.status is SearchLoading) return;
-    final query = current.query.withPage(current.page + 1);
+    if (page < 1 ||
+        page > current.pageCount ||
+        page == current.page ||
+        current.status is SearchLoading) {
+      return PageTurnOutcome.ignored;
+    }
+    final query = current.query.withPage(page);
     final request = ++_requestId;
-    _deferred = false;
-    final cached = _cached(query.cacheKey);
-    if (cached != null) {
-      state = state.copyWith(
-        query: query,
-        status: const SearchLoaded(),
-        results: current.results.append(cached),
-      );
-      return;
+    _deferred = null;
+    var results = _cachedResults(query);
+    if (results == null) {
+      state = state.copyWith(status: SearchLoading(page: page));
+      final roomId = ref.read(roomControllerProvider).activeRoomId;
+      final outcome = await _search(query);
+      if (_stale(request, roomId)) return PageTurnOutcome.ignored;
+      _rememberFetched(query, outcome);
+      final failure = outcome.failure;
+      if (failure != null) {
+        state = state.copyWith(
+          status: SearchPartial(
+            code: failure.code,
+            message: failure.message,
+            page: page,
+          ),
+        );
+        return PageTurnOutcome.failed;
+      }
+      results = outcome.results;
     }
-    state = state.copyWith(status: const SearchLoading());
-    final roomId = ref.read(roomControllerProvider).activeRoomId;
-    final outcome = await _search(query);
-    if (_stale(request, roomId)) return;
-    final failure = outcome.failure;
-    if (failure == null) {
-      _remember(query.cacheKey, outcome.results);
+    final kind = _kindsOf(query).single;
+    if (_isEmpty(results, kind)) {
+      _lastPages[_searchKey(query, kind)] = page - 1;
       state = state.copyWith(
-        query: query,
         status: const SearchLoaded(),
-        results: state.results.append(outcome.results),
+        results: _capped(current.query, current.results),
       );
-    } else {
-      // 已显示的各页保留，重试时请求同一页。
-      state = state.copyWith(
-        status: SearchPartial(code: failure.code, message: failure.message),
-      );
+      return PageTurnOutcome.pastEnd;
     }
+    state = state.copyWith(
+      query: query,
+      status: const SearchLoaded(),
+      results: _capped(query, results),
+    );
+    return PageTurnOutcome.turned;
   }
 
   Future<void> refreshRecommendations() {
@@ -123,25 +140,21 @@ final class SearchController extends Notifier<SearchState> {
         keyword: '',
         page: 1,
       ),
-      force: true,
+      fresh: true,
     );
   }
 
   /// 不记入最近搜索。
-  Future<void> retry() {
-    final current = state;
-    if (current.status is SearchPartial && current.hasMore) return loadMore();
-    return _show(current.query.withPage(1), force: true);
-  }
+  Future<void> retry() => _show(state.query);
 
   Future<void> clearHistory() async {
     state = state.copyWith(recentSearches: const []);
     await _writeHistory((store) => store.clear());
   }
 
-  Future<void> _show(SearchQuery query, {bool force = false}) async {
+  Future<void> _show(SearchQuery query, {bool fresh = false}) async {
     final request = ++_requestId;
-    _deferred = false;
+    _deferred = null;
     final unchanged = query == state.query;
     if (query.view != SearchView.recommend && query.keyword.isEmpty) {
       state = state.copyWith(
@@ -151,12 +164,12 @@ final class SearchController extends Notifier<SearchState> {
       );
       return;
     }
-    final cached = force ? null : _cached(query.cacheKey);
+    final cached = fresh ? null : _cachedResults(query);
     if (cached != null) {
       state = state.copyWith(
         query: query,
         status: const SearchLoaded(),
-        results: cached,
+        results: _capped(query, cached),
       );
       return;
     }
@@ -175,16 +188,21 @@ final class SearchController extends Notifier<SearchState> {
       results: unchanged ? state.results : SearchResults.empty,
     );
     if (connection != RoomConnectionStatus.open) {
-      _deferred = true;
+      _deferred = (fresh: fresh);
       return;
     }
-    await _load(query, request);
+    await _load(query, request, fresh: fresh);
   }
 
-  Future<void> _load(SearchQuery query, int request) async {
+  Future<void> _load(
+    SearchQuery query,
+    int request, {
+    required bool fresh,
+  }) async {
     final roomId = ref.read(roomControllerProvider).activeRoomId;
-    final outcome = await _search(query);
+    final outcome = await _search(query, fresh: fresh);
     if (_stale(request, roomId)) return;
+    _rememberFetched(query, outcome);
     final failure = outcome.failure;
     state = state.copyWith(
       status: failure == null
@@ -192,9 +210,8 @@ final class SearchController extends Notifier<SearchState> {
           : outcome.partial
           ? SearchPartial(code: failure.code, message: failure.message)
           : failure,
-      results: outcome.results,
+      results: _capped(query, outcome.results),
     );
-    if (failure == null) _remember(query.cacheKey, outcome.results);
   }
 
   // 发出请求后若有了更新的请求或换了房间，它的回复既不显示也不写入缓存。
@@ -204,64 +221,64 @@ final class SearchController extends Notifier<SearchState> {
         roomId != ref.read(roomControllerProvider).activeRoomId;
   }
 
-  Future<_Outcome> _search(SearchQuery query) async {
-    if (query.view == SearchView.recommend) {
-      final part = await _capture(query, (c) => c.recommendations());
-      final items = part.value;
-      return items == null
-          ? _Outcome(SearchResults.empty, part.failure, partial: false)
-          : _Outcome(SearchResults(recommendations: items), null);
-    }
-    final withTracks =
-        query.view == SearchView.all || query.view == SearchView.tracks;
-    final withPlaylists =
-        query.view == SearchView.playlists || query.view == SearchView.all;
-    final Future<_Part<SearchPage<TrackSummary>>?> tracksRequest = withTracks
-        ? _capture(
-            query,
-            (c) => c.searchTracks(
-              source: query.source,
-              keyword: query.keyword,
-              page: query.page,
-              pageSize: searchPageSize,
-            ),
-          )
-        : Future.value();
-    final Future<_Part<SearchPage<PlaylistSummary>>?> playlistsRequest =
-        withPlaylists
-        ? _capture(
-            query,
-            (c) => c.searchPlaylists(
-              source: query.source,
-              keyword: query.keyword,
-              page: query.page,
-              pageSize: searchPageSize,
-            ),
-          )
-        : Future.value();
-    final (tracks, playlists) = await (tracksRequest, playlistsRequest).wait;
-    final failures = [?tracks?.failure, ?playlists?.failure];
-    final asked = [?tracks, ?playlists].length;
+  Future<_Outcome> _search(SearchQuery query, {bool fresh = false}) async {
+    final kinds = _kindsOf(query);
+    final parts = await Future.wait([
+      for (final kind in kinds) _part(query, kind, fresh: fresh),
+    ]);
+    final failures = [for (final part in parts) ?part.failure];
     return _Outcome(
-      SearchResults(
-        tracks: tracks?.value?.items ?? const [],
-        tracksTotal: tracks?.value?.total ?? 0,
-        playlists: playlists?.value?.items ?? const [],
-        playlistsTotal: playlists?.value?.total ?? 0,
-      ),
-      failures.isEmpty ? null : failures.first,
-      partial: failures.length < asked,
+      {for (final (index, kind) in kinds.indexed) kind: ?parts[index].value},
+      fetched: {
+        for (final (index, kind) in kinds.indexed)
+          if (parts[index].fetched) kind,
+      },
+      failure: failures.firstOrNull,
+      partial: failures.length < kinds.length,
     );
   }
 
-  // 不抛出：任何失败都作为结果返回，界面才不会一直停在加载中。
-  Future<_Part<T>> _capture<T>(
+  Future<_Part> _part(
     SearchQuery query,
-    Future<T> Function(RoomCommands c) run,
+    _Kind kind, {
+    required bool fresh,
+  }) async {
+    final cached = fresh ? null : _cached(_key(query, kind));
+    if (cached != null) return _Part.cached(cached);
+    return switch (kind) {
+      _Kind.tracks => _capture(query, (c) async {
+        final page = await c.searchTracks(
+          source: query.source,
+          keyword: query.keyword,
+          page: query.page,
+          pageSize: searchPageSize,
+        );
+        return SearchResults(tracks: page.items, tracksTotal: page.total);
+      }),
+      _Kind.playlists => _capture(query, (c) async {
+        final page = await c.searchPlaylists(
+          source: query.source,
+          keyword: query.keyword,
+          page: query.page,
+          pageSize: searchPageSize,
+        );
+        return SearchResults(playlists: page.items, playlistsTotal: page.total);
+      }),
+      _Kind.recommendations => _capture(
+        query,
+        (c) async => SearchResults(recommendations: await c.recommendations()),
+      ),
+    };
+  }
+
+  // 不抛出：任何失败都作为结果返回，界面才不会一直停在加载中。
+  Future<_Part> _capture(
+    SearchQuery query,
+    Future<SearchResults> Function(RoomCommands c) run,
   ) async {
     try {
       final value = await ref.read(roomControllerProvider.notifier).query(run);
-      return _Part.value(value);
+      return _Part.fetched(value);
     } on RoomRequestException catch (error) {
       final text =
           error.code == _invalidArgument && query.view != SearchView.recommend
@@ -274,6 +291,38 @@ final class SearchController extends Notifier<SearchState> {
         SearchFailed(code: null, message: _unexpected),
       );
     }
+  }
+
+  SearchResults? _cachedResults(SearchQuery query) {
+    final parts = {
+      for (final kind in _kindsOf(query)) kind: ?_cached(_key(query, kind)),
+    };
+    return parts.length == _kindsOf(query).length ? _combine(parts) : null;
+  }
+
+  // 只记新取回的部分，取自缓存的不因此多留十分钟。重新取回第一页时，以前
+  // 记下的最后一页不再作数。
+  void _rememberFetched(SearchQuery query, _Outcome outcome) {
+    for (final kind in outcome.fetched) {
+      _remember(_key(query, kind), outcome.parts[kind]!);
+      if (query.page == 1) _lastPages.remove(_searchKey(query, kind));
+    }
+  }
+
+  // 平台给出的总数可能比它肯给的多：总数不超过已知的最后一页。
+  SearchResults _capped(SearchQuery query, SearchResults results) {
+    int capped(int total, _Kind kind) {
+      final last = _lastPages[_searchKey(query, kind)];
+      return last == null ? total : math.min(total, last * searchPageSize);
+    }
+
+    return SearchResults(
+      tracks: results.tracks,
+      tracksTotal: capped(results.tracksTotal, _Kind.tracks),
+      playlists: results.playlists,
+      playlistsTotal: capped(results.playlistsTotal, _Kind.playlists),
+      recommendations: results.recommendations,
+    );
   }
 
   SearchResults? _cached(String key) {
@@ -352,18 +401,20 @@ final class SearchController extends Notifier<SearchState> {
     if (_roomId != next.activeRoomId) {
       _roomId = next.activeRoomId;
       _cache.clear();
-      _deferred = false;
+      _lastPages.clear();
+      _deferred = null;
       _requestId++;
       state = SearchState(recentSearches: state.recentSearches);
       return;
     }
-    if (!_deferred) return;
+    final deferred = _deferred;
+    if (deferred == null) return;
     switch (next.status) {
       case RoomConnectionStatus.open:
-        _deferred = false;
-        unawaited(_load(state.query, ++_requestId));
+        _deferred = null;
+        unawaited(_load(state.query, ++_requestId, fresh: deferred.fresh));
       case RoomConnectionStatus.stopped:
-        _deferred = false;
+        _deferred = null;
         _requestId++;
         state = state.copyWith(
           status: const SearchFailed(code: null, message: _notConnected),
@@ -376,18 +427,66 @@ final class SearchController extends Notifier<SearchState> {
 
 String _queryKey(String query) => query.trim().toLowerCase();
 
-final class _Part<T> {
-  const _Part.value(T this.value) : failure = null;
-  const _Part.failure(SearchFailed this.failure) : value = null;
+enum _Kind { tracks, playlists, recommendations }
 
-  final T? value;
+List<_Kind> _kindsOf(SearchQuery query) => switch (query.view) {
+  SearchView.all => const [_Kind.tracks, _Kind.playlists],
+  SearchView.tracks => const [_Kind.tracks],
+  SearchView.playlists => const [_Kind.playlists],
+  SearchView.recommend => const [_Kind.recommendations],
+};
+
+// 推荐与音源、关键词和页码无关。
+String _searchKey(SearchQuery query, _Kind kind) =>
+    kind == _Kind.recommendations
+    ? kind.name
+    : '${query.source.name}|${kind.name}|${query.keyword}';
+
+String _key(SearchQuery query, _Kind kind) =>
+    '${query.page}|${_searchKey(query, kind)}';
+
+bool _isEmpty(SearchResults results, _Kind kind) => switch (kind) {
+  _Kind.tracks => results.tracks.isEmpty,
+  _Kind.playlists => results.playlists.isEmpty,
+  _Kind.recommendations => results.recommendations.isEmpty,
+};
+
+// 每个部分只填了自己的字段。
+SearchResults _combine(Map<_Kind, SearchResults> parts) => SearchResults(
+  tracks: parts[_Kind.tracks]?.tracks ?? const [],
+  tracksTotal: parts[_Kind.tracks]?.tracksTotal ?? 0,
+  playlists: parts[_Kind.playlists]?.playlists ?? const [],
+  playlistsTotal: parts[_Kind.playlists]?.playlistsTotal ?? 0,
+  recommendations: parts[_Kind.recommendations]?.recommendations ?? const [],
+);
+
+final class _Part {
+  const _Part.cached(SearchResults this.value)
+    : failure = null,
+      fetched = false;
+  const _Part.fetched(SearchResults this.value)
+    : failure = null,
+      fetched = true;
+  const _Part.failure(SearchFailed this.failure)
+    : value = null,
+      fetched = false;
+
+  final SearchResults? value;
   final SearchFailed? failure;
+  final bool fetched;
 }
 
 // [failure] 是第一个失败；[partial] 表示其他部分有结果，照常显示。
 final class _Outcome {
-  const _Outcome(this.results, this.failure, {this.partial = false});
+  _Outcome(
+    this.parts, {
+    required this.fetched,
+    required this.failure,
+    required this.partial,
+  }) : results = _combine(parts);
 
+  final Map<_Kind, SearchResults> parts;
+  final Set<_Kind> fetched;
   final SearchResults results;
   final SearchFailed? failure;
   final bool partial;

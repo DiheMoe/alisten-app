@@ -29,6 +29,7 @@ import 'package:alisten/shared/ui/cover_backdrop.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
+import 'package:alisten/shared/ui/page_turn.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/section_header.dart';
@@ -78,7 +79,8 @@ String _sourceName(TrackSource source) => switch (source) {
   TrackSource.link => '链接',
 };
 
-const _loadMoreDistance = 600.0;
+// 页码在三位数以内变化时，两边的箭头不跟着挪。
+const _pageNumbersWidth = 72.0;
 
 // 慢慢拖动不算，要有甩的速度才换来源，以免竖向滚动时手指偏了就换走。
 const _swipeVelocity = 600.0;
@@ -133,6 +135,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   late final TextEditingController _input;
   late bool _inLibrary = widget.libraryOnly;
   final _focus = FocusNode();
+  final _scroll = ScrollController();
 
   SearchController get _search => ref.read(searchControllerProvider.notifier);
 
@@ -172,6 +175,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void dispose() {
     _input.dispose();
     _focus.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -293,15 +297,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     unawaited(openOriginalPage(pageUrl, widget.onNotice));
   }
 
-  // 上一页加载失败时不自动加载，等用户点“重试”。
-  bool _onScroll(int depth, ScrollMetrics metrics) {
-    // 只看页面本身的列表，忽略其中横向滚动的卡片行和内嵌的状态视图。
-    if (depth != 0 || metrics.extentAfter > _loadMoreDistance) return false;
-    final search = ref.read(searchControllerProvider);
-    if (search.hasMore && search.status is SearchLoaded) {
-      unawaited(_search.loadMore());
+  Future<void> _turnTo(int page) async {
+    final outcome = await _search.turnTo(page);
+    if (mounted && outcome == PageTurnOutcome.pastEnd) {
+      widget.onNotice('已经是最后一页');
     }
-    return false;
+  }
+
+  void _toTop() {
+    if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
   @override
@@ -387,35 +391,28 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: NotificationListener<ScrollMetricsNotification>(
-              onNotification: (notification) =>
-                  _onScroll(notification.depth, notification.metrics),
-              child: NotificationListener<ScrollUpdateNotification>(
-                onNotification: (notification) =>
-                    _onScroll(notification.depth, notification.metrics),
-                // 横向一甩换到相邻的来源。推荐卡片、歌单标签这些横向滚动的行比它
-                // 先收到拖动，在它们上面滑动仍是滚动。
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onHorizontalDragEnd: _swipeSource,
-                  child: CustomScrollView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    slivers: [
-                      ...offers,
-                      ...body,
-                      // 填满页面的状态视图自己居中，不需要底部留白。
-                      if (body.last is! SliverFillRemaining)
-                        SliverPadding(
-                          padding: EdgeInsets.only(
-                            bottom:
-                                MediaQuery.paddingOf(context).bottom +
-                                AlistenSpacing.xl,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+            // 横向一甩换到相邻的来源。推荐卡片、歌单标签这些横向滚动的行比它
+            // 先收到拖动，在它们上面滑动仍是滚动。
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragEnd: _swipeSource,
+              child: CustomScrollView(
+                controller: _scroll,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                slivers: [
+                  ...offers,
+                  ...body,
+                  // 填满页面的状态视图自己居中，不需要底部留白。
+                  if (body.last is! SliverFillRemaining)
+                    SliverPadding(
+                      padding: EdgeInsets.only(
+                        bottom:
+                            MediaQuery.paddingOf(context).bottom +
+                            AlistenSpacing.xl,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -614,9 +611,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final retry = status is SearchPartial
         ? _InlineRetry(
             message: status.message,
-            onRetry: () => unawaited(_search.retry()),
+            onRetry: () {
+              final page = status.page;
+              unawaited(page == null ? _search.retry() : _turnTo(page));
+            },
           )
         : null;
+    // 换了关键词、来源或类别是另一次搜索，不当作翻页。
+    final turnKey = ValueKey((search.source, search.view, search.keyword));
+    final pager = SliverToBoxAdapter(
+      child: _Pager(
+        search: search,
+        retry: retry,
+        onTurn: (page) => unawaited(_turnTo(page)),
+      ),
+    );
     return switch (search.view) {
       SearchView.all || SearchView.recommend => [
         if (retry != null) SliverToBoxAdapter(child: retry),
@@ -624,24 +633,35 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ],
       SearchView.tracks => [
         const SliverPadding(padding: EdgeInsets.only(top: AlistenSpacing.xs)),
-        SliverList.builder(
-          itemCount: search.tracks.length,
-          itemBuilder: (context, index) =>
-              SongRow(song: search.tracks[index], onPick: _pick, onOpen: _open),
-        ),
         SliverToBoxAdapter(
-          child: _More(search: search, retry: retry),
+          child: PageTurn(
+            key: turnKey,
+            page: search.page,
+            onTurned: _toTop,
+            child: Column(
+              children: [
+                for (final song in search.tracks)
+                  SongRow(song: song, onPick: _pick, onOpen: _open),
+              ],
+            ),
+          ),
         ),
+        pager,
       ],
       SearchView.playlists => [
         const SliverPadding(padding: EdgeInsets.only(top: AlistenSpacing.sm)),
-        _PlaylistGrid(
-          playlists: search.playlists,
-          onOpen: widget.onOpenPlaylist,
-        ),
         SliverToBoxAdapter(
-          child: _More(search: search, retry: retry),
+          child: PageTurn(
+            key: turnKey,
+            page: search.page,
+            onTurned: _toTop,
+            child: _PlaylistGrid(
+              playlists: search.playlists,
+              onOpen: widget.onOpenPlaylist,
+            ),
+          ),
         ),
+        pager,
       ],
     };
   }
@@ -689,7 +709,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 : null,
           ),
         ),
-        _PlaylistGrid(playlists: playlists, onOpen: widget.onOpenPlaylist),
+        SliverToBoxAdapter(
+          child: _PlaylistGrid(
+            playlists: playlists,
+            onOpen: widget.onOpenPlaylist,
+          ),
+        ),
       ],
     ];
   }
@@ -1077,38 +1102,41 @@ class _PlaylistGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SliverPadding(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AlistenSpacing.md),
-      sliver: SliverLayoutBuilder(
+      child: LayoutBuilder(
         builder: (context, constraints) {
           final across = math.max(
             2,
-            (constraints.crossAxisExtent / _playlistTileWidth).floor(),
+            (constraints.maxWidth / _playlistTileWidth).floor(),
           );
           final rows = (playlists.length / across).ceil();
-          return SliverList.builder(
-            itemCount: rows,
-            itemBuilder: (context, row) => Padding(
-              padding: EdgeInsets.only(
-                bottom: row == rows - 1 ? 0 : AlistenSpacing.md,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var column = 0; column < across; column++) ...[
-                    if (column > 0) const SizedBox(width: AlistenSpacing.sm),
-                    Expanded(
-                      child: row * across + column < playlists.length
-                          ? _PlaylistTile(
-                              playlist: playlists[row * across + column],
-                              onOpen: onOpen,
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+          return Column(
+            children: [
+              for (var row = 0; row < rows; row++)
+                Padding(
+                  padding: EdgeInsets.only(
+                    bottom: row == rows - 1 ? 0 : AlistenSpacing.md,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var column = 0; column < across; column++) ...[
+                        if (column > 0)
+                          const SizedBox(width: AlistenSpacing.sm),
+                        Expanded(
+                          child: row * across + column < playlists.length
+                              ? _PlaylistTile(
+                                  playlist: playlists[row * across + column],
+                                  onOpen: onOpen,
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+            ],
           );
         },
       ),
@@ -1175,20 +1203,76 @@ class _PlaylistTile extends StatelessWidget {
   }
 }
 
-class _More extends StatelessWidget {
-  const _More({required this.search, required this.retry});
+class _Pager extends StatelessWidget {
+  const _Pager({
+    required this.search,
+    required this.retry,
+    required this.onTurn,
+  });
 
   final SearchState search;
   final Widget? retry;
+  final ValueChanged<int> onTurn;
 
   @override
   Widget build(BuildContext context) {
     final retry = this.retry;
-    if (retry != null) return retry;
-    if (!search.hasMore && !search.loading) return const SizedBox.shrink();
-    return const SizedBox(
-      height: AlistenSizes.largeTouchTarget,
-      child: Center(child: BusyIndicator(semanticLabel: '正在加载更多')),
+    final pages = search.pageCount;
+    if (pages == 1) return retry ?? const SizedBox.shrink();
+    final page = search.page;
+    final turning = search.loading ? search.turningTo : null;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+
+    Widget arrow(String label, int to, {required bool back}) {
+      if (turning == to) {
+        return SizedBox.square(
+          dimension: AlistenSizes.minTouchTarget,
+          child: Center(child: BusyIndicator(semanticLabel: '正在翻页')),
+        );
+      }
+      return IconCircleButton(
+        icon: back == rtl ? AlistenIcons.arrowRight : AlistenIcons.arrowLeft,
+        semanticLabel: label,
+        style: IconCircleButtonStyle.plain,
+        onPressed: turning != null || to < 1 || to > pages
+            ? null
+            : () => onTurn(to),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ?retry,
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AlistenSpacing.xs),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              arrow('上一页', page - 1, back: true),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: _pageNumbersWidth),
+                child: Semantics(
+                  label: '第 $page 页，共 $pages 页',
+                  liveRegion: true,
+                  child: ExcludeSemantics(
+                    child: Text(
+                      '$page / $pages',
+                      maxLines: 1,
+                      softWrap: false,
+                      textAlign: TextAlign.center,
+                      style: AlistenTypography.timecode.copyWith(
+                        color: AlistenColors.of(context).onGlassMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              arrow('下一页', page + 1, back: false),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -82,6 +82,12 @@ abstract final class AlistenMotion {
   static const Curve fadeOut = Cubic(0.4, 0, 1, 1);
   static const double fadeThroughFrom = 0.92;
 
+  /// 旧内容在这段时间里淡出，新内容等它淡完才出现，两者不同时显示。
+  static const double fadeThroughOutShare = 0.3;
+
+  /// 翻页时一页内容横向移开或移入的距离。
+  static const double pageTurnShift = 30;
+
   static const listChange = Duration(milliseconds: 300);
   static const Curve listIn = Curves.easeOutCubic;
   static const Curve listOut = Curves.easeInCubic;

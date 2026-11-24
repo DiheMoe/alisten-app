@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:alisten/domain/history/search_record.dart';
 import 'package:alisten/domain/track/track.dart';
 
@@ -18,11 +20,6 @@ final class SearchQuery {
   final SearchView view;
   final String keyword;
   final int page;
-
-  /// 推荐与音源、关键词和页码无关。
-  String get cacheKey => view == SearchView.recommend
-      ? 'recommend'
-      : '${source.name}|${view.name}|$page|$keyword';
 
   SearchQuery withPage(int page) {
     return SearchQuery(
@@ -54,8 +51,11 @@ final class SearchIdle extends SearchStatus {
   const SearchIdle();
 }
 
+/// [page] 是正在取的那一页；不是翻页时为 null。
 final class SearchLoading extends SearchStatus {
-  const SearchLoading();
+  const SearchLoading({this.page});
+
+  final int? page;
 }
 
 final class SearchLoaded extends SearchStatus {
@@ -70,12 +70,25 @@ final class SearchFailed extends SearchStatus {
   final String message;
 }
 
-/// 已显示部分结果，其余失败：总览的两个列表之一失败，或下一页加载失败。
+/// 已显示部分结果，其余失败：总览的两个列表之一失败，或翻页失败。翻页失败时
+/// [page] 是没取到的那一页。
 final class SearchPartial extends SearchStatus {
-  const SearchPartial({required this.code, required this.message});
+  const SearchPartial({required this.code, required this.message, this.page});
 
   final String? code;
   final String message;
+  final int? page;
+}
+
+enum PageTurnOutcome {
+  turned,
+
+  /// 平台不给这一页：给出的总数比它实际肯给的多。
+  pastEnd,
+  failed,
+
+  /// 没有这一页、已经在这一页，或另一页正在路上。
+  ignored,
 }
 
 /// 缓存只存结果本身，不存结果之外的状态。
@@ -95,19 +108,6 @@ final class SearchResults {
   final List<PlaylistSummary> playlists;
   final int playlistsTotal;
   final List<TrackSummary> recommendations;
-
-  /// 没有条目的一页表示列表已到末尾，不论服务端给出的总数是多少。
-  SearchResults append(SearchResults page) {
-    return SearchResults(
-      tracks: [...tracks, ...page.tracks],
-      tracksTotal: page.tracks.isEmpty ? tracks.length : page.tracksTotal,
-      playlists: [...playlists, ...page.playlists],
-      playlistsTotal: page.playlists.isEmpty
-          ? playlists.length
-          : page.playlistsTotal,
-      recommendations: recommendations,
-    );
-  }
 }
 
 final class SearchState {
@@ -132,8 +132,20 @@ final class SearchState {
   TrackSource get source => query.source;
   SearchView get view => query.view;
 
-  /// 最后加载的页码；[tracks] 和 [playlists] 也包含之前各页的内容。
+  /// 歌曲和歌单一次只显示这一页。
   int get page => query.page;
+
+  int get pageCount => switch (view) {
+    SearchView.tracks => _pages(results.tracksTotal),
+    SearchView.playlists => _pages(results.playlistsTotal),
+    SearchView.all || SearchView.recommend => 1,
+  };
+
+  /// 正在取的那一页，或者刚才没取到、可以再试的那一页。
+  int? get turningTo => switch (status) {
+    SearchLoading(:final page) || SearchPartial(:final page) => page,
+    _ => null,
+  };
 
   List<TrackSummary> get tracks => results.tracks;
   List<PlaylistSummary> get playlists => results.playlists;
@@ -145,12 +157,6 @@ final class SearchState {
   String? get errorMessage => switch (status) {
     SearchFailed(:final message) || SearchPartial(:final message) => message,
     _ => null,
-  };
-
-  bool get hasMore => switch (view) {
-    SearchView.tracks => results.tracks.length < results.tracksTotal,
-    SearchView.playlists => results.playlists.length < results.playlistsTotal,
-    SearchView.all || SearchView.recommend => false,
   };
 
   TrackSummary? get bestMatch => tracks.isEmpty ? null : tracks.first;
@@ -183,3 +189,5 @@ final class SearchState {
     );
   }
 }
+
+int _pages(int total) => math.max(1, (total / searchPageSize).ceil());
