@@ -55,9 +55,13 @@ jobs:
           restore-keys: android-${{ runner.os }}-
       - name: Install cached Android SDK packages
         run: |
-          if [ -d ~/android-sdk-extra ]; then
-            cp -a ~/android-sdk-extra/. "$ANDROID_HOME"/
-          fi
+          for package in "$HOME"/android-sdk-extra/*/*; do
+            target="$ANDROID_HOME/${package#"$HOME/android-sdk-extra/"}"
+            if [ -d "$package" ] && [ ! -e "$target" ]; then
+              mkdir -p "$(dirname "$target")"
+              cp -a "$package" "$target"
+            fi
+          done
       - run: flutter pub get --enforce-lockfile
       - name: Build signed APK
         env:
