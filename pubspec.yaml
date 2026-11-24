@@ -2,7 +2,7 @@ name: alisten
 description: "Alisten synchronized listening client."
 publish_to: 'none'
 
-version: 1.6.4+17
+version: 1.6.5+18
 
 environment:
   sdk: ^3.13.7
