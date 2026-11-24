@@ -9,6 +9,8 @@ import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'image_loading.dart';
+
 void main() {
   setUp(() {
     imageCache
@@ -75,7 +77,7 @@ void main() {
     final button = tester.getRect(find.byType(IconCircleButton));
     expect(find.byIcon(AlistenIcons.gearSix), findsOneWidget);
 
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
     expect(find.byIcon(AlistenIcons.gearSix), findsOneWidget);
     expect(find.byType(RawImage), findsOneWidget);
     expect(tester.getRect(find.byType(IconCircleButton)), button);
@@ -113,7 +115,7 @@ void main() {
       ),
     );
 
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
     await tester.pump();
 
     expect(find.byIcon(AlistenIcons.gearSix), findsNothing);
@@ -121,18 +123,25 @@ void main() {
   });
 
   testWidgets('an image that cannot be loaded leaves the icon', (tester) async {
+    final image = MemoryImage(Uint8List.fromList(const [1, 2, 3, 4]));
+    var failed = false;
+    image
+        .resolve(ImageConfiguration.empty)
+        .addListener(
+          ImageStreamListener((_, _) {}, onError: (_, _) => failed = true),
+        );
     await tester.pumpWidget(
       app(
         IconCircleButton(
           icon: AlistenIcons.gearSix,
           semanticLabel: '设置',
-          image: MemoryImage(Uint8List(0)),
+          image: image,
           onPressed: () {},
         ),
       ),
     );
 
-    await _finishLoading(tester);
+    await pumpUntil(tester, () => failed);
     await tester.pumpAndSettle();
 
     expect(find.byIcon(AlistenIcons.gearSix), findsOneWidget);
@@ -162,19 +171,6 @@ void main() {
       ),
     );
   });
-}
-
-// 解码在引擎中真实异步进行：让出真实时间，直到没有加载中的图片，最多等 5 秒。
-Future<void> _finishLoading(WidgetTester tester) async {
-  final waited = Stopwatch()..start();
-  while (imageCache.pendingImageCount > 0 &&
-      waited.elapsed < const Duration(seconds: 5)) {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 5)),
-    );
-    await tester.pump();
-  }
-  await tester.pump();
 }
 
 Future<Uint8List> _png() async {

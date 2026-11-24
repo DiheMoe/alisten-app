@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'image_loading.dart';
+
 void main() {
   setUp(() {
     imageCache
@@ -49,7 +51,7 @@ void main() {
     server,
   ) async {
     await tester.pumpWidget(backdrop('https://cover/a'));
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
     final blurred = shownCovers(tester).single;
 
     await tester.pumpWidget(
@@ -73,7 +75,7 @@ void main() {
     server,
   ) async {
     await tester.pumpWidget(backdrop('https://cover/a'));
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
     await tester.pumpWidget(const SizedBox.shrink());
 
     await tester.pumpWidget(backdrop('https://cover/a'));
@@ -87,11 +89,11 @@ void main() {
     _,
   ) async {
     await tester.pumpWidget(backdrop('https://cover/a'));
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
     final first = shownCovers(tester).single;
 
     await tester.pumpWidget(backdrop('https://cover/b'));
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
     expect(shownCovers(tester), hasLength(2));
     expect(first.debugDisposed, isFalse);
 
@@ -104,7 +106,7 @@ void main() {
 
   testCovers('leaving the page releases the blurred cover', (tester, _) async {
     await tester.pumpWidget(backdrop('https://cover/a'));
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
     final blurred = shownCovers(tester).single;
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -122,7 +124,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
 
     respond.complete();
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
 
     expect(server.requests, hasLength(1));
     expect(imageCache.liveImageCount, 0);
@@ -134,7 +136,7 @@ void main() {
   ) async {
     await tester.pumpWidget(backdrop('https://cover/missing'));
 
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
 
     expect(server.requests, hasLength(1));
     expect(find.byType(RawImage), findsNothing);
@@ -150,7 +152,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
 
     respond.complete();
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
 
     expect(server.requests, hasLength(1));
     expect(tester.takeException(), isNull);
@@ -158,20 +160,6 @@ void main() {
     expect(imageCache.liveImageCount, 0);
     expect(imageCache.pendingImageCount, 0);
   });
-}
-
-// 封面来源是假的，解码却在引擎中真实异步进行：让出真实时间，直到没有加载中的
-// 封面，最多等 5 秒。
-Future<void> _finishLoading(WidgetTester tester) async {
-  final waited = Stopwatch()..start();
-  while (imageCache.pendingImageCount > 0 &&
-      waited.elapsed < const Duration(seconds: 5)) {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 5)),
-    );
-    await tester.pump();
-  }
-  await tester.pump();
 }
 
 Future<Uint8List> _png() async {

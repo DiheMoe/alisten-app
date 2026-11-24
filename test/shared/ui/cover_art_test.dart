@@ -10,6 +10,8 @@ import 'package:alisten/shared/ui/cover_images.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'image_loading.dart';
+
 const _cover = 'https://cover/a';
 
 void main() {
@@ -44,7 +46,7 @@ void main() {
         ),
       ),
     );
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
 
     expect(asked.toSet(), {_cover});
     expect(find.byIcon(AlistenIcons.musicNote), findsNothing);
@@ -101,7 +103,7 @@ void main() {
       colors.onGlass.withValues(alpha: 0.08),
     );
     expect(find.byIcon(AlistenIcons.musicNote), findsNothing);
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
   });
 
   testWidgets('a cover the image source cannot load shows the placeholder', (
@@ -115,7 +117,7 @@ void main() {
         ),
       ),
     );
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
 
     expect(find.byIcon(AlistenIcons.musicNote), findsOneWidget);
   });
@@ -190,19 +192,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(shuttle, findsNothing);
   });
-}
-
-// 解码在引擎中真实异步进行：让出真实时间，直到没有加载中的封面，最多等 5 秒。
-Future<void> _finishLoading(WidgetTester tester) async {
-  final waited = Stopwatch()..start();
-  while (imageCache.pendingImageCount > 0 &&
-      waited.elapsed < const Duration(seconds: 5)) {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 5)),
-    );
-    await tester.pump();
-  }
-  await tester.pump();
 }
 
 Future<Uint8List> _png(int side) async {

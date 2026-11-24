@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'avatar_test_doubles.dart';
+import '../../shared/ui/image_loading.dart';
 
 void main() {
   late Directory root;
@@ -52,7 +53,7 @@ void main() {
       ..avatars[weavatar] = (await tester.runAsync(_png))!;
 
     await tester.pumpWidget(avatar(server));
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
 
     expect(server.requests, [gravatar, weavatar, cravatar]);
     expect(tester.widget<RawImage>(find.byType(RawImage)).image, isNotNull);
@@ -64,7 +65,7 @@ void main() {
     final server = AvatarServer()..missing.add(gravatar);
 
     await tester.pumpWidget(avatar(server));
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
 
     expect(server.requests, [gravatar]);
     expect(find.byType(RawImage), findsNothing);
@@ -75,7 +76,7 @@ void main() {
     await useTemporaryDirectory(tester);
 
     await tester.pumpWidget(avatar(AvatarServer()));
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
 
     expect(find.byType(RawImage), findsNothing);
     expect(find.text('小'), findsOneWidget);
@@ -87,7 +88,7 @@ void main() {
     final server = AvatarServer()..avatars[gravatar] = '<html>'.codeUnits;
 
     await tester.pumpWidget(avatar(server));
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
 
     expect(find.text('小'), findsOneWidget);
     expect(await tester.runAsync(() => root.list().toList()), isEmpty);
@@ -98,21 +99,6 @@ void main() {
 
     expect('$image', isNot(contains('abc123')));
   });
-}
-
-// 让出真实时间给解码，同时推进假时间给 dio，直到 [done]，最多等 5 秒。
-Future<void> _pumpUntil(WidgetTester tester, bool Function() done) async {
-  const step = Duration(milliseconds: 5);
-  final waited = Stopwatch()..start();
-  while (!done() && waited.elapsed < const Duration(seconds: 5)) {
-    await tester.runAsync(() => Future<void>.delayed(step));
-    await tester.pump(step);
-  }
-}
-
-Future<void> _finishLoading(WidgetTester tester) async {
-  await _pumpUntil(tester, () => imageCache.pendingImageCount == 0);
-  await tester.pump();
 }
 
 Future<Uint8List> _png() async {

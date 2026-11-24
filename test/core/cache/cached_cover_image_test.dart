@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'cover_cache_test_doubles.dart';
+import '../../shared/ui/image_loading.dart';
 
 const _cover = 'https://covers.example.com/a.jpg';
 
@@ -51,7 +52,7 @@ void main() {
     await tester.pumpWidget(
       covers((url) => CachedCoverImage(url, cache), count: 2),
     );
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
 
     expect(cache.loads, [_cover]);
     expect(placeholder(), findsNothing);
@@ -73,11 +74,11 @@ void main() {
       directory: () async => root,
     );
     await tester.pumpWidget(covers((url) => CachedCoverImage(url, cache)));
-    await _pumpUntil(tester, () => server.requests.isNotEmpty);
+    await pumpUntil(tester, () => server.requests.isNotEmpty);
     expect(placeholder(), findsNothing);
 
     await tester.pump(const Duration(seconds: 30));
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
 
     expect(placeholder(), findsOneWidget);
     expect(server.cancelled, 1);
@@ -92,7 +93,7 @@ void main() {
     );
 
     await tester.pumpWidget(covers((url) => CachedCoverImage(url, cache)));
-    await _finishLoading(tester);
+    await finishLoadingImages(tester);
 
     expect(placeholder(), findsOneWidget);
     expect(cache.discarded, [_cover]);
@@ -103,22 +104,6 @@ void main() {
 
     expect('$image', isNot(contains('example')));
   });
-}
-
-// 让出真实时间给文件读写和解码，同时推进假时间，直到 [done]，最多等 5 秒。
-Future<void> _pumpUntil(WidgetTester tester, bool Function() done) async {
-  final waited = Stopwatch()..start();
-  while (!done() && waited.elapsed < const Duration(seconds: 5)) {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 5)),
-    );
-    await tester.pump();
-  }
-}
-
-Future<void> _finishLoading(WidgetTester tester) async {
-  await _pumpUntil(tester, () => imageCache.pendingImageCount == 0);
-  await tester.pump();
 }
 
 Future<Uint8List> _png() async {
