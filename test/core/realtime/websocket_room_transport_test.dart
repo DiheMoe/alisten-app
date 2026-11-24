@@ -863,7 +863,7 @@ Map<String, Object?> _snapshotData() {
     },
     'pending': null,
     'next': null,
-    'items': [_entryData()],
+    'waiting': [_entryData()],
     'members': {
       'sessions': [
         {'id': 'member-id', 'name': '听众', 'avatarHash': 'hash'},

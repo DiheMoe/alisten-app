@@ -426,8 +426,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>['id'],
   );
 
-  static const adminGetNeteaseCredential = RestEndpoint(
-    name: 'adminGetNeteaseCredential',
+  static const adminGetNetEaseCredential = RestEndpoint(
+    name: 'adminGetNetEaseCredential',
     method: 'GET',
     path: '/api/admin/credentials/netease',
     auth: HttpAuth.admin,
@@ -436,8 +436,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const adminGetQqCredential = RestEndpoint(
-    name: 'adminGetQqCredential',
+  static const adminGetQQCredential = RestEndpoint(
+    name: 'adminGetQQCredential',
     method: 'GET',
     path: '/api/admin/credentials/qq',
     auth: HttpAuth.admin,
@@ -446,8 +446,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const adminStartNeteaseLogin = RestEndpoint(
-    name: 'adminStartNeteaseLogin',
+  static const adminStartNetEaseLogin = RestEndpoint(
+    name: 'adminStartNetEaseLogin',
     method: 'POST',
     path: '/api/admin/credentials/netease/qr-logins',
     auth: HttpAuth.admin,
@@ -456,8 +456,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const adminCheckNeteaseLogin = RestEndpoint(
-    name: 'adminCheckNeteaseLogin',
+  static const adminCheckNetEaseLogin = RestEndpoint(
+    name: 'adminCheckNetEaseLogin',
     method: 'POST',
     path: '/api/admin/credentials/netease/qr-logins/status',
     auth: HttpAuth.admin,
@@ -466,8 +466,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const adminStartQqLogin = RestEndpoint(
-    name: 'adminStartQqLogin',
+  static const adminStartQQLogin = RestEndpoint(
+    name: 'adminStartQQLogin',
     method: 'POST',
     path: '/api/admin/credentials/qq/qr-logins',
     auth: HttpAuth.admin,
@@ -476,8 +476,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const adminCheckQqLogin = RestEndpoint(
-    name: 'adminCheckQqLogin',
+  static const adminCheckQQLogin = RestEndpoint(
+    name: 'adminCheckQQLogin',
     method: 'POST',
     path: '/api/admin/credentials/qq/qr-logins/status',
     auth: HttpAuth.admin,
@@ -516,8 +516,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const adminGetYoutubeCredential = RestEndpoint(
-    name: 'adminGetYoutubeCredential',
+  static const adminGetYouTubeCredential = RestEndpoint(
+    name: 'adminGetYouTubeCredential',
     method: 'GET',
     path: '/api/admin/credentials/youtube',
     auth: HttpAuth.admin,
@@ -526,8 +526,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const adminSetYoutubeCredential = RestEndpoint(
-    name: 'adminSetYoutubeCredential',
+  static const adminSetYouTubeCredential = RestEndpoint(
+    name: 'adminSetYouTubeCredential',
     method: 'PUT',
     path: '/api/admin/credentials/youtube',
     auth: HttpAuth.admin,
@@ -536,8 +536,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const adminDeleteYoutubeCredential = RestEndpoint(
-    name: 'adminDeleteYoutubeCredential',
+  static const adminDeleteYouTubeCredential = RestEndpoint(
+    name: 'adminDeleteYouTubeCredential',
     method: 'DELETE',
     path: '/api/admin/credentials/youtube',
     auth: HttpAuth.admin,
@@ -546,8 +546,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const adminGetGithubCredential = RestEndpoint(
-    name: 'adminGetGithubCredential',
+  static const adminGetGitHubCredential = RestEndpoint(
+    name: 'adminGetGitHubCredential',
     method: 'GET',
     path: '/api/admin/credentials/github',
     auth: HttpAuth.admin,
@@ -556,8 +556,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const adminSetGithubCredential = RestEndpoint(
-    name: 'adminSetGithubCredential',
+  static const adminSetGitHubCredential = RestEndpoint(
+    name: 'adminSetGitHubCredential',
     method: 'PUT',
     path: '/api/admin/credentials/github',
     auth: HttpAuth.admin,
@@ -566,8 +566,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const adminDeleteGithubCredential = RestEndpoint(
-    name: 'adminDeleteGithubCredential',
+  static const adminDeleteGitHubCredential = RestEndpoint(
+    name: 'adminDeleteGitHubCredential',
     method: 'DELETE',
     path: '/api/admin/credentials/github',
     auth: HttpAuth.admin,
@@ -766,8 +766,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const startGithubLogin = RestEndpoint(
-    name: 'startGithubLogin',
+  static const startGitHubLogin = RestEndpoint(
+    name: 'startGitHubLogin',
     method: 'POST',
     path: '/api/auth/github',
     auth: HttpAuth.member,
@@ -776,8 +776,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const finishGithubLogin = RestEndpoint(
-    name: 'finishGithubLogin',
+  static const finishGitHubLogin = RestEndpoint(
+    name: 'finishGitHubLogin',
     method: 'POST',
     path: '/api/auth/github/exchange',
     auth: HttpAuth.member,
@@ -786,8 +786,8 @@ abstract final class RestEndpoints {
     pathParameters: <String>[],
   );
 
-  static const unbindGithub = RestEndpoint(
-    name: 'unbindGithub',
+  static const unbindGitHub = RestEndpoint(
+    name: 'unbindGitHub',
     method: 'POST',
     path: '/api/account/github/removals',
     auth: HttpAuth.member,
@@ -839,21 +839,21 @@ abstract final class RestEndpoints {
     adminDeleteRoom,
     adminGetRoomApiKey,
     adminResetRoomApiKey,
-    adminGetNeteaseCredential,
-    adminGetQqCredential,
-    adminStartNeteaseLogin,
-    adminCheckNeteaseLogin,
-    adminStartQqLogin,
-    adminCheckQqLogin,
+    adminGetNetEaseCredential,
+    adminGetQQCredential,
+    adminStartNetEaseLogin,
+    adminCheckNetEaseLogin,
+    adminStartQQLogin,
+    adminCheckQQLogin,
     adminGetBilibiliCredential,
     adminStartBilibiliLogin,
     adminCheckBilibiliLogin,
-    adminGetYoutubeCredential,
-    adminSetYoutubeCredential,
-    adminDeleteYoutubeCredential,
-    adminGetGithubCredential,
-    adminSetGithubCredential,
-    adminDeleteGithubCredential,
+    adminGetYouTubeCredential,
+    adminSetYouTubeCredential,
+    adminDeleteYouTubeCredential,
+    adminGetGitHubCredential,
+    adminSetGitHubCredential,
+    adminDeleteGitHubCredential,
     adminListMedia,
     adminRemoveMedia,
     adminUpdateSite,
@@ -873,8 +873,8 @@ abstract final class RestEndpoints {
     copySharedPlaylist,
     createPairingCode,
     redeemPairingCode,
-    startGithubLogin,
-    finishGithubLogin,
-    unbindGithub,
+    startGitHubLogin,
+    finishGitHubLogin,
+    unbindGitHub,
   ];
 }

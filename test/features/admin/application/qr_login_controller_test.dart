@@ -217,7 +217,7 @@ void main() {
       open(async);
       api.checkResults.add(
         const FakeQrCheck.error(
-          ApiException(code: 'PROVIDER_ERROR', message: '网易云出错了', status: 502),
+          ApiException(code: 'SOURCE_ERROR', message: '网易云出错了', status: 502),
         ),
       );
 
@@ -403,7 +403,7 @@ void main() {
     fakeAsync((async) {
       open(async);
       api.startQrError = const ApiException(
-        code: 'PROVIDER_ERROR',
+        code: 'SOURCE_ERROR',
         message: '暂时无法获取二维码',
         status: 502,
       );

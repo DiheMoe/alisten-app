@@ -288,11 +288,11 @@ void main() {
       }
 
       final apiOfA = container.read(alistenApiProvider);
-      http.respond(200, {'member': _member, 'recordListens': true});
+      http.respond(200, {'member': _member, 'listenRecording': true});
       await apiOfA.getMe();
       http.respond(201, {'ticket': 'ticket-of-A'});
       await joinRoom(await apiOfA.createTicket('room-1'));
-      http.respond(200, {'items': <Object?>[], 'defaultCapacity': 64});
+      http.respond(200, {'items': <Object?>[], 'persistentRoomCapacity': 64});
       expect(await session.signIn('admin-token-of-A'), isA<AdminSignedIn>());
       http.respondRaw(204, '', null);
       await session.run((api, t) => api.setYoutubeCookie(t, 'cookie-of-A'));
@@ -308,7 +308,7 @@ void main() {
       await directory.add(serverB);
       await directory.setCurrent(serverB.id);
 
-      http.respond(200, {'member': _member, 'recordListens': true});
+      http.respond(200, {'member': _member, 'listenRecording': true});
       await container.read(alistenApiProvider).getMe();
       await expectLater(
         apiOfA.getMe(),

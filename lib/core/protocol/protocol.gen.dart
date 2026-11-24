@@ -5,7 +5,7 @@ import 'package:alisten/core/protocol/protocol_runtime.dart';
 export 'package:alisten/core/protocol/protocol_runtime.dart'
     show ProtocolMismatchException, WsEvent, WsRequest, WsResponse;
 
-const protocolVersion = '77c2a450b56ba881';
+const protocolVersion = '31cf9198eff06722';
 
 class APIKey {
   const APIKey({required this.key});
@@ -186,7 +186,7 @@ enum ErrorCode {
   queueFull('QUEUE_FULL'),
   nothingPlaying('NOTHING_PLAYING'),
   rateLimited('RATE_LIMITED'),
-  providerError('PROVIDER_ERROR'),
+  sourceError('SOURCE_ERROR'),
   unavailable('UNAVAILABLE'),
   clientOutdated('CLIENT_OUTDATED'),
   roomFull('ROOM_FULL'),
@@ -941,7 +941,6 @@ class RoomListing {
 
 class RoomSnapshot {
   const RoomSnapshot({
-    required this.items,
     required this.members,
     required this.next,
     required this.nowPlaying,
@@ -950,20 +949,11 @@ class RoomSnapshot {
     required this.room,
     required this.seq,
     required this.term,
+    required this.waiting,
   });
 
   factory RoomSnapshot.fromJson(Map<String, Object?> json) {
     return RoomSnapshot(
-      items:
-          readList(
-                requiredField(json, 'items', 'RoomSnapshot'),
-                'RoomSnapshot.items',
-              )
-              .map(
-                (item) =>
-                    Entry.fromJson(readObject(item, 'RoomSnapshot.items[]')),
-              )
-              .toList(growable: false),
       members: Members.fromJson(
         readObject(
           requiredField(json, 'members', 'RoomSnapshot'),
@@ -1005,10 +995,19 @@ class RoomSnapshot {
         requiredField(json, 'term', 'RoomSnapshot'),
         'RoomSnapshot.term',
       ),
+      waiting:
+          readList(
+                requiredField(json, 'waiting', 'RoomSnapshot'),
+                'RoomSnapshot.waiting',
+              )
+              .map(
+                (item) =>
+                    Entry.fromJson(readObject(item, 'RoomSnapshot.waiting[]')),
+              )
+              .toList(growable: false),
     );
   }
 
-  final List<Entry> items;
   final Members members;
   final NextTrack? next;
   final NowPlaying? nowPlaying;
@@ -1017,9 +1016,9 @@ class RoomSnapshot {
   final RoomInfo room;
   final int seq;
   final int term;
+  final List<Entry> waiting;
 
   Map<String, Object?> toJson() => <String, Object?>{
-    'items': items.map((item) => item.toJson()).toList(growable: false),
     'members': members.toJson(),
     'next': next?.toJson(),
     'nowPlaying': nowPlaying?.toJson(),
@@ -1028,6 +1027,7 @@ class RoomSnapshot {
     'room': room.toJson(),
     'seq': seq,
     'term': term,
+    'waiting': waiting.map((item) => item.toJson()).toList(growable: false),
   };
 }
 
@@ -1948,23 +1948,13 @@ class PlaybackUpdated {
 
 class QueueUpdated {
   const QueueUpdated({
-    required this.items,
     required this.next,
     required this.pending,
+    required this.waiting,
   });
 
   factory QueueUpdated.fromJson(Map<String, Object?> json) {
     return QueueUpdated(
-      items:
-          readList(
-                requiredField(json, 'items', 'QueueUpdated'),
-                'QueueUpdated.items',
-              )
-              .map(
-                (item) =>
-                    Entry.fromJson(readObject(item, 'QueueUpdated.items[]')),
-              )
-              .toList(growable: false),
       next: switch (requiredField(json, 'next', 'QueueUpdated')) {
         null => null,
         final value => NextTrack.fromJson(
@@ -1977,17 +1967,27 @@ class QueueUpdated {
           readObject(value, 'QueueUpdated.pending'),
         ),
       },
+      waiting:
+          readList(
+                requiredField(json, 'waiting', 'QueueUpdated'),
+                'QueueUpdated.waiting',
+              )
+              .map(
+                (item) =>
+                    Entry.fromJson(readObject(item, 'QueueUpdated.waiting[]')),
+              )
+              .toList(growable: false),
     );
   }
 
-  final List<Entry> items;
   final NextTrack? next;
   final Entry? pending;
+  final List<Entry> waiting;
 
   Map<String, Object?> toJson() => <String, Object?>{
-    'items': items.map((item) => item.toJson()).toList(growable: false),
     'next': next?.toJson(),
     'pending': pending?.toJson(),
+    'waiting': waiting.map((item) => item.toJson()).toList(growable: false),
   };
 }
 
@@ -2175,8 +2175,8 @@ class CreateMemberResponse {
 class GetMeResponse {
   const GetMeResponse({
     this.account,
+    required this.listenRecording,
     required this.member,
-    required this.recordListens,
   });
 
   factory GetMeResponse.fromJson(Map<String, Object?> json) {
@@ -2187,27 +2187,27 @@ class GetMeResponse {
           readObject(value, 'GetMeResponse.account'),
         ),
       },
+      listenRecording: readBool(
+        requiredField(json, 'listenRecording', 'GetMeResponse'),
+        'GetMeResponse.listenRecording',
+      ),
       member: Member.fromJson(
         readObject(
           requiredField(json, 'member', 'GetMeResponse'),
           'GetMeResponse.member',
         ),
       ),
-      recordListens: readBool(
-        requiredField(json, 'recordListens', 'GetMeResponse'),
-        'GetMeResponse.recordListens',
-      ),
     );
   }
 
   final Account? account;
+  final bool listenRecording;
   final Member member;
-  final bool recordListens;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'account': ?account?.toJson(),
+    'listenRecording': listenRecording,
     'member': member.toJson(),
-    'recordListens': recordListens,
   };
 }
 
@@ -3027,16 +3027,12 @@ class GetSiteResponse {
 
 class AdminListRoomsResponse {
   const AdminListRoomsResponse({
-    required this.defaultCapacity,
     required this.items,
+    required this.persistentRoomCapacity,
   });
 
   factory AdminListRoomsResponse.fromJson(Map<String, Object?> json) {
     return AdminListRoomsResponse(
-      defaultCapacity: readInt(
-        requiredField(json, 'defaultCapacity', 'AdminListRoomsResponse'),
-        'AdminListRoomsResponse.defaultCapacity',
-      ),
       items:
           readList(
                 requiredField(json, 'items', 'AdminListRoomsResponse'),
@@ -3048,15 +3044,19 @@ class AdminListRoomsResponse {
                 ),
               )
               .toList(growable: false),
+      persistentRoomCapacity: readInt(
+        requiredField(json, 'persistentRoomCapacity', 'AdminListRoomsResponse'),
+        'AdminListRoomsResponse.persistentRoomCapacity',
+      ),
     );
   }
 
-  final int defaultCapacity;
   final List<RoomListing> items;
+  final int persistentRoomCapacity;
 
   Map<String, Object?> toJson() => <String, Object?>{
-    'defaultCapacity': defaultCapacity,
     'items': items.map((item) => item.toJson()).toList(growable: false),
+    'persistentRoomCapacity': persistentRoomCapacity,
   };
 }
 
@@ -3232,34 +3232,34 @@ class AdminResetRoomApiKeyRequest {
   Map<String, Object?> toJson() => <String, Object?>{};
 }
 
-class AdminGetNeteaseCredentialResponse {
-  const AdminGetNeteaseCredentialResponse({
+class AdminGetNetEaseCredentialResponse {
+  const AdminGetNetEaseCredentialResponse({
     required this.account,
     required this.set,
     required this.signedOut,
   });
 
-  factory AdminGetNeteaseCredentialResponse.fromJson(
+  factory AdminGetNetEaseCredentialResponse.fromJson(
     Map<String, Object?> json,
   ) {
-    return AdminGetNeteaseCredentialResponse(
+    return AdminGetNetEaseCredentialResponse(
       account: switch (requiredField(
         json,
         'account',
-        'AdminGetNeteaseCredentialResponse',
+        'AdminGetNetEaseCredentialResponse',
       )) {
         null => null,
         final value => SourceAccount.fromJson(
-          readObject(value, 'AdminGetNeteaseCredentialResponse.account'),
+          readObject(value, 'AdminGetNetEaseCredentialResponse.account'),
         ),
       },
       set: readBool(
-        requiredField(json, 'set', 'AdminGetNeteaseCredentialResponse'),
-        'AdminGetNeteaseCredentialResponse.set',
+        requiredField(json, 'set', 'AdminGetNetEaseCredentialResponse'),
+        'AdminGetNetEaseCredentialResponse.set',
       ),
       signedOut: readBool(
-        requiredField(json, 'signedOut', 'AdminGetNeteaseCredentialResponse'),
-        'AdminGetNeteaseCredentialResponse.signedOut',
+        requiredField(json, 'signedOut', 'AdminGetNetEaseCredentialResponse'),
+        'AdminGetNetEaseCredentialResponse.signedOut',
       ),
     );
   }
@@ -3275,32 +3275,32 @@ class AdminGetNeteaseCredentialResponse {
   };
 }
 
-class AdminGetQqCredentialResponse {
-  const AdminGetQqCredentialResponse({
+class AdminGetQQCredentialResponse {
+  const AdminGetQQCredentialResponse({
     required this.account,
     required this.set,
     required this.signedOut,
   });
 
-  factory AdminGetQqCredentialResponse.fromJson(Map<String, Object?> json) {
-    return AdminGetQqCredentialResponse(
+  factory AdminGetQQCredentialResponse.fromJson(Map<String, Object?> json) {
+    return AdminGetQQCredentialResponse(
       account: switch (requiredField(
         json,
         'account',
-        'AdminGetQqCredentialResponse',
+        'AdminGetQQCredentialResponse',
       )) {
         null => null,
         final value => SourceAccount.fromJson(
-          readObject(value, 'AdminGetQqCredentialResponse.account'),
+          readObject(value, 'AdminGetQQCredentialResponse.account'),
         ),
       },
       set: readBool(
-        requiredField(json, 'set', 'AdminGetQqCredentialResponse'),
-        'AdminGetQqCredentialResponse.set',
+        requiredField(json, 'set', 'AdminGetQQCredentialResponse'),
+        'AdminGetQQCredentialResponse.set',
       ),
       signedOut: readBool(
-        requiredField(json, 'signedOut', 'AdminGetQqCredentialResponse'),
-        'AdminGetQqCredentialResponse.signedOut',
+        requiredField(json, 'signedOut', 'AdminGetQQCredentialResponse'),
+        'AdminGetQQCredentialResponse.signedOut',
       ),
     );
   }
@@ -3316,23 +3316,23 @@ class AdminGetQqCredentialResponse {
   };
 }
 
-class AdminStartNeteaseLoginRequest {
-  const AdminStartNeteaseLoginRequest();
+class AdminStartNetEaseLoginRequest {
+  const AdminStartNetEaseLoginRequest();
 
-  factory AdminStartNeteaseLoginRequest.fromJson(Map<String, Object?> json) =>
-      const AdminStartNeteaseLoginRequest();
+  factory AdminStartNetEaseLoginRequest.fromJson(Map<String, Object?> json) =>
+      const AdminStartNetEaseLoginRequest();
 
   Map<String, Object?> toJson() => <String, Object?>{};
 }
 
-class AdminCheckNeteaseLoginRequest {
-  const AdminCheckNeteaseLoginRequest({required this.key});
+class AdminCheckNetEaseLoginRequest {
+  const AdminCheckNetEaseLoginRequest({required this.key});
 
-  factory AdminCheckNeteaseLoginRequest.fromJson(Map<String, Object?> json) {
-    return AdminCheckNeteaseLoginRequest(
+  factory AdminCheckNetEaseLoginRequest.fromJson(Map<String, Object?> json) {
+    return AdminCheckNetEaseLoginRequest(
       key: readString(
-        requiredField(json, 'key', 'AdminCheckNeteaseLoginRequest'),
-        'AdminCheckNeteaseLoginRequest.key',
+        requiredField(json, 'key', 'AdminCheckNetEaseLoginRequest'),
+        'AdminCheckNetEaseLoginRequest.key',
       ),
     );
   }
@@ -3342,13 +3342,13 @@ class AdminCheckNeteaseLoginRequest {
   Map<String, Object?> toJson() => <String, Object?>{'key': key};
 }
 
-class AdminStartQqLoginRequest {
-  const AdminStartQqLoginRequest({required this.type});
+class AdminStartQQLoginRequest {
+  const AdminStartQQLoginRequest({required this.type});
 
-  factory AdminStartQqLoginRequest.fromJson(Map<String, Object?> json) {
-    return AdminStartQqLoginRequest(
+  factory AdminStartQQLoginRequest.fromJson(Map<String, Object?> json) {
+    return AdminStartQQLoginRequest(
       type: QQLoginType.fromJson(
-        requiredField(json, 'type', 'AdminStartQqLoginRequest'),
+        requiredField(json, 'type', 'AdminStartQQLoginRequest'),
       ),
     );
   }
@@ -3358,17 +3358,17 @@ class AdminStartQqLoginRequest {
   Map<String, Object?> toJson() => <String, Object?>{'type': type.toJson()};
 }
 
-class AdminCheckQqLoginRequest {
-  const AdminCheckQqLoginRequest({required this.key, required this.type});
+class AdminCheckQQLoginRequest {
+  const AdminCheckQQLoginRequest({required this.key, required this.type});
 
-  factory AdminCheckQqLoginRequest.fromJson(Map<String, Object?> json) {
-    return AdminCheckQqLoginRequest(
+  factory AdminCheckQQLoginRequest.fromJson(Map<String, Object?> json) {
+    return AdminCheckQQLoginRequest(
       key: readString(
-        requiredField(json, 'key', 'AdminCheckQqLoginRequest'),
-        'AdminCheckQqLoginRequest.key',
+        requiredField(json, 'key', 'AdminCheckQQLoginRequest'),
+        'AdminCheckQQLoginRequest.key',
       ),
       type: QQLoginType.fromJson(
-        requiredField(json, 'type', 'AdminCheckQqLoginRequest'),
+        requiredField(json, 'type', 'AdminCheckQQLoginRequest'),
       ),
     );
   }
@@ -3386,6 +3386,7 @@ class AdminGetBilibiliCredentialResponse {
   const AdminGetBilibiliCredentialResponse({
     required this.account,
     required this.set,
+    required this.signedOut,
   });
 
   factory AdminGetBilibiliCredentialResponse.fromJson(
@@ -3406,15 +3407,21 @@ class AdminGetBilibiliCredentialResponse {
         requiredField(json, 'set', 'AdminGetBilibiliCredentialResponse'),
         'AdminGetBilibiliCredentialResponse.set',
       ),
+      signedOut: readBool(
+        requiredField(json, 'signedOut', 'AdminGetBilibiliCredentialResponse'),
+        'AdminGetBilibiliCredentialResponse.signedOut',
+      ),
     );
   }
 
   final SourceAccount? account;
   final bool set;
+  final bool signedOut;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'account': account?.toJson(),
     'set': set,
+    'signedOut': signedOut,
   };
 }
 
@@ -3444,23 +3451,23 @@ class AdminCheckBilibiliLoginRequest {
   Map<String, Object?> toJson() => <String, Object?>{'key': key};
 }
 
-class AdminGetYoutubeCredentialResponse {
-  const AdminGetYoutubeCredentialResponse({
+class AdminGetYouTubeCredentialResponse {
+  const AdminGetYouTubeCredentialResponse({
     required this.set,
     required this.updatedAtMs,
   });
 
-  factory AdminGetYoutubeCredentialResponse.fromJson(
+  factory AdminGetYouTubeCredentialResponse.fromJson(
     Map<String, Object?> json,
   ) {
-    return AdminGetYoutubeCredentialResponse(
+    return AdminGetYouTubeCredentialResponse(
       set: readBool(
-        requiredField(json, 'set', 'AdminGetYoutubeCredentialResponse'),
-        'AdminGetYoutubeCredentialResponse.set',
+        requiredField(json, 'set', 'AdminGetYouTubeCredentialResponse'),
+        'AdminGetYouTubeCredentialResponse.set',
       ),
       updatedAtMs: readInt(
-        requiredField(json, 'updatedAtMs', 'AdminGetYoutubeCredentialResponse'),
-        'AdminGetYoutubeCredentialResponse.updatedAtMs',
+        requiredField(json, 'updatedAtMs', 'AdminGetYouTubeCredentialResponse'),
+        'AdminGetYouTubeCredentialResponse.updatedAtMs',
       ),
     );
   }
@@ -3474,14 +3481,14 @@ class AdminGetYoutubeCredentialResponse {
   };
 }
 
-class AdminSetYoutubeCredentialRequest {
-  const AdminSetYoutubeCredentialRequest({required this.cookies});
+class AdminSetYouTubeCredentialRequest {
+  const AdminSetYouTubeCredentialRequest({required this.cookies});
 
-  factory AdminSetYoutubeCredentialRequest.fromJson(Map<String, Object?> json) {
-    return AdminSetYoutubeCredentialRequest(
+  factory AdminSetYouTubeCredentialRequest.fromJson(Map<String, Object?> json) {
+    return AdminSetYouTubeCredentialRequest(
       cookies: readString(
-        requiredField(json, 'cookies', 'AdminSetYoutubeCredentialRequest'),
-        'AdminSetYoutubeCredentialRequest.cookies',
+        requiredField(json, 'cookies', 'AdminSetYouTubeCredentialRequest'),
+        'AdminSetYouTubeCredentialRequest.cookies',
       ),
     );
   }
@@ -3491,37 +3498,37 @@ class AdminSetYoutubeCredentialRequest {
   Map<String, Object?> toJson() => <String, Object?>{'cookies': cookies};
 }
 
-class AdminGetGithubCredentialResponse {
-  const AdminGetGithubCredentialResponse({
+class AdminGetGitHubCredentialResponse {
+  const AdminGetGitHubCredentialResponse({
     required this.callbackUrl,
     required this.clientId,
     required this.clientSecretSet,
   });
 
-  factory AdminGetGithubCredentialResponse.fromJson(Map<String, Object?> json) {
-    return AdminGetGithubCredentialResponse(
+  factory AdminGetGitHubCredentialResponse.fromJson(Map<String, Object?> json) {
+    return AdminGetGitHubCredentialResponse(
       callbackUrl: readString(
-        requiredField(json, 'callbackUrl', 'AdminGetGithubCredentialResponse'),
-        'AdminGetGithubCredentialResponse.callbackUrl',
+        requiredField(json, 'callbackUrl', 'AdminGetGitHubCredentialResponse'),
+        'AdminGetGitHubCredentialResponse.callbackUrl',
       ),
       clientId: switch (requiredField(
         json,
         'clientId',
-        'AdminGetGithubCredentialResponse',
+        'AdminGetGitHubCredentialResponse',
       )) {
         null => null,
         final value => readString(
           value,
-          'AdminGetGithubCredentialResponse.clientId',
+          'AdminGetGitHubCredentialResponse.clientId',
         ),
       },
       clientSecretSet: readBool(
         requiredField(
           json,
           'clientSecretSet',
-          'AdminGetGithubCredentialResponse',
+          'AdminGetGitHubCredentialResponse',
         ),
-        'AdminGetGithubCredentialResponse.clientSecretSet',
+        'AdminGetGitHubCredentialResponse.clientSecretSet',
       ),
     );
   }
@@ -3537,21 +3544,21 @@ class AdminGetGithubCredentialResponse {
   };
 }
 
-class AdminSetGithubCredentialRequest {
-  const AdminSetGithubCredentialRequest({
+class AdminSetGitHubCredentialRequest {
+  const AdminSetGitHubCredentialRequest({
     required this.clientId,
     required this.clientSecret,
   });
 
-  factory AdminSetGithubCredentialRequest.fromJson(Map<String, Object?> json) {
-    return AdminSetGithubCredentialRequest(
+  factory AdminSetGitHubCredentialRequest.fromJson(Map<String, Object?> json) {
+    return AdminSetGitHubCredentialRequest(
       clientId: readString(
-        requiredField(json, 'clientId', 'AdminSetGithubCredentialRequest'),
-        'AdminSetGithubCredentialRequest.clientId',
+        requiredField(json, 'clientId', 'AdminSetGitHubCredentialRequest'),
+        'AdminSetGitHubCredentialRequest.clientId',
       ),
       clientSecret: readString(
-        requiredField(json, 'clientSecret', 'AdminSetGithubCredentialRequest'),
-        'AdminSetGithubCredentialRequest.clientSecret',
+        requiredField(json, 'clientSecret', 'AdminSetGitHubCredentialRequest'),
+        'AdminSetGitHubCredentialRequest.clientSecret',
       ),
     );
   }
@@ -4002,20 +4009,20 @@ class RedeemPairingCodeResponse {
   };
 }
 
-class StartGithubLoginRequest {
-  const StartGithubLoginRequest({
+class StartGitHubLoginRequest {
+  const StartGitHubLoginRequest({
     this.client,
     this.currentPassword,
     required this.intent,
     required this.nonce,
   });
 
-  factory StartGithubLoginRequest.fromJson(Map<String, Object?> json) {
-    return StartGithubLoginRequest(
+  factory StartGitHubLoginRequest.fromJson(Map<String, Object?> json) {
+    return StartGitHubLoginRequest(
       client: switch (optionalField(
         json,
         'client',
-        'StartGithubLoginRequest',
+        'StartGitHubLoginRequest',
       )) {
         null => null,
         final value => GitHubClient.fromJson(value),
@@ -4023,20 +4030,20 @@ class StartGithubLoginRequest {
       currentPassword: switch (optionalField(
         json,
         'currentPassword',
-        'StartGithubLoginRequest',
+        'StartGitHubLoginRequest',
       )) {
         null => null,
         final value => readString(
           value,
-          'StartGithubLoginRequest.currentPassword',
+          'StartGitHubLoginRequest.currentPassword',
         ),
       },
       intent: GitHubIntent.fromJson(
-        requiredField(json, 'intent', 'StartGithubLoginRequest'),
+        requiredField(json, 'intent', 'StartGitHubLoginRequest'),
       ),
       nonce: readString(
-        requiredField(json, 'nonce', 'StartGithubLoginRequest'),
-        'StartGithubLoginRequest.nonce',
+        requiredField(json, 'nonce', 'StartGitHubLoginRequest'),
+        'StartGitHubLoginRequest.nonce',
       ),
     );
   }
@@ -4054,14 +4061,14 @@ class StartGithubLoginRequest {
   };
 }
 
-class StartGithubLoginResponse {
-  const StartGithubLoginResponse({required this.url});
+class StartGitHubLoginResponse {
+  const StartGitHubLoginResponse({required this.url});
 
-  factory StartGithubLoginResponse.fromJson(Map<String, Object?> json) {
-    return StartGithubLoginResponse(
+  factory StartGitHubLoginResponse.fromJson(Map<String, Object?> json) {
+    return StartGitHubLoginResponse(
       url: readString(
-        requiredField(json, 'url', 'StartGithubLoginResponse'),
-        'StartGithubLoginResponse.url',
+        requiredField(json, 'url', 'StartGitHubLoginResponse'),
+        'StartGitHubLoginResponse.url',
       ),
     );
   }
@@ -4071,18 +4078,18 @@ class StartGithubLoginResponse {
   Map<String, Object?> toJson() => <String, Object?>{'url': url};
 }
 
-class FinishGithubLoginRequest {
-  const FinishGithubLoginRequest({required this.code, required this.nonce});
+class FinishGitHubLoginRequest {
+  const FinishGitHubLoginRequest({required this.code, required this.nonce});
 
-  factory FinishGithubLoginRequest.fromJson(Map<String, Object?> json) {
-    return FinishGithubLoginRequest(
+  factory FinishGitHubLoginRequest.fromJson(Map<String, Object?> json) {
+    return FinishGitHubLoginRequest(
       code: readString(
-        requiredField(json, 'code', 'FinishGithubLoginRequest'),
-        'FinishGithubLoginRequest.code',
+        requiredField(json, 'code', 'FinishGitHubLoginRequest'),
+        'FinishGitHubLoginRequest.code',
       ),
       nonce: readString(
-        requiredField(json, 'nonce', 'FinishGithubLoginRequest'),
-        'FinishGithubLoginRequest.nonce',
+        requiredField(json, 'nonce', 'FinishGitHubLoginRequest'),
+        'FinishGitHubLoginRequest.nonce',
       ),
     );
   }
@@ -4096,36 +4103,36 @@ class FinishGithubLoginRequest {
   };
 }
 
-class FinishGithubLoginResponse {
-  const FinishGithubLoginResponse({
+class FinishGitHubLoginResponse {
+  const FinishGitHubLoginResponse({
     required this.account,
     required this.member,
     this.memberToken,
   });
 
-  factory FinishGithubLoginResponse.fromJson(Map<String, Object?> json) {
-    return FinishGithubLoginResponse(
+  factory FinishGitHubLoginResponse.fromJson(Map<String, Object?> json) {
+    return FinishGitHubLoginResponse(
       account: Account.fromJson(
         readObject(
-          requiredField(json, 'account', 'FinishGithubLoginResponse'),
-          'FinishGithubLoginResponse.account',
+          requiredField(json, 'account', 'FinishGitHubLoginResponse'),
+          'FinishGitHubLoginResponse.account',
         ),
       ),
       member: Member.fromJson(
         readObject(
-          requiredField(json, 'member', 'FinishGithubLoginResponse'),
-          'FinishGithubLoginResponse.member',
+          requiredField(json, 'member', 'FinishGitHubLoginResponse'),
+          'FinishGitHubLoginResponse.member',
         ),
       ),
       memberToken: switch (optionalField(
         json,
         'memberToken',
-        'FinishGithubLoginResponse',
+        'FinishGitHubLoginResponse',
       )) {
         null => null,
         final value => readString(
           value,
-          'FinishGithubLoginResponse.memberToken',
+          'FinishGitHubLoginResponse.memberToken',
         ),
       },
     );
@@ -4142,14 +4149,14 @@ class FinishGithubLoginResponse {
   };
 }
 
-class UnbindGithubRequest {
-  const UnbindGithubRequest({required this.currentPassword});
+class UnbindGitHubRequest {
+  const UnbindGitHubRequest({required this.currentPassword});
 
-  factory UnbindGithubRequest.fromJson(Map<String, Object?> json) {
-    return UnbindGithubRequest(
+  factory UnbindGitHubRequest.fromJson(Map<String, Object?> json) {
+    return UnbindGitHubRequest(
       currentPassword: readString(
-        requiredField(json, 'currentPassword', 'UnbindGithubRequest'),
-        'UnbindGithubRequest.currentPassword',
+        requiredField(json, 'currentPassword', 'UnbindGitHubRequest'),
+        'UnbindGitHubRequest.currentPassword',
       ),
     );
   }

@@ -145,7 +145,7 @@ void main() {
     harness.transport.requestHandler = (type, data) async {
       if (type == 'search.playlists') {
         throw const RoomRequestException(
-          code: 'PROVIDER_ERROR',
+          code: 'SOURCE_ERROR',
           message: '音乐平台没有正常响应，请稍后再试。',
           outcome: RoomRequestOutcome.failed,
         );
@@ -156,7 +156,7 @@ void main() {
     await harness.search.submit('jazz', source: TrackSource.netease);
     final status = harness.state.status;
     expect(status, isA<SearchPartial>());
-    expect((status as SearchPartial).code, 'PROVIDER_ERROR');
+    expect((status as SearchPartial).code, 'SOURCE_ERROR');
     expect(harness.state.tracks, hasLength(1));
 
     await harness.search.submit('jazz', source: TrackSource.netease);

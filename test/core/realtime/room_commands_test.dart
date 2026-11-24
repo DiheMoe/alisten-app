@@ -358,7 +358,7 @@ Map<String, Object?> _snapshotJson() {
     },
     'pending': null,
     'next': null,
-    'items': [_entryJson()],
+    'waiting': [_entryJson()],
     'members': {
       'sessions': [_memberJson()],
       'onlineCount': 1,

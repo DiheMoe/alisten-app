@@ -179,7 +179,7 @@ RoomSnapshot toDomainSnapshot(protocol.RoomSnapshot snapshot) {
         ? null
         : toDomainNowPlaying(snapshot.nowPlaying!),
     pending: snapshot.pending == null ? null : toDomainEntry(snapshot.pending!),
-    items: snapshot.items.map(toDomainEntry).toList(growable: false),
+    items: snapshot.waiting.map(toDomainEntry).toList(growable: false),
     next: _next(snapshot.next),
     members: snapshot.members.sessions
         .map(toDomainMember)
@@ -225,7 +225,7 @@ QueueUpdatedEvent _queueUpdated(int term, int seq, Map<String, Object?> data) {
     term: term,
     seq: seq,
     pending: event.pending == null ? null : toDomainEntry(event.pending!),
-    items: event.items.map(toDomainEntry).toList(growable: false),
+    items: event.waiting.map(toDomainEntry).toList(growable: false),
     next: _next(event.next),
   );
 }

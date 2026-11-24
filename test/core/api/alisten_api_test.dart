@@ -74,7 +74,7 @@ void main() {
     () async {
       adapter.respond(200, {
         'member': _memberJson(id: 'member-2', name: 'Current listener'),
-        'recordListens': true,
+        'listenRecording': true,
       });
 
       final member = (await api.getMe()).member;
@@ -477,7 +477,7 @@ void main() {
         'email': 'mao@example.com',
         'github': true,
       },
-      'recordListens': false,
+      'listenRecording': false,
     });
 
     final profile = await api.getMe();
@@ -492,7 +492,7 @@ void main() {
   test('getMe leaves the account empty for a guest', () async {
     adapter.respond(200, {
       'member': _memberJson(id: 'member-3', name: '游客'),
-      'recordListens': true,
+      'listenRecording': true,
     });
 
     final profile = await api.getMe();

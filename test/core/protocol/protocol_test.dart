@@ -246,7 +246,7 @@ void main() {
         <String, Object?>{'password': '', 'slug': ''},
       );
       expect(
-        const protocol.AdminStartQqLoginRequest(type: protocol.QQLoginType.wx)
+        const protocol.AdminStartQQLoginRequest(type: protocol.QQLoginType.wx)
             .toJson(),
         <String, Object?>{'type': 'wx'},
       );

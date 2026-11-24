@@ -6,7 +6,7 @@ const githubCallbackScheme = 'moe.dihe.alisten';
 
 const _callbackPath = '/auth/github';
 
-// FinishGithubLoginRequest.code 的上限。
+// FinishGitHubLoginRequest.code 的上限。
 const _maxCodeLength = 128;
 
 sealed class GithubCallback {

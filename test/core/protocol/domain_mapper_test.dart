@@ -57,7 +57,7 @@ void main() {
       final event = toDomainEvent(protocol.RoomEventTypes.queueUpdated, 1, 2, {
         'pending': null,
         'next': next,
-        'items': <Object?>[],
+        'waiting': <Object?>[],
       });
       final snapshot = toDomainSnapshot(
         protocol.RoomSnapshot.fromJson({
@@ -74,7 +74,7 @@ void main() {
           'nowPlaying': null,
           'pending': null,
           'next': next,
-          'items': <Object?>[],
+          'waiting': <Object?>[],
           'members': {'sessions': <Object?>[], 'onlineCount': 0},
         }),
       );
@@ -119,7 +119,7 @@ void main() {
           'nowPlaying': null,
           'pending': null,
           'next': null,
-          'items': <Object?>[],
+          'waiting': <Object?>[],
           'members': {'sessions': <Object?>[], 'onlineCount': 0},
         }),
       );

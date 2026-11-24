@@ -334,7 +334,7 @@ final class RestAlistenApi implements AlistenApi {
         return MemberProfile(
           member: toDomainMember(response.member),
           account: account == null ? null : toDomainAccount(account),
-          recordListens: response.recordListens,
+          recordListens: response.listenRecording,
         );
       },
     );
@@ -452,8 +452,8 @@ final class RestAlistenApi implements AlistenApi {
     String? currentPassword,
   }) {
     return _request(
-      http.RestEndpoints.startGithubLogin,
-      body: protocol.StartGithubLoginRequest(
+      http.RestEndpoints.startGitHubLogin,
+      body: protocol.StartGitHubLoginRequest(
         client: protocol.GitHubClient.app,
         currentPassword: currentPassword,
         intent: switch (intent) {
@@ -465,7 +465,7 @@ final class RestAlistenApi implements AlistenApi {
       ).toJson(),
       decode: (json) {
         final url = Uri.tryParse(
-          protocol.StartGithubLoginResponse.fromJson(json).url,
+          protocol.StartGitHubLoginResponse.fromJson(json).url,
         );
         // 授权页交给系统浏览器打开，只接受 https。
         if (url == null || url.scheme != 'https' || url.host.isEmpty) {
@@ -482,13 +482,13 @@ final class RestAlistenApi implements AlistenApi {
     required String nonce,
   }) {
     return _request(
-      http.RestEndpoints.finishGithubLogin,
-      body: protocol.FinishGithubLoginRequest(
+      http.RestEndpoints.finishGitHubLogin,
+      body: protocol.FinishGitHubLoginRequest(
         code: code,
         nonce: nonce,
       ).toJson(),
       decode: (json) {
-        final response = protocol.FinishGithubLoginResponse.fromJson(json);
+        final response = protocol.FinishGitHubLoginResponse.fromJson(json);
         final member = toDomainMember(response.member);
         final account = toDomainAccount(response.account);
         final token = response.memberToken;
@@ -506,8 +506,8 @@ final class RestAlistenApi implements AlistenApi {
   @override
   Future<void> unbindGithub({required String currentPassword}) {
     return _send(
-      http.RestEndpoints.unbindGithub,
-      body: protocol.UnbindGithubRequest(currentPassword: currentPassword)
+      http.RestEndpoints.unbindGitHub,
+      body: protocol.UnbindGitHubRequest(currentPassword: currentPassword)
           .toJson(),
     );
   }

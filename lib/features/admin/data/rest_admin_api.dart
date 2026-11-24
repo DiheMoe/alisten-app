@@ -28,7 +28,7 @@ final class RestAdminApi implements AdminApi {
           rooms: response.items
               .map(toDomainRoomListing)
               .toList(growable: false),
-          defaultCapacity: response.defaultCapacity,
+          defaultCapacity: response.persistentRoomCapacity,
         );
       },
     );
@@ -201,8 +201,8 @@ final class RestAdminApi implements AdminApi {
   ) {
     return _request(
       switch (source) {
-        LoginSource.netease => http.RestEndpoints.adminGetNeteaseCredential,
-        LoginSource.qq => http.RestEndpoints.adminGetQqCredential,
+        LoginSource.netease => http.RestEndpoints.adminGetNetEaseCredential,
+        LoginSource.qq => http.RestEndpoints.adminGetQQCredential,
         LoginSource.bilibili => http.RestEndpoints.adminGetBilibiliCredential,
       },
       token: token,
@@ -213,7 +213,7 @@ final class RestAdminApi implements AdminApi {
       },
       decode: switch (source) {
         LoginSource.netease => (json) {
-          final response = protocol.AdminGetNeteaseCredentialResponse.fromJson(
+          final response = protocol.AdminGetNetEaseCredentialResponse.fromJson(
             json,
           );
           return _accountStatus(
@@ -223,7 +223,7 @@ final class RestAdminApi implements AdminApi {
           );
         },
         LoginSource.qq => (json) {
-          final response = protocol.AdminGetQqCredentialResponse.fromJson(json);
+          final response = protocol.AdminGetQQCredentialResponse.fromJson(json);
           return _accountStatus(
             response.set,
             response.account,
@@ -234,7 +234,11 @@ final class RestAdminApi implements AdminApi {
           final response = protocol.AdminGetBilibiliCredentialResponse.fromJson(
             json,
           );
-          return _accountStatus(response.set, response.account);
+          return _accountStatus(
+            response.set,
+            response.account,
+            signedOut: response.signedOut,
+          );
         },
       },
     );
@@ -248,12 +252,12 @@ final class RestAdminApi implements AdminApi {
   }) {
     final (endpoint, body) = switch (source) {
       LoginSource.netease => (
-        http.RestEndpoints.adminStartNeteaseLogin,
-        const protocol.AdminStartNeteaseLoginRequest().toJson(),
+        http.RestEndpoints.adminStartNetEaseLogin,
+        const protocol.AdminStartNetEaseLoginRequest().toJson(),
       ),
       LoginSource.qq => (
-        http.RestEndpoints.adminStartQqLogin,
-        protocol.AdminStartQqLoginRequest(type: _qqType(qqType)).toJson(),
+        http.RestEndpoints.adminStartQQLogin,
+        protocol.AdminStartQQLoginRequest(type: _qqType(qqType)).toJson(),
       ),
       LoginSource.bilibili => (
         http.RestEndpoints.adminStartBilibiliLogin,
@@ -285,12 +289,12 @@ final class RestAdminApi implements AdminApi {
   }) {
     final (endpoint, body) = switch (source) {
       LoginSource.netease => (
-        http.RestEndpoints.adminCheckNeteaseLogin,
-        protocol.AdminCheckNeteaseLoginRequest(key: key).toJson(),
+        http.RestEndpoints.adminCheckNetEaseLogin,
+        protocol.AdminCheckNetEaseLoginRequest(key: key).toJson(),
       ),
       LoginSource.qq => (
-        http.RestEndpoints.adminCheckQqLogin,
-        protocol.AdminCheckQqLoginRequest(
+        http.RestEndpoints.adminCheckQQLogin,
+        protocol.AdminCheckQQLoginRequest(
           key: key,
           type: _qqType(qqType),
         ).toJson(),
@@ -324,10 +328,10 @@ final class RestAdminApi implements AdminApi {
   @override
   Future<YoutubeCookieStatus> getYoutubeCookie(String token) {
     return _request(
-      http.RestEndpoints.adminGetYoutubeCredential,
+      http.RestEndpoints.adminGetYouTubeCredential,
       token: token,
       decode: (json) {
-        final response = protocol.AdminGetYoutubeCredentialResponse.fromJson(
+        final response = protocol.AdminGetYouTubeCredentialResponse.fromJson(
           json,
         );
         return YoutubeCookieStatus(
@@ -341,9 +345,9 @@ final class RestAdminApi implements AdminApi {
   @override
   Future<void> setYoutubeCookie(String token, String cookies) async {
     await _transport.execute(
-      http.RestEndpoints.adminSetYoutubeCredential,
+      http.RestEndpoints.adminSetYouTubeCredential,
       token: token,
-      body: protocol.AdminSetYoutubeCredentialRequest(cookies: cookies)
+      body: protocol.AdminSetYouTubeCredentialRequest(cookies: cookies)
           .toJson(),
     );
   }
@@ -351,7 +355,7 @@ final class RestAdminApi implements AdminApi {
   @override
   Future<void> deleteYoutubeCookie(String token) async {
     await _transport.execute(
-      http.RestEndpoints.adminDeleteYoutubeCredential,
+      http.RestEndpoints.adminDeleteYouTubeCredential,
       token: token,
     );
   }
@@ -359,10 +363,10 @@ final class RestAdminApi implements AdminApi {
   @override
   Future<GithubAppStatus> getGithubApp(String token) {
     return _request(
-      http.RestEndpoints.adminGetGithubCredential,
+      http.RestEndpoints.adminGetGitHubCredential,
       token: token,
       decode: (json) {
-        final response = protocol.AdminGetGithubCredentialResponse.fromJson(
+        final response = protocol.AdminGetGitHubCredentialResponse.fromJson(
           json,
         );
         return GithubAppStatus(
@@ -381,9 +385,9 @@ final class RestAdminApi implements AdminApi {
     required String clientSecret,
   }) async {
     await _transport.execute(
-      http.RestEndpoints.adminSetGithubCredential,
+      http.RestEndpoints.adminSetGitHubCredential,
       token: token,
-      body: protocol.AdminSetGithubCredentialRequest(
+      body: protocol.AdminSetGitHubCredentialRequest(
         clientId: clientId,
         clientSecret: clientSecret,
       ).toJson(),
@@ -393,7 +397,7 @@ final class RestAdminApi implements AdminApi {
   @override
   Future<void> deleteGithubApp(String token) async {
     await _transport.execute(
-      http.RestEndpoints.adminDeleteGithubCredential,
+      http.RestEndpoints.adminDeleteGitHubCredential,
       token: token,
     );
   }
@@ -460,7 +464,7 @@ final class RestAdminApi implements AdminApi {
   static SourceAccountStatus _accountStatus(
     bool saved,
     protocol.SourceAccount? account, {
-    bool signedOut = false,
+    required bool signedOut,
   }) {
     return SourceAccountStatus(
       saved: saved,

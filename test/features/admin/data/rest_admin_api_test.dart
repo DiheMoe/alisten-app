@@ -46,7 +46,7 @@ void main() {
           'capacity': 64,
         },
       ],
-      'defaultCapacity': 32,
+      'persistentRoomCapacity': 32,
     });
 
     final list = await api.listRooms('t');
@@ -319,6 +319,7 @@ void main() {
     adapter.respond(200, {
       'set': true,
       'account': {'id': '1', 'name': null, 'vip': null, 'verified': false},
+      'signedOut': false,
     });
 
     final status = await api.getSourceAccount('t', LoginSource.bilibili);
@@ -356,7 +357,7 @@ void main() {
   });
 
   test('a login the platform says has expired is read as signed out', () async {
-    for (final source in [LoginSource.netease, LoginSource.qq]) {
+    for (final source in LoginSource.values) {
       adapter.respond(200, {'set': true, 'account': null, 'signedOut': true});
 
       final status = await api.getSourceAccount('t', source);
