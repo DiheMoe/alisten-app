@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:alisten/app/app.dart';
 import 'package:alisten/app/assembly.dart';
@@ -17,6 +18,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main({
@@ -70,6 +72,13 @@ Future<AudioEngine> _audioEngine(Future<AudioEngine> Function() start) async {
 }
 
 Future<AudioEngine> _startAudio() async {
+  // just_audio 在 Linux 上没有原生实现，由系统的 libmpv 播放；找不到它时抛出。
+  if (Platform.isLinux) {
+    JustAudioMediaKit.title = 'Alisten';
+    // 变调滤镜会关掉 mpv 的音高校正；播放速率固定为 1.0，用不到它。
+    JustAudioMediaKit.pitch = false;
+    JustAudioMediaKit.ensureInitialized();
+  }
   final handler = await AlistenAudioHandler.create(newThirdPartyDio());
   await AudioService.init(
     builder: () => handler,

@@ -112,6 +112,15 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach {
     dependsOn(verifyReleaseLinkHost)
 }
 
+// media_kit 只在桌面上播放音频，它给网页端带的脚本会被打进所有平台的资源里。
+tasks.withType<Copy>().matching { it.name.startsWith("copyFlutterAssets") }.configureEach {
+    doLast {
+        (this as Copy).destinationDir
+            .resolve("flutter_assets/packages/media_kit/assets/web")
+            .deleteRecursively()
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17

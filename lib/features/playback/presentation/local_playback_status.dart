@@ -1,5 +1,6 @@
 import 'package:alisten/features/playback/application/local_playback_state.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 typedef LocalPlaybackNote = ({
@@ -54,7 +55,10 @@ LocalPlaybackNote? localPlaybackNote(LocalPlaybackStatus status) {
     ),
     // 重试无效，所以不像播放失败那样提供重试。
     LocalPlaybackStatus.unavailable => (
-      text: '本机无法播放，请重启应用',
+      // Linux 上由系统的 libmpv 播放，没装时重启也没用。
+      text: defaultTargetPlatform == TargetPlatform.linux
+          ? '本机无法播放，请确认已安装 mpv 后重启应用'
+          : '本机无法播放，请重启应用',
       icon: AlistenIcons.speakerSlash,
       busy: false,
       failed: false,

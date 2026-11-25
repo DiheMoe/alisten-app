@@ -35,6 +35,7 @@ final class PluginNotificationGateway implements NotificationGateway {
           requestBadgePermission: false,
           requestSoundPermission: false,
         ),
+        linux: LinuxInitializationSettings(defaultActionName: '打开房间'),
       ),
       onDidReceiveNotificationResponse: (response) {
         final payload = response.payload;
@@ -50,6 +51,8 @@ final class PluginNotificationGateway implements NotificationGateway {
 
   @override
   Future<bool> checkPermission() async {
+    // 桌面通知不需要授权。
+    if (Platform.isLinux) return true;
     if (Platform.isAndroid) {
       final plugin = _plugin
           .resolvePlatformSpecificImplementation<
@@ -72,6 +75,7 @@ final class PluginNotificationGateway implements NotificationGateway {
 
   @override
   Future<bool> requestPermission() async {
+    if (Platform.isLinux) return true;
     if (Platform.isAndroid) {
       final plugin = _plugin
           .resolvePlatformSpecificImplementation<
