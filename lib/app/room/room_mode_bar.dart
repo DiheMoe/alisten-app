@@ -18,6 +18,12 @@ class RoomModeBar extends StatelessWidget {
     required this.onSelect,
     required this.onSearch,
     required this.onPickFromPlaylists,
+    this.padding = const EdgeInsets.fromLTRB(
+      AlistenSpacing.sm,
+      AlistenSpacing.xs,
+      AlistenSpacing.sm,
+      AlistenSpacing.sm,
+    ),
     super.key,
   });
 
@@ -32,16 +38,12 @@ class RoomModeBar extends StatelessWidget {
   final ValueChanged<RoomMode> onSelect;
   final VoidCallback onSearch;
   final VoidCallback onPickFromPlaylists;
+  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AlistenSpacing.sm,
-        AlistenSpacing.xs,
-        AlistenSpacing.sm,
-        AlistenSpacing.sm,
-      ),
+      padding: padding,
       // 两个点歌按钮和模式条一样高。
       child: Row(
         children: [

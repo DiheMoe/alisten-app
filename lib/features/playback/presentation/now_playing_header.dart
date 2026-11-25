@@ -52,6 +52,33 @@ class NowPlayingHeader extends ConsumerStatefulWidget {
   final Widget Function(Track track, String title)? saveToPlaylist;
   final Widget? body;
 
+  /// 完整的播放器放进 [size] 时，封面上方和控件下方各空出多少。旁边的内容照此
+  /// 留白，顶边和底边就与播放器对齐。
+  static ({double top, double bottom}) stageInsets(
+    BuildContext context,
+    Size size,
+  ) {
+    final titleHeight = _TitleBlock.heightOf(
+      MediaQuery.textScalerOf(context),
+      compact: false,
+    );
+    final fit = _PlayerFit.of(context, size, titleHeight: titleHeight);
+    final controls =
+        PlaybackProgressBar.heightOf(context) +
+        fit.progressToControls +
+        PlayerControls.height;
+    final arranged = _arrange(
+      size,
+      fit,
+      titleHeight: titleHeight,
+      controlsHeightAt: (_) => controls,
+    );
+    return (
+      top: arranged.cover.isEmpty ? arranged.titleTop : arranged.cover.top,
+      bottom: math.max(0.0, size.height - arranged.controlsTop - controls),
+    );
+  }
+
   @override
   ConsumerState<NowPlayingHeader> createState() => _NowPlayingHeaderState();
 }

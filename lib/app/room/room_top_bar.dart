@@ -1,5 +1,4 @@
 import 'package:alisten/app/room/connection_pill.dart';
-import 'package:alisten/app/room/song_buttons.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
@@ -23,8 +22,6 @@ class RoomTopBar extends StatefulWidget {
     required this.onInvite,
     required this.onLeave,
     this.onRetryNow,
-    this.onSearch,
-    this.onPickFromPlaylists,
     super.key,
   });
 
@@ -38,10 +35,6 @@ class RoomTopBar extends StatefulWidget {
   final VoidCallback onLeave;
 
   final VoidCallback? onRetryNow;
-
-  /// 宽屏时点歌的两个按钮在顶栏；窄屏时在底部的模式条，这里为 null。
-  final VoidCallback? onSearch;
-  final VoidCallback? onPickFromPlaylists;
 
   @override
   State<RoomTopBar> createState() => _RoomTopBarState();
@@ -87,14 +80,6 @@ class _RoomTopBarState extends State<RoomTopBar> {
               ),
             ),
             actions: [
-              if (widget.onPickFromPlaylists case final pick?) ...[
-                PickFromPlaylistsButton(onPressed: pick),
-                const SizedBox(width: AlistenSpacing.xs),
-              ],
-              if (widget.onSearch case final search?) ...[
-                SearchSongsButton(onPressed: search),
-                const SizedBox(width: AlistenSpacing.xs),
-              ],
               Popover(
                 open: _menuOpen,
                 onClose: _closeMenu,

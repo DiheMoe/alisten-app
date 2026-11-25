@@ -80,7 +80,6 @@ abstract final class AlistenSizes {
   static const double sheetMaxWidth = 560;
   static const double toastMaxWidth = 480;
   static const double contentMaxWidth = 640;
-  static const double sidePanelWidth = 400;
 }
 
 abstract final class AlistenPress {

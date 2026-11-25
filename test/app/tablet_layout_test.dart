@@ -1,8 +1,11 @@
 import 'package:alisten/app/room/room_mode.dart';
+import 'package:alisten/app/room/room_mode_bar.dart';
+import 'package:alisten/app/room/room_pager.dart';
 import 'package:alisten/app/router.dart';
 import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/playback/index.dart';
-import 'package:alisten/shared/ui/segmented_pills.dart';
+import 'package:alisten/shared/ui/tracked_hero.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,8 +17,12 @@ import 'app_test_harness.dart';
 const _tablet = Size(1024, 1366);
 const _ipadLandscape = Size(1194, 834);
 
-/// 平板竖屏和横屏。
-final _tablets = ValueVariant({_tablet, const Size(1366, 1024)});
+/// 竖着拿的平板：分屏、11 寸、13 寸。
+final _uprightTablets = ValueVariant({
+  const Size(760, 1000),
+  const Size(834, 1194),
+  _tablet,
+});
 
 /// 常见 iPad 横屏及分屏尺寸：2/3 分屏、经典 1024、mini、11 寸、13 寸。
 final _landscapeIpads = ValueVariant({
@@ -34,73 +41,15 @@ Future<void> _expectAccessible(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('a tablet shows the player beside the queue, with 点歌 at the '
-      'top and no mode bar', (tester) async {
+  testWidgets('on a landscape tablet leaving the room while the lyrics still '
+      'spring to the queue is not undone', (tester) async {
     final semantics = tester.ensureSemantics();
-    final (rooms: _, :router, :settle) = await enterRoom(tester, size: _tablet);
-    final play = find.bySemanticsLabel('暂停本机播放');
-    final queue = find.text('等待中 1 首');
-
-    expect(play, findsOneWidget);
-    expect(find.bySemanticsLabel('投票切歌'), findsOneWidget);
-    expect(queue, findsOneWidget);
-    expect(
-      tester.getRect(queue).left,
-      greaterThan(tester.getRect(play).right),
-      reason: 'the queue is in a column of its own beside the player',
+    final (rooms: _, :router, :settle) = await enterRoom(
+      tester,
+      size: _ipadLandscape,
     );
-    expect(
-      tester.getRect(find.byTooltip('搜歌')).bottom,
-      lessThan(tester.getRect(play).top),
-      reason: '点歌 is in the bar at the top',
-    );
-    // 队列和聊天只在右栏出现一次，歌词留在左栏的播放器下方。
-    expect(find.bySemanticsLabel('歌词'), findsNothing);
-    expect(find.text('队列'), findsOneWidget);
-    expect(find.text('聊天'), findsOneWidget);
-    await _expectAccessible(tester);
 
-    await tester.tap(find.text('聊天'));
-    await settle();
-
-    expect(router.state.uri.path, '/r/listen/chat');
-    expect(find.bySemanticsLabel('说点什么…'), findsOneWidget);
-    expect(queue, findsNothing);
-    expect(play, findsOneWidget);
-    await _expectAccessible(tester);
-    semantics.dispose();
-  });
-
-  testWidgets('on a tablet the queue and the chat swipe into each other, and '
-      'the switch follows once the page settles', (tester) async {
-    final (rooms: _, :router, :settle) = await enterRoom(tester, size: _tablet);
-    final play = find.bySemanticsLabel('暂停本机播放');
-    final before = tester.getRect(play);
-    RoomMode switched() => tester
-        .widget<SegmentedPills<RoomMode>>(find.byType(SegmentedPills<RoomMode>))
-        .selected;
-
-    await tester.drag(find.text('等待中 1 首'), const Offset(-300, 0));
-    await settle();
-    expect(router.state.uri.path, '/r/listen/chat');
-    expect(find.bySemanticsLabel('说点什么…'), findsOneWidget);
-    expect(find.text('等待中 1 首'), findsNothing);
-    expect(switched(), RoomMode.chat);
-    expect(tester.getRect(play), before, reason: 'the player stays');
-
-    await tester.drag(find.text('还没有消息'), const Offset(300, 0));
-    await settle();
-    expect(router.state.uri.path, '/r/listen/queue');
-    expect(find.text('等待中 1 首'), findsOneWidget);
-    expect(switched(), RoomMode.queue);
-  });
-
-  testWidgets('on a tablet leaving the room while the queue still springs to '
-      'the chat is not undone', (tester) async {
-    final semantics = tester.ensureSemantics();
-    final (rooms: _, :router, :settle) = await enterRoom(tester, size: _tablet);
-
-    await tester.drag(find.text('等待中 1 首'), const Offset(-300, 0));
+    await tester.drag(find.byType(LyricsView), const Offset(-400, 0));
     await tester.pump(const Duration(milliseconds: 50));
     expect(router.state.uri.path, '/r/listen', reason: 'springing');
     await tester.tap(find.bySemanticsLabel('收起房间'));
@@ -111,10 +60,10 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('on a tablet the keyboard lifts only the chat, and the player '
-      'stays where it was', (tester) async {
+  testWidgets('on a landscape tablet the keyboard lifts only the chat, and the '
+      'player stays where it was', (tester) async {
     final semantics = tester.ensureSemantics();
-    final size = _tablets.currentValue!;
+    const size = Size(1366, 1024);
     final (rooms: _, :router, :settle) = await enterRoom(tester, size: size);
     router.go('/r/listen/chat');
     await settle();
@@ -141,7 +90,7 @@ void main() {
       );
     }
     semantics.dispose();
-  }, variant: _tablets);
+  });
 
   testWidgets('on a short tablet the keyboard leaves the chat its input and '
       'takes the queue and chat switch away until it goes down', (
@@ -243,17 +192,27 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('between phone and tablet widths, the room keeps the phone '
-      'layout in the middle', (tester) async {
+  testWidgets('held upright, however wide, the room keeps the phone layout in '
+      'the middle', (tester) async {
     final semantics = tester.ensureSemantics();
-    await enterRoom(tester, size: const Size(760, 1000));
+    final size = _uprightTablets.currentValue!;
+    await enterRoom(tester, size: size);
     final lyrics = find.bySemanticsLabel('歌词');
+    final edge = (size.width - 640) / 2;
 
     expect(lyrics, findsOneWidget);
-    expect(tester.getRect(lyrics).left, greaterThan((760 - 640) / 2));
-    expect(tester.getRect(find.byTooltip('搜歌')).right, lessThan(760 - 60));
+    expect(tester.getRect(lyrics).left, greaterThan(edge));
+    expect(
+      tester.getRect(find.byTooltip('搜歌')).right,
+      lessThan(size.width - edge),
+    );
+    expect(
+      tester.getRect(find.byType(RoomModeBar)).bottom,
+      size.height,
+      reason: 'the bar of the phone is at the bottom',
+    );
     semantics.dispose();
-  });
+  }, variant: _uprightTablets);
 
   testWidgets('on a landscape iPad the room keeps the player on the left and '
       'switches lyrics, queue, and chat in the right pane', (tester) async {
@@ -271,40 +230,68 @@ void main() {
       reason: 'the player stays vertical on the left',
     );
     expect(
-      lyrics.height,
-      greaterThan(size.height * 0.6),
-      reason: 'the right pane spans full height beside the player',
-    );
-    expect(find.text('歌词'), findsOneWidget);
-    expect(find.text('队列'), findsOneWidget);
-    expect(find.text('聊天'), findsOneWidget);
-    expect(find.byTooltip('搜歌'), findsOneWidget);
-    expect(find.byTooltip('从歌单点歌'), findsOneWidget);
-    expect(
-      tester.getSize(find.byType(SegmentedPills<RoomMode>)).width,
-      lessThanOrEqualTo(300),
-      reason: 'the mode switcher keeps a compact width instead of stretching',
+      lyrics.width,
+      lessThan(560.5),
+      reason: 'what the right pane shows keeps to a readable width',
     );
     await _expectAccessible(tester);
 
-    await tester.tap(find.text('队列'));
+    await tester.tap(_modeTab('队列'));
     await settle();
     expect(router.state.uri.path, '/r/listen/queue');
     expect(find.text('等待中 1 首'), findsOneWidget);
     expect(tester.getRect(find.byType(NowPlayingHeader)), player);
 
-    await tester.tap(find.text('聊天'));
+    await tester.tap(_modeTab('聊天'));
     await settle();
     expect(router.state.uri.path, '/r/listen/chat');
     expect(find.bySemanticsLabel('说点什么…'), findsOneWidget);
     expect(tester.getRect(find.byType(NowPlayingHeader)), player);
 
-    await tester.tap(find.text('歌词'));
+    await tester.tap(_modeTab('聊天'));
+    await settle();
+    expect(
+      router.state.uri.path,
+      '/r/listen/chat',
+      reason: 'the player is always there, so the chosen tab does not fold',
+    );
+
+    await tester.tap(_modeTab('歌词'));
     await settle();
     expect(router.state.uri.path, '/r/listen/lyrics');
     expect(find.byType(LyricsView), findsOneWidget);
     await _expectAccessible(tester);
     semantics.dispose();
+  }, variant: _landscapeIpads);
+
+  testWidgets('on a landscape iPad the bar of the phone tops the right pane, '
+      'and the pane starts at the cover and ends at the play button', (
+    tester,
+  ) async {
+    final size = _landscapeIpads.currentValue!;
+    final (rooms: _, router: _, :settle) = await enterRoom(tester, size: size);
+    await tester.tap(_modeTab('聊天'));
+    await settle();
+
+    final player = tester.getRect(find.byType(NowPlayingHeader));
+    final bar = tester.getRect(find.byType(RoomModeBar));
+    final cover = tester.getRect(
+      find.descendant(
+        of: find.byType(NowPlayingHeader),
+        matching: find.byType(TrackedHero),
+      ),
+    );
+    final controls = tester.getRect(find.byType(PlayerControls));
+    final pane = tester.getRect(find.byType(RoomPager));
+
+    expect(bar.left, greaterThan(player.right));
+    expect(bar.width, lessThan(400.5));
+    final pick = tester.getRect(find.byTooltip('从歌单点歌'));
+    expect(pick.left, bar.left);
+    expect(tester.getRect(find.byTooltip('搜歌')).right, bar.right);
+    expect(pick.top, moreOrLessEquals(cover.top, epsilon: 0.5));
+    expect(pane.top, greaterThanOrEqualTo(bar.bottom));
+    expect(pane.bottom, moreOrLessEquals(controls.bottom, epsilon: 0.5));
   }, variant: _landscapeIpads);
 
   testWidgets('on a landscape iPad swiping the right pane moves across '
@@ -314,9 +301,8 @@ void main() {
       size: _ipadLandscape,
     );
     final playerBefore = tester.getRect(find.byType(NowPlayingHeader));
-    RoomMode switched() => tester
-        .widget<SegmentedPills<RoomMode>>(find.byType(SegmentedPills<RoomMode>))
-        .selected;
+    RoomMode switched() =>
+        tester.widget<RoomModeBar>(find.byType(RoomModeBar)).mode;
 
     expect(switched(), RoomMode.lyrics);
 
@@ -333,6 +319,46 @@ void main() {
     expect(switched(), RoomMode.chat);
     expect(find.bySemanticsLabel('说点什么…'), findsOneWidget);
     expect(tester.getRect(find.byType(NowPlayingHeader)), playerBefore);
+  });
+
+  testWidgets('halfway through a swipe on a landscape iPad the thumb of the '
+      'bar is between two tabs and the pane fades at its sides', (
+    tester,
+  ) async {
+    final (rooms: _, router: _, :settle) = await enterRoom(
+      tester,
+      size: _ipadLandscape,
+    );
+    // 右栏里的页面自己也有渐隐（如歌词的上下两端），这里只看盖住整个右栏的。
+    Iterable<ShaderMaskLayer> fades() {
+      final pane = tester.getRect(find.byType(RoomPager));
+      return tester.layers.whereType<ShaderMaskLayer>().where(
+        (layer) => layer.maskRect == pane,
+      );
+    }
+
+    final lyrics = tester.getRect(_modeTab('歌词'));
+    final queue = tester.getRect(_modeTab('队列'));
+    expect(_thumbRect(tester).left, moreOrLessEquals(lyrics.left));
+    expect(fades(), isEmpty);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(LyricsView)),
+    );
+    await gesture.moveBy(const Offset(-30, 0));
+    await tester.pump();
+    await gesture.moveBy(const Offset(-220, 0));
+    await tester.pump();
+
+    final halfway = _thumbRect(tester).left;
+    final step = queue.left - lyrics.left;
+    expect(halfway, greaterThan(lyrics.left + step / 4));
+    expect(halfway, lessThan(queue.left - step / 4));
+    expect(fades(), hasLength(1));
+
+    await gesture.up();
+    await settle();
+    expect(fades(), isEmpty);
   });
 
   testWidgets('rotating between portrait and landscape tablet keeps the '
@@ -362,7 +388,10 @@ void main() {
     await settle();
 
     expect(find.text('等待中 1 首'), findsOneWidget);
-    expect(find.byType(LyricsView), findsOneWidget);
+    expect(
+      tester.widget<RoomModeBar>(find.byType(RoomModeBar)).mode,
+      RoomMode.queue,
+    );
     expect(rooms.transports, hasLength(1));
     expect(engine.loadCalls, loads);
   });
@@ -383,4 +412,26 @@ void main() {
     await _expectAccessible(tester);
     semantics.dispose();
   });
+}
+
+// 模式条里的一格。没选中的格子收起了文字，点按落在整格上。
+Finder _modeTab(String label) => find.descendant(
+  of: find.byType(RoomModeBar),
+  matching: find.bySemanticsLabel(label),
+);
+
+Rect _thumbRect(WidgetTester tester) {
+  final box = tester.renderObject<RenderCustomPaint>(
+    find.byKey(const ValueKey('mode-thumb')),
+  );
+  Rect? drawn;
+  expect(
+    box,
+    paints..something((method, arguments) {
+      if (method != #drawRRect) return false;
+      drawn = (arguments.first as RRect).outerRect;
+      return true;
+    }),
+  );
+  return drawn!.shift(box.localToGlobal(Offset.zero));
 }

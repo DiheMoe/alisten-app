@@ -22,9 +22,10 @@ import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
-import 'package:alisten/shared/ui/glass_panel.dart';
-import 'package:alisten/shared/ui/segmented_pills.dart';
+import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/side_fade.dart';
 import 'package:alisten/shared/ui/toast.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -79,8 +80,6 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
   // 切回播放器时保留上一个模式，内容按原样淡出；横屏两栏右栏也共用它（默认歌词）。
   late RoomMode _pane = _paneFor(widget.mode, RoomMode.lyrics);
 
-  late RoomMode _side = _sideFor(widget.mode, RoomMode.queue);
-
   // 播放器在手机布局和两栏布局之间移动时保留状态（投票、封面位置动画），
   // 旋转或展开折叠屏不会让它从头开始。
   final _player = GlobalKey();
@@ -88,30 +87,25 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
   final _page = GlobalKey();
 
   final _phonePages = GlobalKey<RoomPagerState>();
-  // 竖屏两栏（2 页）与横屏两栏（3 页）页数不同，各自持有分页状态，旋转时不会
-  // 沿用旧页序号。
-  final _portraitSidePages = GlobalKey<RoomPagerState>();
   final _landscapeSidePages = GlobalKey<RoomPagerState>();
   final _phonePosition = ValueNotifier(0.0);
+  final _landscapePosition = ValueNotifier(0.0);
 
   ui.Image? _still;
 
   static RoomMode _paneFor(RoomMode mode, RoomMode previous) =>
       mode == RoomMode.player ? previous : mode;
 
-  static RoomMode _sideFor(RoomMode mode, RoomMode previous) =>
-      mode == RoomMode.queue || mode == RoomMode.chat ? mode : previous;
-
   @override
   void didUpdateWidget(RoomScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     _pane = _paneFor(widget.mode, _pane);
-    _side = _sideFor(widget.mode, _side);
   }
 
   @override
   void dispose() {
     _phonePosition.dispose();
+    _landscapePosition.dispose();
     _still?.dispose();
     super.dispose();
   }
@@ -126,8 +120,8 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
     _show(mode);
   }
 
-  void _chooseSide(GlobalKey<RoomPagerState> pages, RoomMode mode) {
-    pages.currentState?.glideTo(mode);
+  void _chooseSide(RoomMode mode) {
+    _landscapeSidePages.currentState?.glideTo(mode);
     _show(mode);
   }
 
@@ -255,8 +249,6 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
               ref.read(roomControllerProvider.notifier).checkConnection(),
             )
           : null,
-      onSearch: wide ? _searchSongs : null,
-      onPickFromPlaylists: wide ? _pickFromPlaylists : null,
     );
     final player = NowPlayingHeader(
       key: _player,
@@ -285,36 +277,35 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
     );
     final Widget body = switch (layout) {
       RoomLayout.compact => player,
-      RoomLayout.portraitTwoPanes => _PortraitTwoPanes(
-        player: player,
-        side: _SidePanel(
-          segments: _portraitSideModes,
-          mode: _side,
-          framed: true,
-          onSelect: (next) => _chooseSide(_portraitSidePages, next),
-          pages: RoomPager(
-            key: _portraitSidePages,
-            pages: [for (final side in _portraitSideModes) side.value],
-            page: _side,
-            onSettled: _settleSide,
-            builder: content,
-          ),
-        ),
-      ),
       RoomLayout.landscapeTwoPanes => _LandscapeTwoPanes(
         player: player,
-        side: _SidePanel(
-          segments: _landscapeSideModes,
-          mode: _pane,
-          framed: false,
-          switcherMaxWidth: _landscapeSwitcherWidth,
-          onSelect: (next) => _chooseSide(_landscapeSidePages, next),
+        side: _LandscapeSide(
+          bar: RoomModeBar(
+            mode: _pane,
+            position: _landscapePosition,
+            // 播放器一直在左边：再点一次选中的那格，内容不用收起。
+            onSelect: (next) {
+              if (next != RoomMode.player) _chooseSide(next);
+            },
+            onSearch: _searchSongs,
+            onPickFromPlaylists: _pickFromPlaylists,
+            padding: const EdgeInsets.only(bottom: AlistenSpacing.sm),
+          ),
+          position: _landscapePosition,
           pages: RoomPager(
             key: _landscapeSidePages,
-            pages: [for (final side in _landscapeSideModes) side.value],
+            pages: RoomModeBar.modes,
             page: _pane,
+            position: _landscapePosition,
             onSettled: _settleSide,
-            builder: content,
+            builder: (mode) => Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: _landscapeContentWidth,
+                ),
+                child: content(mode),
+              ),
+            ),
           ),
         ),
       ),
@@ -346,81 +337,12 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
   }
 }
 
-const _minSideWidth = 320.0;
 const _minLandscapePlayerWidth = 320.0;
 const _maxLandscapePlayerWidth = 520.0;
 const _landscapeMaxStageWidth = 1200.0;
-// 横屏右栏较宽，三段切换胶囊收在合适宽度并居中，避免三个两字标签被拉满整栏。
-const _landscapeSwitcherWidth = 300.0;
-
-class _PortraitTwoPanes extends StatelessWidget {
-  const _PortraitTwoPanes({required this.player, required this.side});
-
-  final Widget player;
-  final Widget side;
-
-  @override
-  Widget build(BuildContext context) {
-    // 左栏按不随键盘变化的系统边距排版，键盘升降时播放器和歌词不重排；
-    // 只有右栏让到键盘之上。
-    final system = MediaQuery.viewPaddingOf(context);
-    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        system.left,
-        AlistenSpacing.xs,
-        system.right + AlistenSpacing.page,
-        0,
-      ),
-      child: MediaQuery(
-        data: MediaQuery.of(context)
-            .removePadding(
-              removeLeft: true,
-              removeRight: true,
-              removeBottom: true,
-            )
-            .removeViewInsets(removeBottom: true),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final sideWidth = (constraints.maxWidth * 0.38).clamp(
-              _minSideWidth,
-              AlistenSizes.sidePanelWidth,
-            );
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      bottom: system.bottom + AlistenSpacing.page,
-                    ),
-                    child: Column(
-                      children: [
-                        Expanded(child: player),
-                        const Expanded(child: LyricsView()),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: sideWidth,
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      bottom:
-                          math.max(system.bottom, keyboard) +
-                          AlistenSpacing.page,
-                    ),
-                    child: side,
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
+// 横屏右栏较宽：模式条收在手机屏幕那么宽，内容收在读起来不费眼的宽度，都居中。
+const _landscapeBarWidth = 400.0;
+const _landscapeContentWidth = 560.0;
 
 class _LandscapeTwoPanes extends StatelessWidget {
   const _LandscapeTwoPanes({required this.player, required this.side});
@@ -460,15 +382,19 @@ class _LandscapeTwoPanes extends StatelessWidget {
                   _minLandscapePlayerWidth,
                   _maxLandscapePlayerWidth,
                 );
+                final playerBottom = system.bottom + AlistenSpacing.page;
+                // 右栏的顶边对齐封面的顶边，底边对齐播放按钮的底边。
+                final stage = NowPlayingHeader.stageInsets(
+                  context,
+                  Size(playerWidth, constraints.maxHeight - playerBottom),
+                );
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
                       width: playerWidth,
                       child: Padding(
-                        padding: EdgeInsets.only(
-                          bottom: system.bottom + AlistenSpacing.page,
-                        ),
+                        padding: EdgeInsets.only(bottom: playerBottom),
                         child: player,
                       ),
                     ),
@@ -476,9 +402,11 @@ class _LandscapeTwoPanes extends StatelessWidget {
                     Expanded(
                       child: Padding(
                         padding: EdgeInsets.only(
-                          bottom:
-                              math.max(system.bottom, keyboard) +
-                              AlistenSpacing.page,
+                          top: stage.top,
+                          bottom: math.max(
+                            playerBottom + stage.bottom,
+                            keyboard + AlistenSpacing.page,
+                          ),
                         ),
                         child: side,
                       ),
@@ -494,98 +422,50 @@ class _LandscapeTwoPanes extends StatelessWidget {
   }
 }
 
-const _portraitSideModes = [
-  PillSegment(value: RoomMode.queue, label: '队列', icon: AlistenIcons.queue),
-  PillSegment(
-    value: RoomMode.chat,
-    label: '聊天',
-    icon: AlistenIcons.chatsCircle,
-  ),
-];
-
-const _landscapeSideModes = [
-  PillSegment(
-    value: RoomMode.lyrics,
-    label: '歌词',
-    icon: AlistenIcons.microphoneStage,
-  ),
-  PillSegment(value: RoomMode.queue, label: '队列', icon: AlistenIcons.queue),
-  PillSegment(
-    value: RoomMode.chat,
-    label: '聊天',
-    icon: AlistenIcons.chatsCircle,
-  ),
-];
-
-class _SidePanel extends StatelessWidget {
-  const _SidePanel({
-    required this.segments,
-    required this.mode,
-    required this.framed,
-    required this.onSelect,
+class _LandscapeSide extends StatelessWidget {
+  const _LandscapeSide({
+    required this.bar,
+    required this.position,
     required this.pages,
-    this.switcherMaxWidth,
   });
 
-  final List<PillSegment<RoomMode>> segments;
-  final RoomMode mode;
-
-  /// 竖屏两栏左栏下方紧挨歌词，右栏用玻璃面板隔开；横屏两栏左侧只有播放器，
-  /// 右侧直接浮在流动封面背景上，与手机端一致。
-  final bool framed;
-  final ValueChanged<RoomMode> onSelect;
+  final Widget bar;
+  final ValueListenable<double> position;
   final Widget pages;
-  final double? switcherMaxWidth;
 
   @override
   Widget build(BuildContext context) {
-    Widget pills = SegmentedPills(
-      segments: segments,
-      selected: mode,
-      onChanged: onSelect,
-    );
-    if (switcherMaxWidth case final limit?) {
-      pills = Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.textScalerOf(context).scale(limit),
-          ),
-          child: pills,
-        ),
-      );
-    }
-    final switcher = Padding(
-      key: const ValueKey('switch'),
-      padding: framed
-          ? const EdgeInsets.all(AlistenSpacing.sm)
-          : const EdgeInsets.fromLTRB(
-              AlistenSpacing.sm,
-              AlistenSpacing.xs,
-              AlistenSpacing.sm,
-              AlistenSpacing.xs,
-            ),
-      child: pills,
-    );
-    final switcherHeight =
-        SegmentedPills.heightOf(context) +
-        2 * (framed ? AlistenSpacing.sm : AlistenSpacing.xs);
-    final content = LayoutBuilder(
+    final barHeight =
+        PillButton.heightOf(context, large: true) + AlistenSpacing.sm;
+    return LayoutBuilder(
       builder: (context, constraints) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 矮屏上键盘升起时右栏可能很矮：显示切换行之后，
-          // 内容（如正在使用的输入框）仍至少有切换行那么高时才显示它。
-          if (constraints.maxHeight >= 2 * switcherHeight) switcher,
-          // 切换行出现或消失时聊天保留状态，输入框不失去焦点。
-          Expanded(key: const ValueKey('body'), child: pages),
+          // 矮屏上键盘升起时右栏可能很矮：内容（如正在使用的输入框）仍至少有
+          // 模式条那么高时才显示模式条。
+          if (constraints.maxHeight >= 2 * barHeight)
+            Center(
+              key: const ValueKey('switch'),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.textScalerOf(context)
+                      .scale(_landscapeBarWidth),
+                ),
+                child: bar,
+              ),
+            ),
+          // 模式条出现或消失时聊天保留状态，输入框不失去焦点。
+          Expanded(
+            key: const ValueKey('body'),
+            // 手机上内容滑出屏幕；这里左边紧挨着播放器，滑出去的内容渐隐。
+            child: SideFade(
+              position: position,
+              extent: AlistenSpacing.lg,
+              child: pages,
+            ),
+          ),
         ],
       ),
-    );
-    if (!framed) return content;
-    return GlassPanel(
-      padding: EdgeInsets.zero,
-      radius: AlistenRadii.lg,
-      child: content,
     );
   }
 }
