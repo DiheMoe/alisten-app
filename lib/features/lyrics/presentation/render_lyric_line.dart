@@ -627,7 +627,7 @@ class RenderLyricLine extends RenderBox {
       snapshot.rect,
       Paint()
         ..color = Color.fromRGBO(255, 255, 255, opacity)
-        ..filterQuality = FilterQuality.low,
+        ..filterQuality = FilterQuality.medium,
     );
     return true;
   }
@@ -637,7 +637,8 @@ class RenderLyricLine extends RenderBox {
     final layout = _layout!;
     final sigma = level * _blurStepEm * _styles.em;
     final rect = (Offset.zero & size).inflate(sigma * 4);
-    final ratio = pixelRatio * _snapshotScale;
+    // 高分屏（如 3x 手机）半分辨率采样足够；1x/1.25x 桌面屏再折半会明显发糊锯齿。
+    final ratio = pixelRatio >= 2.0 ? pixelRatio * _snapshotScale : pixelRatio;
     final width = (rect.width * ratio).ceil();
     final height = (rect.height * ratio).ceil();
     if (width <= 0 || height <= 0) return null;

@@ -17,9 +17,11 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/visible_frames.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -56,7 +58,7 @@ class LyricsView extends ConsumerStatefulWidget {
 }
 
 class _LyricsViewState extends ConsumerState<LyricsView>
-    with WidgetsBindingObserver, VisibleFrames {
+    with WidgetsBindingObserver, VisibleFrames, SingleTickerProviderStateMixin {
   final _clock = LyricFrameClock();
   final _motion = LyricMotion();
   final _snapshots = LyricSnapshotCache();
@@ -78,6 +80,7 @@ class _LyricsViewState extends ConsumerState<LyricsView>
   bool _alignQueued = false;
 
   Timer? _frames;
+  Ticker? _ticker;
   Duration _framesEvery = _sweepInterval;
   Timer? _nextEvent;
   bool _frameQueued = false;
@@ -108,6 +111,7 @@ class _LyricsViewState extends ConsumerState<LyricsView>
     if (_holdingScreen) _screen.release();
     _resume?.cancel();
     _frames?.cancel();
+    _ticker?.dispose();
     _nextEvent?.cancel();
     _clock.dispose();
     _motion.dispose();
@@ -173,16 +177,37 @@ class _LyricsViewState extends ConsumerState<LyricsView>
     return false;
   }
 
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || event.scrollDelta.dy == 0) return;
+    final wasScrolling = _scrolling;
+    _resume?.cancel();
+    _resume = Timer(_holdAfterDrag, () {
+      _resume = null;
+      _resuming = true;
+      _requestFrame();
+    });
+    if (!wasScrolling) setState(() {});
+    _requestFrame();
+  }
+
   void _requestFrame() {
-    if (_frameQueued) return;
+    if (_frameQueued || (_ticker?.isActive ?? false)) return;
     _frameQueued = true;
     SchedulerBinding.instance.scheduleFrameCallback(_onFrame);
   }
 
+  void _onTick(Duration _) {
+    _step(SchedulerBinding.instance.currentFrameTimeStamp);
+  }
+
   // 定时器只决定何时要帧，时间戳取自帧本身：单调且与屏幕同步，滚动和重绘也落在
-  // 同一帧内。
+  // 同一帧内。桌面端改用 Ticker 直接对齐显示器 VSync。
   void _onFrame(Duration stamp) {
     _frameQueued = false;
+    _step(stamp);
+  }
+
+  void _step(Duration stamp) {
     if (!mounted) return;
     final nowSeconds = stamp.inMicroseconds / Duration.microsecondsPerSecond;
     if (_smoothShown != _smooth) setState(() {});
@@ -209,13 +234,18 @@ class _LyricsViewState extends ConsumerState<LyricsView>
     SchedulerBinding.instance.addPostFrameCallback((_) => _arm());
   }
 
+  void _stopFrames() {
+    _frames?.cancel();
+    _frames = null;
+    _ticker?.stop();
+  }
+
   void _arm() {
     _nextEvent?.cancel();
     _nextEvent = null;
     if (mounted) _syncScreen();
     if (!mounted || !onScreen) {
-      _frames?.cancel();
-      _frames = null;
+      _stopFrames();
       return;
     }
     final positionMs = _clock.positionMs;
@@ -224,6 +254,14 @@ class _LyricsViewState extends ConsumerState<LyricsView>
         _motion.active ||
         (_playing && _smooth && _animating(positionMs));
     if (continuous) {
+      if (isDesktopPlatform) {
+        _frames?.cancel();
+        _frames = null;
+        final ticker = _ticker ??= createTicker(_onTick);
+        if (!ticker.isActive) unawaited(ticker.start());
+        return;
+      }
+      _ticker?.stop();
       final interval = _clock.busy || _motion.active
           ? _scrollInterval
           : _sweepInterval;
@@ -234,8 +272,7 @@ class _LyricsViewState extends ConsumerState<LyricsView>
       }
       return;
     }
-    _frames?.cancel();
-    _frames = null;
+    _stopFrames();
     if (!_playing) return;
     var nextMs = _timeline.nextFocusChangeMs(positionMs);
     if (!_smooth) {
@@ -439,24 +476,33 @@ class _LyricsViewState extends ConsumerState<LyricsView>
               _contentInset = constraints.hasBoundedHeight
                   ? constraints.maxHeight / 2
                   : AlistenSpacing.xl;
-              return SingleChildScrollView(
-                // 每次播放用新的滚动视图，从顶部开始而非停在上一首的位置。
-                key: ValueKey(playback),
-                // 可能与队列或聊天同时显示（如滑动切换途中、两栏布局），不能
-                // 共用 primary 控制器。
-                primary: false,
-                // 上下各留半个视口，首行和末行也能滚到中央（仅限高度有界时）。
-                padding: EdgeInsets.symmetric(vertical: _contentInset),
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: _maxLyricWidth),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (var index = 0; index < lines.length; index++)
-                          _row(index, constraints.maxHeight),
-                      ],
+              return Listener(
+                onPointerSignal: _onPointerSignal,
+                child: ScrollConfiguration(
+                  behavior: ScrollConfiguration.of(context)
+                      .copyWith(scrollbars: false),
+                  child: SingleChildScrollView(
+                    // 每次播放用新的滚动视图，从顶部开始而非停在上一首的位置。
+                    key: ValueKey(playback),
+                    // 可能与队列或聊天同时显示（如滑动切换途中、两栏布局），不能
+                    // 共用 primary 控制器。
+                    primary: false,
+                    // 上下各留半个视口，首行和末行也能滚到中央（仅限高度有界时）。
+                    padding: EdgeInsets.symmetric(vertical: _contentInset),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: _maxLyricWidth,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (var index = 0; index < lines.length; index++)
+                              _row(index, constraints.maxHeight),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -25,6 +25,7 @@ import 'package:alisten/features/update/index.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/avatar_images.dart';
 import 'package:alisten/shared/ui/cover_images.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -311,6 +312,16 @@ final class _ForegroundTickerMode extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return TickerMode(enabled: ref.watch(appVisibleProvider), child: child);
+    // 桌面窗口失焦（inactive）时仍显示在屏幕上，歌词与动效继续刷新；
+    // 仅在最小化/隐藏或移动端退后台时停帧。
+    final enabled = isDesktopPlatform
+        ? switch (ref.watch(appLifecycleProvider)) {
+            AppLifecycleState.resumed || AppLifecycleState.inactive => true,
+            AppLifecycleState.hidden ||
+            AppLifecycleState.paused ||
+            AppLifecycleState.detached => false,
+          }
+        : ref.watch(appVisibleProvider);
+    return TickerMode(enabled: enabled, child: child);
   }
 }

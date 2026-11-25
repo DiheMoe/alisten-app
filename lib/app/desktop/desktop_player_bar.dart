@@ -15,6 +15,7 @@ import 'package:alisten/shared/ui/alisten_slider.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
+import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -51,14 +52,22 @@ class _DesktopPlayerBarState extends ConsumerState<DesktopPlayerBar> {
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
-    final (nowPlaying, connected) = ref.watch(
+    final room = ref.watch(
       roomControllerProvider.select(
         (room) => (
-          room.snapshot?.nowPlaying,
-          room.status == RoomConnectionStatus.open,
+          id: room.activeRoomId,
+          slug: room.roomSlug,
+          nowPlaying: room.snapshot?.nowPlaying,
+          connected: room.status == RoomConnectionStatus.open,
         ),
       ),
     );
+    final nowPlaying = room.nowPlaying;
+    final connected = room.connected;
+    final roomRef = room.slug ?? room.id;
+    final router = GoRouter.of(context);
+    final toasts = ref.read(toastControllerProvider);
+    final openRoom = roomRef == null ? null : () => router.go('/r/$roomRef');
     final playback = nowPlaying == null
         ? null
         : PlaybackIdentity(
@@ -84,7 +93,10 @@ class _DesktopPlayerBarState extends ConsumerState<DesktopPlayerBar> {
       ),
       child: Row(
         children: [
-          Expanded(flex: 3, child: _Playing(nowPlaying: nowPlaying)),
+          Expanded(
+            flex: 3,
+            child: _Playing(nowPlaying: nowPlaying, onOpenRoom: openRoom),
+          ),
           const SizedBox(width: AlistenSpacing.lg),
           Expanded(
             flex: 5,
@@ -106,11 +118,29 @@ class _DesktopPlayerBarState extends ConsumerState<DesktopPlayerBar> {
                   ),
           ),
           const SizedBox(width: AlistenSpacing.lg),
-          const Expanded(
+          Expanded(
             flex: 3,
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: _Volume(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (nowPlaying != null) ...[
+                    Tooltip(
+                      message: '保存到歌单',
+                      excludeFromSemantics: true,
+                      child: SaveToPlaylistButton(
+                        track: nowPlaying.entry.track,
+                        title: nowPlaying.entry.meta.title,
+                        onOpenAccount: () => router.go('/settings/account'),
+                        onNotice: toasts.show,
+                      ),
+                    ),
+                    const SizedBox(width: AlistenSpacing.xs),
+                  ],
+                  const _Volume(),
+                ],
+              ),
             ),
           ),
         ],
@@ -119,17 +149,20 @@ class _DesktopPlayerBarState extends ConsumerState<DesktopPlayerBar> {
   }
 }
 
-class _Playing extends ConsumerWidget {
-  const _Playing({required this.nowPlaying});
+class _Playing extends StatelessWidget {
+  const _Playing({required this.nowPlaying, required this.onOpenRoom});
 
   final NowPlaying? nowPlaying;
+  final VoidCallback? onOpenRoom;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     final entry = nowPlaying?.entry;
+    final Widget content;
     if (entry == null) {
-      return Row(
+      content = Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             AlistenIcons.musicNote,
@@ -149,55 +182,67 @@ class _Playing extends ConsumerWidget {
           ),
         ],
       );
+    } else {
+      final meta = entry.meta;
+      final requester = entry.auto
+          ? '自动推荐'
+          : switch (entry.requestedBy) {
+              final member? => '${member.name} 点歌',
+              null => null,
+            };
+      content = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CoverArt(url: meta.coverUrl, size: 48),
+          const SizedBox(width: AlistenSpacing.sm),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  meta.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AlistenTypography.bodyStrong.copyWith(
+                    color: colors.onGlass,
+                  ),
+                ),
+                Text(
+                  [
+                    meta.artist,
+                    ?requester,
+                  ].where((part) => part.isNotEmpty).join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AlistenTypography.secondary.copyWith(
+                    color: colors.onGlassMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
     }
-    final meta = entry.meta;
-    final requester = entry.auto
-        ? '自动推荐'
-        : switch (entry.requestedBy) {
-            final member? => '${member.name} 点歌',
-            null => null,
-          };
-    final toasts = ref.read(toastControllerProvider);
-    final router = GoRouter.of(context);
-    return Row(
-      children: [
-        CoverArt(url: meta.coverUrl, size: 48),
-        const SizedBox(width: AlistenSpacing.sm),
-        Flexible(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                meta.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AlistenTypography.bodyStrong.copyWith(
-                  color: colors.onGlass,
-                ),
-              ),
-              Text(
-                [
-                  meta.artist,
-                  ?requester,
-                ].where((part) => part.isNotEmpty).join(' · '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AlistenTypography.secondary.copyWith(
-                  color: colors.onGlassMuted,
-                ),
-              ),
-            ],
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: Tooltip(
+        message: '回到房间',
+        excludeFromSemantics: true,
+        child: Pressable(
+          onPressed: onOpenRoom,
+          semanticLabel: '回到房间',
+          focusRadius: BorderRadius.circular(AlistenRadii.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AlistenSpacing.xxs,
+              vertical: AlistenSpacing.xxs,
+            ),
+            child: content,
           ),
         ),
-        const SizedBox(width: AlistenSpacing.xxs),
-        SaveToPlaylistButton(
-          track: entry.track,
-          title: meta.title,
-          onOpenAccount: () => router.go('/settings/account'),
-          onNotice: toasts.show,
-        ),
-      ],
+      ),
     );
   }
 }

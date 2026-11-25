@@ -63,15 +63,18 @@ class EmptyState extends StatelessWidget {
             child: content,
           );
         }
-        return SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: constraints.maxHeight,
-              minWidth: constraints.maxWidth,
-            ),
-            child: Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: content,
+        return ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+          child: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight,
+                minWidth: constraints.maxWidth,
+              ),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: content,
+              ),
             ),
           ),
         );

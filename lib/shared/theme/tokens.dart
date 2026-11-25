@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 abstract final class AlistenRadii {
@@ -122,56 +123,76 @@ abstract final class AlistenCurves {
 abstract final class AlistenTypography {
   static const family = 'PlusJakartaSans';
 
-  static final largeTitle = _style(
+  // Windows 英文系统未指定回退时会退到宋体等非界面字体，字形和清晰度均异常。
+  static const _windowsFallback = [
+    'Microsoft YaHei UI',
+    'Microsoft YaHei',
+    'Segoe UI Emoji',
+  ];
+
+  static List<String>? get fallback =>
+      defaultTargetPlatform == TargetPlatform.windows ? _windowsFallback : null;
+
+  static final _largeTitle = _pair(
     32,
     FontWeight.w700,
     height: 1.15,
     letterSpacing: -0.8,
   );
+  static TextStyle get largeTitle => _pick(_largeTitle);
 
-  static final title = _style(
+  static final _title = _pair(
     22,
     FontWeight.w600,
     height: 1.25,
     letterSpacing: -0.3,
   );
+  static TextStyle get title => _pick(_title);
 
   /// 分区标题：比正文略大，用次要色。只有页面主标题用大号粗体。
-  static final section = _style(
+  static final _section = _pair(
     16,
     FontWeight.w600,
     height: 1.3,
     letterSpacing: -0.1,
   );
+  static TextStyle get section => _pick(_section);
 
-  static final body = _style(15, FontWeight.w500, height: 1.4);
+  static final _body = _pair(15, FontWeight.w500, height: 1.4);
+  static TextStyle get body => _pick(_body);
 
-  static final bodyStrong = _style(15, FontWeight.w600, height: 1.35);
+  static final _bodyStrong = _pair(15, FontWeight.w600, height: 1.35);
+  static TextStyle get bodyStrong => _pick(_bodyStrong);
 
-  static final secondary = _style(13, FontWeight.w500, height: 1.35);
+  static final _secondary = _pair(13, FontWeight.w500, height: 1.35);
+  static TextStyle get secondary => _pick(_secondary);
 
-  static final caption = _style(
+  static final _caption = _pair(
     11,
     FontWeight.w600,
     height: 1.3,
     letterSpacing: 0.1,
   );
+  static TextStyle get caption => _pick(_caption);
 
-  static final lyric = _style(
+  static final _lyric = _pair(
     26,
     FontWeight.w700,
     height: 1.3,
     letterSpacing: -0.3,
   );
+  static TextStyle get lyric => _pick(_lyric);
 
-  static final lyricTranslation = _style(15, FontWeight.w600, height: 1.3);
+  static final _lyricTranslation = _pair(15, FontWeight.w600, height: 1.3);
+  static TextStyle get lyricTranslation => _pick(_lyricTranslation);
 
-  static final timecode = _style(
+  static final _timecode = _pair(
     13,
     FontWeight.w600,
     height: 1.3,
     tabularFigures: true,
   );
+  static TextStyle get timecode => _pick(_timecode);
 
   /// 排版会把行高取整，不能直接用字号乘行高；需要预知行高的布局应使用它。
   static double lineHeight(TextStyle style, TextScaler scaler) {
@@ -193,6 +214,26 @@ abstract final class AlistenTypography {
       fontVariations: [FontVariation.weight(weight.value.toDouble())],
     );
   }
+
+  static (TextStyle, TextStyle) _pair(
+    double size,
+    FontWeight weight, {
+    required double height,
+    double letterSpacing = 0,
+    bool tabularFigures = false,
+  }) {
+    final base = _style(
+      size,
+      weight,
+      height: height,
+      letterSpacing: letterSpacing,
+      tabularFigures: tabularFigures,
+    );
+    return (base, base.copyWith(fontFamilyFallback: _windowsFallback));
+  }
+
+  static TextStyle _pick((TextStyle, TextStyle) pair) =>
+      defaultTargetPlatform == TargetPlatform.windows ? pair.$2 : pair.$1;
 
   static TextStyle _style(
     double size,

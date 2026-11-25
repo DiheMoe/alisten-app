@@ -36,6 +36,11 @@ final class PluginNotificationGateway implements NotificationGateway {
           requestSoundPermission: false,
         ),
         linux: LinuxInitializationSettings(defaultActionName: '打开房间'),
+        windows: WindowsInitializationSettings(
+          appName: 'Alisten',
+          appUserModelId: 'moe.dihe.alisten',
+          guid: 'a8e5c4d2-7b31-4f9e-8d12-3c6b9a5f4e10',
+        ),
       ),
       onDidReceiveNotificationResponse: (response) {
         final payload = response.payload;
@@ -52,7 +57,7 @@ final class PluginNotificationGateway implements NotificationGateway {
   @override
   Future<bool> checkPermission() async {
     // 桌面通知不需要授权。
-    if (Platform.isLinux) return true;
+    if (Platform.isLinux || Platform.isWindows) return true;
     if (Platform.isAndroid) {
       final plugin = _plugin
           .resolvePlatformSpecificImplementation<
@@ -75,7 +80,7 @@ final class PluginNotificationGateway implements NotificationGateway {
 
   @override
   Future<bool> requestPermission() async {
-    if (Platform.isLinux) return true;
+    if (Platform.isLinux || Platform.isWindows) return true;
     if (Platform.isAndroid) {
       final plugin = _plugin
           .resolvePlatformSpecificImplementation<

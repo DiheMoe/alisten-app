@@ -72,8 +72,8 @@ Future<AudioEngine> _audioEngine(Future<AudioEngine> Function() start) async {
 }
 
 Future<AudioEngine> _startAudio() async {
-  // just_audio 在 Linux 上没有原生实现，由系统的 libmpv 播放；找不到它时抛出。
-  if (Platform.isLinux) {
+  // just_audio 在 Linux 和 Windows 上没有原生实现，由 libmpv 播放；找不到时抛出。
+  if (Platform.isLinux || Platform.isWindows) {
     JustAudioMediaKit.title = 'Alisten';
     // 变调滤镜会关掉 mpv 的音高校正；播放速率固定为 1.0，用不到它。
     JustAudioMediaKit.pitch = false;

@@ -9,7 +9,8 @@ ThemeData buildAlistenTheme(ColorScheme scheme, {bool immersive = false}) {
     useMaterial3: true,
     colorScheme: scheme,
     fontFamily: AlistenTypography.family,
-    textTheme: _textTheme,
+    fontFamilyFallback: AlistenTypography.fallback,
+    textTheme: _textTheme(),
     scaffoldBackgroundColor: scheme.surface,
     canvasColor: scheme.surface,
     splashFactory: NoSplash.splashFactory,
@@ -24,7 +25,7 @@ ThemeData buildAlistenTheme(ColorScheme scheme, {bool immersive = false}) {
   );
 }
 
-final _textTheme = TextTheme(
+TextTheme _textTheme() => TextTheme(
   displayLarge: AlistenTypography.largeTitle,
   displayMedium: AlistenTypography.largeTitle,
   displaySmall: AlistenTypography.largeTitle,

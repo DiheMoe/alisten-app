@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui' show lerpDouble;
 
 import 'package:alisten/app/app_theme.dart';
 import 'package:alisten/app/desktop/desktop_player_bar.dart';
@@ -19,8 +21,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 /// 桌面窗口的骨架：左边导航，中间是当前页面，底部是常驻的播放条；页面属于
-/// 所在房间时，右边同时显示队列和聊天。
-class DesktopShell extends ConsumerWidget {
+/// 所在房间时，右边同时显示队列和聊天，并可收起为吸附在右侧边缘的展开按钮。
+class DesktopShell extends ConsumerStatefulWidget {
   const DesktopShell({required this.location, required this.child, super.key});
 
   final Uri location;
@@ -29,11 +31,60 @@ class DesktopShell extends ConsumerWidget {
   static const _sidebarWidth = 208.0;
   static const _minPanelWidth = 300.0;
   static const _maxPanelWidth = 360.0;
-  // 窗口再窄，中间放不下封面和歌词，右边的队列和聊天让出位置。
+  // 窗口再窄，中间放不下歌词，右边的队列和聊天让出位置。
   static const _minStageWidth = 400.0;
 
+  static const _expandCurve = Cubic(0.22, 1.0, 0.36, 1.0);
+  static const _collapseCurve = Cubic(0.4, 0.0, 0.2, 1.0);
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DesktopShell> createState() => _DesktopShellState();
+}
+
+class _DesktopShellState extends ConsumerState<DesktopShell>
+    with SingleTickerProviderStateMixin {
+  bool _panelExpanded = true;
+  final _panelKey = GlobalKey();
+  late final AnimationController _panelController = AnimationController(
+    vsync: this,
+    value: 1,
+  );
+  late final CurvedAnimation _panelMotion = CurvedAnimation(
+    parent: _panelController,
+    curve: DesktopShell._expandCurve,
+    reverseCurve: DesktopShell._collapseCurve,
+  );
+  late final CurvedAnimation _panelOpacity = CurvedAnimation(
+    parent: _panelController,
+    curve: const Interval(0.2, 0.92, curve: Curves.easeOut),
+    reverseCurve: const Interval(0.28, 1.0, curve: Curves.easeIn),
+  );
+
+  @override
+  void dispose() {
+    _panelOpacity.dispose();
+    _panelMotion.dispose();
+    _panelController.dispose();
+    super.dispose();
+  }
+
+  void _togglePanel() {
+    final expand = !_panelExpanded;
+    final duration = AlistenDurations.of(context, AlistenDurations.layout);
+    setState(() => _panelExpanded = expand);
+    if (duration == Duration.zero) {
+      _panelController.value = expand ? 1 : 0;
+      return;
+    }
+    _panelController.duration = duration;
+    _panelController.reverseDuration = const Duration(milliseconds: 340);
+    unawaited(expand ? _panelController.forward() : _panelController.reverse());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final location = widget.location;
+    final child = widget.child;
     final (roomId, cover) = ref.watch(
       roomControllerProvider.select(
         (room) =>
@@ -105,46 +156,126 @@ class DesktopShell extends ConsumerWidget {
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final panelWidth = (constraints.maxWidth * 0.27).clamp(
-                        _minPanelWidth,
-                        _maxPanelWidth,
+                        DesktopShell._minPanelWidth,
+                        DesktopShell._maxPanelWidth,
                       );
-                      final showPanel =
+                      final canShowPanel =
                           onRoomPage &&
-                          constraints.maxWidth - _sidebarWidth - panelWidth >=
-                              _minStageWidth;
-                      final stageWidth =
                           constraints.maxWidth -
-                          _sidebarWidth -
-                          (showPanel ? panelWidth : 0);
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          SizedBox(
-                            width: _sidebarWidth,
-                            child: RoomTheme(
-                              child: _Sidebar(location: location),
-                            ),
-                          ),
-                          Expanded(
-                            // 页面按自己这一块的大小排版，而不是整个窗口。
-                            child: MediaQuery(
-                              data: media.copyWith(
-                                size: Size(stageWidth, constraints.maxHeight),
+                                  DesktopShell._sidebarWidth -
+                                  panelWidth >=
+                              DesktopShell._minStageWidth;
+                      final panel = RoomTheme(
+                        child: DesktopRoomPanel(key: _panelKey),
+                      );
+                      return AnimatedBuilder(
+                        animation: _panelController,
+                        child: panel,
+                        builder: (context, panelChild) {
+                          final progress = canShowPanel
+                              ? _panelMotion.value.clamp(0.0, 1.0)
+                              : 0.0;
+                          final opacity = canShowPanel
+                              ? _panelOpacity.value.clamp(0.0, 1.0)
+                              : 0.0;
+                          final shownWidth = panelWidth * progress;
+                          final stageWidth =
+                              constraints.maxWidth -
+                              DesktopShell._sidebarWidth -
+                              shownWidth;
+                          final collapsed = progress <= 0.001;
+                          return Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  SizedBox(
+                                    width: DesktopShell._sidebarWidth,
+                                    child: RoomTheme(
+                                      child: _Sidebar(location: location),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    // 页面按自己这一块的大小排版，而不是整个窗口。
+                                    child: MediaQuery(
+                                      data: media.copyWith(
+                                        size: Size(
+                                          stageWidth,
+                                          constraints.maxHeight,
+                                        ),
+                                      ),
+                                      child: ClipRect(
+                                        child: SidebarPage(
+                                          active: _sidebarPages.contains(
+                                            location.path,
+                                          ),
+                                          child: child,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (canShowPanel)
+                                    SizedBox(
+                                      width: shownWidth,
+                                      child: TickerMode(
+                                        enabled: !collapsed,
+                                        child: Offstage(
+                                          offstage: collapsed,
+                                          child: IgnorePointer(
+                                            ignoring: !_panelExpanded,
+                                            child: ClipRect(
+                                              child: OverflowBox(
+                                                alignment: AlignmentDirectional
+                                                    .centerStart,
+                                                minWidth: panelWidth,
+                                                maxWidth: panelWidth,
+                                                child: Transform.translate(
+                                                  offset: Offset(
+                                                    (1 - progress) * 24,
+                                                    0,
+                                                  ),
+                                                  child: Transform.scale(
+                                                    scale: lerpDouble(
+                                                      0.96,
+                                                      1.0,
+                                                      progress,
+                                                    )!,
+                                                    alignment:
+                                                        AlignmentDirectional
+                                                            .centerEnd,
+                                                    child: Opacity(
+                                                      opacity: opacity,
+                                                      child: panelChild,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
-                              child: ClipRect(
-                                child: SidebarPage(
-                                  active: _sidebarPages.contains(location.path),
-                                  child: child,
+                              if (canShowPanel)
+                                PositionedDirectional(
+                                  end: shownWidth,
+                                  top: 0,
+                                  bottom: 0,
+                                  child: Center(
+                                    child: RoomTheme(
+                                      child: _PanelEdgeToggle(
+                                        expanded: _panelExpanded,
+                                        progress: progress,
+                                        onPressed: _togglePanel,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ),
-                          if (showPanel)
-                            SizedBox(
-                              width: panelWidth,
-                              child: const RoomTheme(child: DesktopRoomPanel()),
-                            ),
-                        ],
+                            ],
+                          );
+                        },
                       );
                     },
                   ),
@@ -153,6 +284,110 @@ class DesktopShell extends ConsumerWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PanelEdgeToggle extends StatefulWidget {
+  const _PanelEdgeToggle({
+    required this.expanded,
+    required this.progress,
+    required this.onPressed,
+  });
+
+  final bool expanded;
+  final double progress;
+  final VoidCallback onPressed;
+
+  @override
+  State<_PanelEdgeToggle> createState() => _PanelEdgeToggleState();
+}
+
+class _PanelEdgeToggleState extends State<_PanelEdgeToggle> {
+  bool _hovered = false;
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AlistenColors.of(context);
+    final label = widget.expanded ? '收起队列与聊天' : '展开队列与聊天';
+    final width = _hovered ? 28.0 : (widget.expanded ? 20.0 : 24.0);
+    final height = _hovered ? 64.0 : 56.0;
+    final stroke = colors.onGlass.withValues(alpha: _hovered ? 0.22 : 0.12);
+    const radius = Radius.circular(AlistenRadii.sm);
+    final borderRadius = const BorderRadiusDirectional.only(
+      topStart: radius,
+      bottomStart: radius,
+    );
+    return Semantics(
+      button: true,
+      label: label,
+      child: Tooltip(
+        message: label,
+        excludeFromSemantics: true,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: GestureDetector(
+            key: const ValueKey('desktop-panel-toggle'),
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onPressed,
+            onTapDown: (_) => setState(() => _pressed = true),
+            onTapUp: (_) => setState(() => _pressed = false),
+            onTapCancel: () => setState(() => _pressed = false),
+            child: AnimatedScale(
+              duration: AlistenDurations.of(context, AlistenDurations.short),
+              curve: AlistenCurves.standard,
+              scale: _pressed ? 0.94 : 1.0,
+              alignment: Alignment.centerRight,
+              child: ClipRect(
+                child: AnimatedContainer(
+                  duration: AlistenDurations.of(
+                    context,
+                    AlistenDurations.short,
+                  ),
+                  curve: AlistenCurves.standard,
+                  width: width,
+                  height: height,
+                  child: OverflowBox(
+                    alignment: AlignmentDirectional.centerStart,
+                    minWidth: width + AlistenSizes.hairline,
+                    maxWidth: width + AlistenSizes.hairline,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: _hovered ? colors.raised : colors.glassFill,
+                        borderRadius: borderRadius,
+                        border: Border.all(
+                          color: stroke,
+                          width: AlistenSizes.hairline,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          end: AlistenSizes.hairline,
+                        ),
+                        child: Center(
+                          child: Transform.rotate(
+                            angle: lerpDouble(math.pi, 0.0, widget.progress)!,
+                            child: Icon(
+                              AlistenIcons.caretRight,
+                              size: 14,
+                              color: colors.onGlass.withValues(
+                                alpha: _hovered ? 0.95 : 0.72,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
