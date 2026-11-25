@@ -27,3 +27,9 @@ jobs:
     uses: ./.github/workflows/ios.yml
     with:
       version: ${{ github.sha }}
+
+  linux:
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/linux.yml
+    with:
+      version: ${{ github.sha }}
