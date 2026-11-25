@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:alisten/app/deep_link_controller.dart';
 import 'package:alisten/app/feedback.dart';
 import 'package:alisten/app/layout.dart';
+import 'package:alisten/app/room/room_actions.dart';
 import 'package:alisten/app/room/room_mode.dart';
 import 'package:alisten/app/room/room_mode_bar.dart';
 import 'package:alisten/app/room/room_pager.dart';
@@ -18,17 +18,13 @@ import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/tokens.dart';
-import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
-import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/side_fade.dart';
-import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -145,24 +141,8 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
   void _pickFromPlaylists() =>
       unawaited(context.push<void>('/r/${widget.roomRef}/from-playlists'));
 
-  void _invite(_RoomView room) {
-    final link = ref
-        .read(deepLinkControllerProvider)
-        .inviteLink(id: room.id, slug: room.slug);
-    unawaited(Clipboard.setData(ClipboardData(text: link)));
-    ref.read(toastControllerProvider).show(ToastKind.success, '邀请链接已复制');
-  }
-
   Future<void> _leave() async {
-    final confirmed = await showConfirmSheet(
-      context,
-      title: '退出这个房间？',
-      message: '这台设备会停止播放，房间里的其他人照常收听。',
-      confirmLabel: '退出房间',
-      confirmIcon: AlistenIcons.signOut,
-      // 面板收起后页面才能以动画滑出。
-      untilClosed: true,
-    );
+    final confirmed = await confirmLeavingRoom(context);
     if (!confirmed || !mounted) return;
     final room = ref.read(roomControllerProvider.notifier);
     // 退出会立即清空房间，队列、歌词、进度和封面配色都会随之变化。
@@ -179,18 +159,6 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
     }
     context.go('/');
     unawaited(room.leaveRoom());
-  }
-
-  static void _reportVote(
-    ToastController toasts,
-    MutationResult<VoteSkipResult> result,
-  ) {
-    reportMutation(
-      toasts,
-      result,
-      success: (vote) =>
-          vote.skipped ? '已切歌' : '已投票 ${vote.votes}/${vote.requiredVotes}',
-    );
   }
 
   @override
@@ -242,7 +210,7 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
       status: room.status,
       nextRetryAt: room.nextRetryAt,
       onCollapse: () => context.go('/'),
-      onInvite: () => _invite(room),
+      onInvite: () => copyInviteLink(ref, id: room.id, slug: room.slug),
       onLeave: () => unawaited(_leave()),
       onRetryNow: room.mayReconnectNow
           ? () => unawaited(
@@ -255,7 +223,7 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
       nowPlaying: nowPlaying,
       compact: !wide && mode != RoomMode.player,
       connected: room.status == RoomConnectionStatus.open,
-      onVoteSkipped: (result) => _reportVote(toasts, result),
+      onVoteSkipped: (result) => reportVote(toasts, result),
       onExpand: () => _show(RoomMode.player),
       onCopyTitle: copyTitle,
       saveToPlaylist: (track, title) => SaveToPlaylistButton(

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:alisten/app/desktop/desktop_room.dart';
+import 'package:alisten/app/desktop/desktop_shell.dart';
 import 'package:alisten/app/app_theme.dart';
 import 'package:alisten/app/app_version.dart';
 import 'package:alisten/app/deep_link_controller.dart';
@@ -21,6 +23,7 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/features/server/index.dart';
 import 'package:alisten/features/settings/index.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
@@ -60,6 +63,8 @@ const playlistSegment = 'playlists/:source/:id';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final rootNavigator = GlobalKey<NavigatorState>(debugLabel: 'root');
+  // 手机上房间盖住整个屏幕；桌面上它是窗口骨架里的一页，侧栏和播放条不动。
+  final roomNavigator = isDesktopPlatform ? null : rootNavigator;
   final toasts = ref.read(toastControllerProvider);
   void reportPick(MutationResult<Object?> result, String success) {
     reportMutation(toasts, result, success: (_) => success);
@@ -144,7 +149,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         pageBuilder: (context, state, child) => AlistenPage<void>(
           key: state.pageKey,
-          child: MiniPlayerHost(location: state.uri, child: child),
+          child: isDesktopPlatform
+              ? DesktopShell(location: state.uri, child: child)
+              : MiniPlayerHost(location: state.uri, child: child),
         ),
         routes: [
           GoRoute(
@@ -376,14 +383,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               for (final mode in RoomMode.values)
                 GoRoute(
                   path: _roomPath(mode),
-                  parentNavigatorKey: rootNavigator,
+                  parentNavigatorKey: roomNavigator,
                   pageBuilder: (context, state) =>
                       _roomPage(state.pathParameters['ref']!, mode),
                   routes: [
                     if (mode == RoomMode.player) ...[
                       GoRoute(
                         path: songSearchSegment,
-                        parentNavigatorKey: rootNavigator,
+                        parentNavigatorKey: roomNavigator,
                         pageBuilder: _page(
                           task: true,
                           (context, state) =>
@@ -392,7 +399,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                       ),
                       GoRoute(
                         path: pickFromPlaylistsSegment,
-                        parentNavigatorKey: rootNavigator,
+                        parentNavigatorKey: roomNavigator,
                         pageBuilder: _page(
                           task: true,
                           (context, state) =>
@@ -401,7 +408,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                       ),
                       GoRoute(
                         path: playlistSegment,
-                        parentNavigatorKey: rootNavigator,
+                        parentNavigatorKey: roomNavigator,
                         pageBuilder: _page((context, state) {
                           // 重定向已经按 roomRoute 只放行网易云和 QQ 音乐。
                           final source = TrackSource.values.byName(
@@ -490,7 +497,9 @@ Page<void> _roomPage(String roomRef, RoomMode mode) {
     child: RoomTheme(
       child: RoomRouteGate(
         roomRef: roomRef,
-        child: RoomScreen(roomRef: roomRef, mode: mode),
+        child: isDesktopPlatform
+            ? DesktopRoomStage(roomRef: roomRef)
+            : RoomScreen(roomRef: roomRef, mode: mode),
       ),
     ),
   );

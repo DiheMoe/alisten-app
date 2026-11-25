@@ -3,6 +3,20 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/widgets.dart';
 
+/// 桌面窗口里由侧栏直接到达的页面：侧栏就是它的导航，顶栏不再放返回按钮。
+class SidebarPage extends InheritedWidget {
+  const SidebarPage({required this.active, required super.child, super.key});
+
+  final bool active;
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SidebarPage>()?.active ??
+      false;
+
+  @override
+  bool updateShouldNotify(SidebarPage oldWidget) => active != oldWidget.active;
+}
+
 class AlistenTopBar extends StatelessWidget {
   const AlistenTopBar({
     this.leading,
@@ -24,6 +38,7 @@ class AlistenTopBar extends StatelessWidget {
     final colors = AlistenColors.of(context);
     final title = this.title;
     final subtitle = this.subtitle;
+    final leading = SidebarPage.of(context) ? null : this.leading;
     return ToastClearance(
       child: SafeArea(
         bottom: false,

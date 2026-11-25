@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/motion.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:alisten/shared/ui/zoom_frame.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -86,6 +87,8 @@ final class AlistenPage<T> extends Page<T> {
   Route<T> createRoute(BuildContext context) {
     // 普通导航也要取走这次点按，免得之后的页面从它长出。
     final origin = TapOrigin.take();
+    // 桌面窗口里页面原地换上，不从点按处长出，也不从边缘滑入。
+    if (isDesktopPlatform) return _FadePageRoute<T>(this);
     if (!task) {
       if (push) return PushPageRoute<T>._(this);
       final source = origin?.source;
@@ -112,6 +115,40 @@ final class AlistenPage<T> extends Page<T> {
         origin != null && screen != null && sitsLow(origin.rect, screen);
     return TaskPageRoute<T>._(this, low ? origin : null);
   }
+}
+
+final class _FadePageRoute<T> extends PageRoute<T> {
+  _FadePageRoute(AlistenPage<T> page) : super(settings: page);
+
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  String? get barrierLabel => null;
+
+  @override
+  bool get maintainState => true;
+
+  @override
+  Duration get transitionDuration => AlistenDurations.short;
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) => (settings as AlistenPage<T>).child;
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => FadeTransition(
+    opacity: CurveTween(curve: AlistenCurves.standard).animate(animation),
+    child: child,
+  );
 }
 
 /// 从刚点的元素长出、关闭时缩回去、可以用手指拖走的页面。

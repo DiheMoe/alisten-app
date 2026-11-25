@@ -21,7 +21,9 @@ import 'package:alisten/features/admin/data/gal_image_gallery.dart';
 import 'package:alisten/features/admin/data/platform_media_link_opener.dart';
 import 'package:alisten/features/admin/data/platform_sensitive_clipboard.dart';
 import 'package:alisten/features/admin/data/rest_admin_api.dart';
+import 'package:alisten/features/admin/data/save_image_gallery.dart';
 import 'package:alisten/features/admin/index.dart';
+import 'package:alisten/features/history/data/save_history_exporter.dart';
 import 'package:alisten/features/history/data/share_history_exporter.dart';
 import 'package:alisten/features/history/index.dart';
 import 'package:alisten/features/identity/index.dart';
@@ -33,6 +35,7 @@ import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/playlists/data/file_picker_playlist_file_source.dart';
 import 'package:alisten/features/playlists/data/preferences_playlist_view_store.dart';
 import 'package:alisten/features/playlists/data/rest_playlist_api.dart';
+import 'package:alisten/features/playlists/data/save_playlist_exporter.dart';
 import 'package:alisten/features/playlists/data/share_playlist_exporter.dart';
 import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/room/data/preferences_last_room_store.dart';
@@ -54,6 +57,7 @@ import 'package:alisten/features/update/data/github_release_source.dart';
 import 'package:alisten/features/update/data/platform_release_opener.dart';
 import 'package:alisten/features/update/data/preferences_update_store.dart';
 import 'package:alisten/features/update/index.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -270,7 +274,11 @@ List<Override> platformAdapters({
     playlistFileSourceProvider.overrideWithValue(
       const FilePickerPlaylistFileSource(),
     ),
-    playlistExporterProvider.overrideWithValue(const SharePlaylistExporter()),
+    playlistExporterProvider.overrideWithValue(
+      isDesktopPlatform
+          ? const SavePlaylistExporter()
+          : const SharePlaylistExporter(),
+    ),
     connectivityStatusProvider.overrideWith(
       (ref) => connectivityStatus ?? Connectivity().onConnectivityChanged,
     ),
@@ -301,11 +309,17 @@ List<Override> platformAdapters({
       ref.onDispose(() => dio.close(force: true));
       return DioQrImageLoader(dio);
     }),
-    imageGalleryProvider.overrideWithValue(const GalImageGallery()),
+    imageGalleryProvider.overrideWithValue(
+      isDesktopPlatform ? const SaveImageGallery() : const GalImageGallery(),
+    ),
     notificationGatewayProvider.overrideWith(
       (ref) => PluginNotificationGateway(FlutterLocalNotificationsPlugin()),
     ),
-    historyExporterProvider.overrideWithValue(const ShareHistoryExporter()),
+    historyExporterProvider.overrideWithValue(
+      isDesktopPlatform
+          ? const SaveHistoryExporter()
+          : const ShareHistoryExporter(),
+    ),
     systemSettingsProvider.overrideWithValue(PlatformSystemSettings()),
     sharedTextSourceProvider.overrideWithValue(PlatformSharedTextSource()),
     clipboardSourceProvider.overrideWithValue(PlatformClipboardSource()),

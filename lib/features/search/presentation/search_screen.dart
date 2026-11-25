@@ -17,6 +17,7 @@ import 'package:alisten/features/search/presentation/playlist_screen.dart';
 import 'package:alisten/features/search/presentation/song_row.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
@@ -329,6 +330,27 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final offers = library != null
         ? const <Widget>[]
         : _offers(typed, compact: !home && typed == null);
+    final back = IconCircleButton(
+      // 页面从底部升起时，收起的方向是向下。
+      icon: ModalRoute.of(context)?.fullscreenDialog ?? false
+          ? AlistenIcons.caretDown
+          : AlistenIcons.arrowLeft,
+      semanticLabel: '返回房间',
+      style: IconCircleButtonStyle.plain,
+      onPressed: () => unawaited(Navigator.maybePop(context)),
+    );
+    final field = AlistenTextField(
+      controller: _input,
+      focusNode: _focus,
+      hint: library?.hint ?? '搜歌名、歌手，或粘贴链接',
+      icon: AlistenIcons.magnifyingGlass,
+      pill: true,
+      textInputAction: TextInputAction.search,
+      onChanged: _onChanged,
+      onSubmitted: (_) => _submit(),
+      onClear: _clear,
+    );
+    final picked = _PickedCount(onPressed: widget.onShowQueue);
     return AlistenScaffold(
       // 提示显示在输入框和筛选项下方，以免搜下一首歌时挡住它们。
       topBar: ToastClearance(
@@ -336,38 +358,39 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AlistenTopBar(
-              leading: IconCircleButton(
-                // 页面从底部升起时，收起的方向是向下。
-                icon: ModalRoute.of(context)?.fullscreenDialog ?? false
-                    ? AlistenIcons.caretDown
-                    : AlistenIcons.arrowLeft,
-                semanticLabel: '返回房间',
-                style: IconCircleButtonStyle.plain,
-                onPressed: () => unawaited(Navigator.maybePop(context)),
+            if (isDesktopPlatform)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AlistenSpacing.xs,
+                  AlistenSpacing.sm,
+                  AlistenSpacing.md,
+                  0,
+                ),
+                child: Row(
+                  children: [
+                    back,
+                    const SizedBox(width: AlistenSpacing.xxs),
+                    Expanded(child: field),
+                    picked,
+                  ],
+                ),
+              )
+            else ...[
+              AlistenTopBar(
+                leading: back,
+                title: widget.libraryOnly ? '从歌单点歌' : '搜歌',
+                actions: [picked],
               ),
-              title: widget.libraryOnly ? '从歌单点歌' : '搜歌',
-              actions: [_PickedCount(onPressed: widget.onShowQueue)],
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AlistenSpacing.md,
-                AlistenSpacing.xxs,
-                AlistenSpacing.md,
-                0,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AlistenSpacing.md,
+                  AlistenSpacing.xxs,
+                  AlistenSpacing.md,
+                  0,
+                ),
+                child: field,
               ),
-              child: AlistenTextField(
-                controller: _input,
-                focusNode: _focus,
-                hint: library?.hint ?? '搜歌名、歌手，或粘贴链接',
-                icon: AlistenIcons.magnifyingGlass,
-                pill: true,
-                textInputAction: TextInputAction.search,
-                onChanged: _onChanged,
-                onSubmitted: (_) => _submit(),
-                onClear: _clear,
-              ),
-            ),
+            ],
             if (!widget.libraryOnly)
               Padding(
                 padding: const EdgeInsets.symmetric(

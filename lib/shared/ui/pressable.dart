@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/motion.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:flutter/widgets.dart';
 
@@ -58,6 +60,7 @@ class _PressableState extends State<Pressable>
   late final _ink = AnimationController(vsync: this);
   bool _down = false;
   bool _focused = false;
+  bool _hovered = false;
   Timer? _hold;
   bool _lifted = false;
 
@@ -152,6 +155,9 @@ class _PressableState extends State<Pressable>
             ? SystemMouseCursors.click
             : SystemMouseCursors.basic,
         onShowFocusHighlight: (focused) => setState(() => _focused = focused),
+        onShowHoverHighlight: isDesktopPlatform && widget.ink
+            ? (hovered) => setState(() => _hovered = hovered)
+            : null,
         actions: {
           ActivateIntent: CallbackAction<ActivateIntent>(
             onInvoke: (_) => _press(),
@@ -164,6 +170,10 @@ class _PressableState extends State<Pressable>
           onTapCancel: _enabled ? _onTapCancel : null,
           onTap: widget.onPressed == null ? null : _press,
           onLongPress: _enabled ? widget.onLongPress : null,
+          // 鼠标没有长按的习惯，右键做同一件事。
+          onSecondaryTap: isDesktopPlatform && _enabled
+              ? widget.onLongPress
+              : null,
           child: AnimatedOpacity(
             opacity: opacity,
             duration: AlistenDurations.of(context, AlistenDurations.short),
@@ -174,10 +184,13 @@ class _PressableState extends State<Pressable>
               builder: (context, child) => DecoratedBox(
                 position: DecorationPosition.foreground,
                 decoration: BoxDecoration(
-                  color: _ink.value == 0
+                  color: _ink.value == 0 && !_hovered
                       ? null
                       : colors.onGlass.withValues(
-                          alpha: AlistenMotion.pressInkAlpha * _ink.value,
+                          alpha: math.max(
+                            AlistenMotion.pressInkAlpha * _ink.value,
+                            _hovered ? _hoverAlpha : 0,
+                          ),
                         ),
                   borderRadius: widget.focusRadius,
                 ),
@@ -203,3 +216,6 @@ class _PressableState extends State<Pressable>
     );
   }
 }
+
+// 比按下的墨迹淡一半：只表示鼠标指着它。
+const _hoverAlpha = AlistenMotion.pressInkAlpha / 2;

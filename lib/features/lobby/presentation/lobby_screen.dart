@@ -7,6 +7,7 @@ import 'package:alisten/features/lobby/presentation/create_room_sheet.dart';
 import 'package:alisten/features/lobby/presentation/join_room_sheet.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
@@ -183,6 +184,9 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     final busy = lobby.busy || _joinSheetShown;
     final loading = lobby.loading && !_pulling;
     return AlistenScaffold(
+      contentMaxWidth: isDesktopPlatform
+          ? _desktopContentWidth
+          : AlistenSizes.contentMaxWidth,
       body: Builder(
         builder: (context) {
           // 已包含悬浮在安全区之上的迷你播放条。
@@ -201,29 +205,32 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                       topInset: MediaQuery.paddingOf(context).top,
                       scaler: MediaQuery.textScalerOf(context),
                       barExtent: PillButton.heightOf(context),
-                      actions: [
-                        IconCircleButton(
-                          icon: AlistenIcons.clockCounterClockwise,
-                          semanticLabel: '播放历史',
-                          style: IconCircleButtonStyle.plain,
-                          onPressed: widget.onOpenHistory,
-                        ),
-                        IconCircleButton(
-                          icon: AlistenIcons.playlist,
-                          semanticLabel: '我的歌单',
-                          style: IconCircleButtonStyle.plain,
-                          onPressed: widget.onOpenPlaylists,
-                        ),
-                        IconCircleButton(
-                          icon: AlistenIcons.gearSix,
-                          semanticLabel: '设置',
-                          style: IconCircleButtonStyle.plain,
-                          image: avatarUrl == null
-                              ? null
-                              : avatarImageOf(context, avatarUrl),
-                          onPressed: widget.onOpenSettings,
-                        ),
-                      ],
+                      // 桌面窗口的侧栏里已有这三个入口。
+                      actions: isDesktopPlatform
+                          ? const []
+                          : [
+                              IconCircleButton(
+                                icon: AlistenIcons.clockCounterClockwise,
+                                semanticLabel: '播放历史',
+                                style: IconCircleButtonStyle.plain,
+                                onPressed: widget.onOpenHistory,
+                              ),
+                              IconCircleButton(
+                                icon: AlistenIcons.playlist,
+                                semanticLabel: '我的歌单',
+                                style: IconCircleButtonStyle.plain,
+                                onPressed: widget.onOpenPlaylists,
+                              ),
+                              IconCircleButton(
+                                icon: AlistenIcons.gearSix,
+                                semanticLabel: '设置',
+                                style: IconCircleButtonStyle.plain,
+                                image: avatarUrl == null
+                                    ? null
+                                    : avatarImageOf(context, avatarUrl),
+                                onPressed: widget.onOpenSettings,
+                              ),
+                            ],
                     ),
                   ),
                   SliverPullRefresh(onRefresh: _pullRefresh),
@@ -403,6 +410,42 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       ];
     }
     final colors = AlistenColors.of(context);
+    Widget row(RoomListing room) => _RoomRow(
+      room: room,
+      joining: _joining == room.id,
+      onPressed: lobby.busy || _joinSheetShown
+          ? null
+          : () => unawaited(_join(room)),
+    );
+    if (isDesktopPlatform) {
+      return [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            AlistenSpacing.page,
+            0,
+            AlistenSpacing.page,
+            bottom + AlistenSpacing.page,
+          ),
+          sliver: SliverGrid.builder(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: _roomCardWidth,
+              mainAxisExtent: _roomCardHeight,
+              crossAxisSpacing: AlistenSpacing.sm,
+              mainAxisSpacing: AlistenSpacing.sm,
+            ),
+            itemCount: rooms.length,
+            itemBuilder: (context, index) => DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.glassFill,
+                borderRadius: BorderRadius.circular(AlistenRadii.md),
+                border: Border.all(color: colors.glassStroke),
+              ),
+              child: row(rooms[index]),
+            ),
+          ),
+        ),
+      ];
+    }
     return [
       SliverPadding(
         padding: EdgeInsets.fromLTRB(
@@ -429,22 +472,17 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                 child: ColoredBox(color: colors.glassStroke),
               ),
             ),
-            itemBuilder: (context, index) {
-              final room = rooms[index];
-              return _RoomRow(
-                room: room,
-                joining: _joining == room.id,
-                onPressed: lobby.busy || _joinSheetShown
-                    ? null
-                    : () => unawaited(_join(room)),
-              );
-            },
+            itemBuilder: (context, index) => row(rooms[index]),
           ),
         ),
       ),
     ];
   }
 }
+
+const _desktopContentWidth = 1120.0;
+const _roomCardWidth = 380.0;
+const _roomCardHeight = 92.0;
 
 // 吸顶头部的高度须预先算出并随系统字号变化：操作栏按胶囊按钮的高度算（栏内
 // 小标题与它同字号），大标题区按字号算。
@@ -732,6 +770,8 @@ class _RoomRow extends StatelessWidget {
                           size: AlistenSizes.iconSm,
                           semanticLabel: '正在进入',
                         )
+                      : isDesktopPlatform
+                      ? null
                       : Icon(
                           AlistenIcons.caretRight,
                           size: AlistenSizes.icon,

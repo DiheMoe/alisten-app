@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/motion.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:alisten/shared/ui/zoom_frame.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +26,19 @@ Future<T?> showSheetPanel<T>(
   final navigator = Navigator.of(context, rootNavigator: true);
   final localizations = MaterialLocalizations.of(context);
   final origin = TapOrigin.take();
+  // 桌面窗口里从底边升起的面板离鼠标很远，改成窗口正中的对话框。
+  if (isDesktopPlatform) {
+    final route = _DialogRoute<T>(
+      builder: builder,
+      dismissible: dismissible,
+      barrierColor: AlistenColors.of(context).barrier,
+      barrierLabel: localizations.modalBarrierDismissLabel,
+      themes: InheritedTheme.capture(from: context, to: navigator.context),
+    );
+    final result = await navigator.push(route);
+    if (untilClosed) await route.completed;
+    return result;
+  }
   final screen = MediaQuery.sizeOf(context);
   final route = _SheetRoute<T>(
     origin: origin != null && sitsLow(origin.rect, screen) ? origin : null,
@@ -48,6 +62,114 @@ void dismissSheet(BuildContext context, [Object? result]) {
     Navigator.of(context).pop(result);
   } else {
     Navigator.of(context).removeRoute(route, result);
+  }
+}
+
+final class _DialogRoute<T> extends PopupRoute<T> {
+  _DialogRoute({
+    required this.builder,
+    required this.dismissible,
+    required this.barrierColor,
+    required this.barrierLabel,
+    required this.themes,
+  });
+
+  final WidgetBuilder builder;
+  final bool dismissible;
+  final CapturedThemes themes;
+
+  @override
+  final Color barrierColor;
+
+  @override
+  final String barrierLabel;
+
+  @override
+  bool get barrierDismissible => dismissible;
+
+  @override
+  Duration get transitionDuration => AlistenDurations.short;
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    return themes.wrap(
+      PopScope<T>(
+        canPop: dismissible,
+        child: _DialogCard(child: Builder(builder: builder)),
+      ),
+    );
+  }
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curve = CurveTween(curve: AlistenCurves.standard);
+    return FadeTransition(
+      opacity: animation.drive(curve),
+      child: ScaleTransition(
+        scale: animation.drive(Tween(begin: 0.96, end: 1.0).chain(curve)),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _DialogCard extends StatelessWidget {
+  const _DialogCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AlistenColors.of(context);
+    final media = MediaQuery.of(context);
+    return Semantics(
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: MaterialLocalizations.of(context).dialogLabel,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AlistenSpacing.xl,
+          AlistenSpacing.xl,
+          AlistenSpacing.xl,
+          AlistenSpacing.xl + media.viewInsets.bottom,
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: AlistenSizes.sheetMaxWidth,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: colors.raised,
+                borderRadius: BorderRadius.circular(AlistenRadii.lg),
+                border: Border.all(color: colors.glassStroke),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Material(
+                type: MaterialType.transparency,
+                child: DefaultTextStyle.merge(
+                  style: AlistenTypography.body.copyWith(color: colors.onGlass),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(AlistenSpacing.page),
+                    child: child,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
