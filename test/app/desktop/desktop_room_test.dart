@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:alisten/app/desktop/desktop_player_bar.dart';
 import 'package:alisten/app/desktop/desktop_room.dart';
 import 'package:alisten/domain/playback/lrc.dart';
@@ -15,6 +17,7 @@ import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../app_test_harness.dart';
@@ -59,7 +62,7 @@ void main() {
         ],
       );
 
-      // 房间名已在左侧栏顶部卡片显示，舞台顶栏不再重复显示。
+      // 房间名只在左侧栏的卡片上。
       expect(find.text('一起听'), findsOneWidget);
       expect(
         find.descendant(
@@ -69,7 +72,7 @@ void main() {
         findsNothing,
       );
 
-      // 舞台不再显示单独的大封面，歌词页也不显示桌面滚动条。
+      // 舞台上没有大封面，歌词页没有滚动条。
       expect(
         find.descendant(
           of: find.byType(DesktopRoomStage),
@@ -86,7 +89,7 @@ void main() {
         findsNothing,
       );
 
-      // 拖动分隔条 1:1 跟手响应，无 18px 手势延迟也不丢位移。
+      // 分隔条与指针 1:1 对应。
       final queueFinder = find.byType(QueueView);
       final chatFinder = find.byType(ChatView);
       final splitter = find.byKey(
@@ -137,21 +140,29 @@ void main() {
         closeTo(initialQueueHeight, 1.0),
       );
 
-      // 桌面窗口失焦（inactive）时仍可见，TickerMode 保持开启；隐藏时关闭。
-      final visibility = appContainer(tester).read(appVisibleProvider.notifier);
+      // 窗口失去焦点（inactive）时仍在屏幕上，照常算在前台；隐藏时才不算。
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      bool visible() => appContainer(tester).read(appVisibleProvider);
       bool ticking() =>
           TickerMode.valuesOf(tester.element(find.byType(LyricsView))).enabled;
 
-      visibility.follow(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       await tester.pump();
+      expect(visible(), isTrue);
       expect(ticking(), isTrue);
 
-      visibility.follow(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
       await tester.pump();
+      expect(visible(), isFalse);
       expect(ticking(), isFalse);
 
-      visibility.follow(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       await tester.pump();
+      expect(visible(), isTrue);
       expect(ticking(), isTrue);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.windows),
@@ -289,6 +300,118 @@ void main() {
       expect(panel, findsOneWidget);
       expect(tester.getSize(stage).width, closeTo(expandedStageWidth, 1));
       expect(tester.getSize(queue).height, closeTo(customQueueHeight, 0.5));
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  testWidgets('the split set by dragging is kept while another page is shown', (
+    tester,
+  ) async {
+    final (:settle, :router, rooms: _) = await enterRoom(
+      tester,
+      size: _wideDesktop,
+    );
+    final queue = find.byType(QueueView);
+    final initial = tester.getSize(queue).height;
+    final drag = await tester.startGesture(
+      tester.getCenter(
+        find.byKey(const ValueKey('desktop-room-panel-splitter')),
+      ),
+      kind: PointerDeviceKind.mouse,
+    );
+    await drag.moveBy(const Offset(0, 80));
+    await drag.up();
+    await tester.pump();
+    expect(tester.getSize(queue).height, closeTo(initial + 80, 0.5));
+
+    router.go('/settings');
+    await settle();
+    expect(queue, findsNothing);
+    router.go('/r/listen');
+    await settle();
+
+    expect(tester.getSize(queue).height, closeTo(initial + 80, 0.5));
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
+  testWidgets(
+    'the panel is collapsed from the keyboard, and then Tab never lands on '
+    'what it hides',
+    (tester) async {
+      final (:settle, rooms: _, router: _) = await enterRoom(
+        tester,
+        size: _wideDesktop,
+      );
+      final toggle = find.byKey(const ValueKey('desktop-panel-toggle'));
+      Focus.of(
+        tester.element(
+          find.descendant(of: toggle, matching: find.byType(Icon)),
+        ),
+      ).requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await settle();
+      expect(find.byType(DesktopRoomPanel), findsNothing);
+
+      final panel = tester.element(
+        find.byType(DesktopRoomPanel, skipOffstage: false),
+      );
+      for (var press = 0; press < 40; press++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        var inside = false;
+        FocusManager.instance.primaryFocus?.context?.visitAncestorElements((
+          ancestor,
+        ) {
+          inside = ancestor == panel;
+          return !inside;
+        });
+        expect(inside, isFalse, reason: 'after $press presses of Tab');
+      }
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  testWidgets(
+    'while the panel slides the lyrics keep the width they have beside it, '
+    'and the edge toggle stays off pages that scroll',
+    (tester) async {
+      final (:settle, :router, rooms: _) = await enterRoom(
+        tester,
+        size: const Size(1100, 700),
+        overrides: [
+          lyricsProvider.overrideWithValue(const [
+            LyricLine(timeMs: 0, text: '第一行歌词'),
+            LyricLine(timeMs: 5000, text: '第二行歌词'),
+          ]),
+        ],
+      );
+      final lyrics = find.byType(LyricsView);
+      final toggle = find.byKey(const ValueKey('desktop-panel-toggle'));
+      final beside = tester.getSize(lyrics).width;
+
+      await tester.tap(toggle);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 140));
+      expect(tester.getSize(lyrics).width, beside, reason: 'collapsing');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+      final alone = tester.getSize(lyrics).width;
+      expect(alone, greaterThan(beside));
+
+      await tester.tap(toggle);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(tester.getSize(lyrics).width, beside, reason: 'expanding');
+      await tester.pump(const Duration(milliseconds: 500));
+      await settle();
+
+      unawaited(router.push<void>('/r/listen/search'));
+      await settle();
+      await settle();
+      expect(toggle, findsNothing);
+      expect(find.byType(DesktopRoomPanel), findsOneWidget);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.windows),
   );

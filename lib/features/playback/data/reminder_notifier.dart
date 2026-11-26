@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:alisten/features/playback/application/track_start_reminder.dart';
 import 'package:alisten/features/settings/index.dart' show NotificationAccess;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:window_to_front/window_to_front.dart';
 
 abstract interface class NotificationGateway {
   Future<void> initialize(void Function(String payload) onPayload);
@@ -43,6 +45,12 @@ final class PluginNotificationGateway implements NotificationGateway {
         ),
       ),
       onDidReceiveNotificationResponse: (response) {
+        // 桌面上窗口可能被别的窗口盖住，点了通知要把它带到前面。
+        if (Platform.isWindows || Platform.isLinux) {
+          unawaited(
+            WindowToFront.activate().then((_) {}, onError: (Object _) {}),
+          );
+        }
         final payload = response.payload;
         if (payload != null) onPayload(payload);
       },

@@ -7,6 +7,7 @@ import 'package:alisten/features/lyrics/presentation/lyric_line_layout.dart';
 import 'package:alisten/features/lyrics/presentation/lyric_motion.dart';
 import 'package:alisten/features/lyrics/presentation/lyric_snapshots.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
@@ -627,7 +628,9 @@ class RenderLyricLine extends RenderBox {
       snapshot.rect,
       Paint()
         ..color = Color.fromRGBO(255, 255, 255, opacity)
-        ..filterQuality = FilterQuality.medium,
+        ..filterQuality = isDesktopPlatform
+            ? FilterQuality.medium
+            : FilterQuality.low,
     );
     return true;
   }
@@ -637,8 +640,10 @@ class RenderLyricLine extends RenderBox {
     final layout = _layout!;
     final sigma = level * _blurStepEm * _styles.em;
     final rect = (Offset.zero & size).inflate(sigma * 4);
-    // 高分屏（如 3x 手机）半分辨率采样足够；1x/1.25x 桌面屏再折半会明显发糊锯齿。
-    final ratio = pixelRatio >= 2.0 ? pixelRatio * _snapshotScale : pixelRatio;
+    // 手机屏像素密，半分辨率采样足够；1x、1.25x 的桌面屏再折半会明显发糊。
+    final ratio = isDesktopPlatform && pixelRatio < 2.0
+        ? pixelRatio
+        : pixelRatio * _snapshotScale;
     final width = (rect.width * ratio).ceil();
     final height = (rect.height * ratio).ceil();
     if (width <= 0 || height <= 0) return null;

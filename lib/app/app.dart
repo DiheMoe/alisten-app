@@ -54,6 +54,7 @@ final class AlistenApp extends ConsumerStatefulWidget {
 
 final class _AlistenAppState extends ConsumerState<AlistenApp> {
   late final AppLifecycleListener _lifecycle;
+  AppLifecycleState? _lifecycleSeen;
   late final Future<void> _started;
 
   // 链接或提醒已指定房间时，启动流程不再恢复上次的房间。
@@ -84,7 +85,17 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
     super.dispose();
   }
 
-  void _onLifecycle(AppLifecycleState state) {
+  // 桌面窗口失去焦点（inactive）时仍然显示在屏幕上，不算离开前台；否则每次切回
+  // 窗口都会被当成从后台回来，重置时钟、重查连接。
+  static AppLifecycleState _foregroundOf(AppLifecycleState state) =>
+      isDesktopPlatform && state == AppLifecycleState.inactive
+      ? AppLifecycleState.resumed
+      : state;
+
+  void _onLifecycle(AppLifecycleState reported) {
+    final state = _foregroundOf(reported);
+    if (state == _lifecycleSeen) return;
+    _lifecycleSeen = state;
     // 管理会话必须最先处理：回到前台后其他逻辑可能立即发请求，
     // 离开太久的会话要先结束。
     ref.read(adminSessionProvider.notifier).handleLifecycle(state);
@@ -101,7 +112,8 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
   Future<void> _start() async {
     // 挂载之前平台可能已报告过生命周期，[_lifecycle] 只报告之后的变化。
     if (WidgetsBinding.instance.lifecycleState case final launched?) {
-      ref.read(appVisibleProvider.notifier).follow(launched);
+      final state = _lifecycleSeen = _foregroundOf(launched);
+      ref.read(appVisibleProvider.notifier).follow(state);
     }
     // 不等待：网络慢时不能拖住通知和链接的初始化。播放历史在服务器上，第一
     // 次打开要等它读回来；身份恢复之后先在后台读好，之后由历史页自己刷新。
@@ -312,16 +324,6 @@ final class _ForegroundTickerMode extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 桌面窗口失焦（inactive）时仍显示在屏幕上，歌词与动效继续刷新；
-    // 仅在最小化/隐藏或移动端退后台时停帧。
-    final enabled = isDesktopPlatform
-        ? switch (ref.watch(appLifecycleProvider)) {
-            AppLifecycleState.resumed || AppLifecycleState.inactive => true,
-            AppLifecycleState.hidden ||
-            AppLifecycleState.paused ||
-            AppLifecycleState.detached => false,
-          }
-        : ref.watch(appVisibleProvider);
-    return TickerMode(enabled: enabled, child: child);
+    return TickerMode(enabled: ref.watch(appVisibleProvider), child: child);
   }
 }

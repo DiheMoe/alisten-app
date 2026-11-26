@@ -114,10 +114,21 @@ class DesktopRoomStage extends ConsumerWidget {
               ),
             ),
           ),
-          const Expanded(
+          Expanded(
             child: Padding(
-              padding: EdgeInsets.only(bottom: AlistenSpacing.md),
-              child: LyricsView(),
+              padding: const EdgeInsets.only(bottom: AlistenSpacing.md),
+              child: LayoutBuilder(
+                builder: (context, constraints) => Center(
+                  child: SizedBox(
+                    width: math.min(
+                      constraints.maxWidth,
+                      SettledStageWidth.maybeOf(context) ??
+                          constraints.maxWidth,
+                    ),
+                    child: const LyricsView(),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -206,9 +217,36 @@ class _Action extends StatelessWidget {
   }
 }
 
-/// 所在房间的队列和聊天，同时显示且可拖动分隔条调整各自高度。
+/// 中间区域停稳时的宽度。右侧面板展开或收起的途中它不变，歌词照它排一次版，
+/// 不必跟着逐帧重排。
+class SettledStageWidth extends InheritedWidget {
+  const SettledStageWidth({
+    required this.width,
+    required super.child,
+    super.key,
+  });
+
+  final double width;
+
+  static double? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SettledStageWidth>()?.width;
+
+  @override
+  bool updateShouldNotify(SettledStageWidth oldWidget) =>
+      width != oldWidget.width;
+}
+
+/// 所在房间的队列和聊天，同时显示且可拖动分隔条调整各自高度。离开房间页面时
+/// 面板会被移除，所以队列所占的比例 [queueFraction] 由上层保存。
 class DesktopRoomPanel extends ConsumerStatefulWidget {
-  const DesktopRoomPanel({super.key});
+  const DesktopRoomPanel({
+    required this.queueFraction,
+    required this.onQueueFractionChanged,
+    super.key,
+  });
+
+  final double queueFraction;
+  final ValueChanged<double> onQueueFractionChanged;
 
   static const defaultQueueFraction = 5 / 9;
   static const splitterHeight = 14.0;
@@ -219,7 +257,6 @@ class DesktopRoomPanel extends ConsumerStatefulWidget {
 }
 
 class _DesktopRoomPanelState extends ConsumerState<DesktopRoomPanel> {
-  double _queueFraction = DesktopRoomPanel.defaultQueueFraction;
   double? _dragStartY;
   double? _dragStartQueueHeight;
 
@@ -250,7 +287,7 @@ class _DesktopRoomPanelState extends ConsumerState<DesktopRoomPanel> {
                 available / 2,
               );
               final maxQueue = math.max(minPane, available - minPane);
-              final queueHeight = (available * _queueFraction).clamp(
+              final queueHeight = (available * widget.queueFraction).clamp(
                 minPane,
                 maxQueue,
               );
@@ -294,19 +331,21 @@ class _DesktopRoomPanelState extends ConsumerState<DesktopRoomPanel> {
                         maxQueue,
                       );
                       final fraction = next / available;
-                      if (fraction != _queueFraction) {
-                        setState(() => _queueFraction = fraction);
+                      if (fraction != widget.queueFraction) {
+                        widget.onQueueFractionChanged(fraction);
                       }
                     },
                     onDragEnd: () {
                       _dragStartY = null;
                       _dragStartQueueHeight = null;
                     },
-                    onReset: () => setState(() {
+                    onReset: () {
                       _dragStartY = null;
                       _dragStartQueueHeight = null;
-                      _queueFraction = DesktopRoomPanel.defaultQueueFraction;
-                    }),
+                      widget.onQueueFractionChanged(
+                        DesktopRoomPanel.defaultQueueFraction,
+                      );
+                    },
                   ),
                   SizedBox(height: chatHeight, child: const ChatView()),
                 ],
@@ -339,45 +378,8 @@ class _PanelSplitter extends StatefulWidget {
 class _PanelSplitterState extends State<_PanelSplitter> {
   bool _hovered = false;
   bool _dragging = false;
-  int? _activePointer;
-  Duration? _lastTapAt;
-  Offset? _lastTapPosition;
 
-  // 直接用 Listener 避免手势竞争的 18px 滑动阈值，并用绝对指针位移计算高度，
-  // 防止高回报率鼠标同帧多次触发时丢增量。
-  void _onPointerDown(PointerDownEvent event) {
-    if (event.buttons != 0 && (event.buttons & kPrimaryButton) == 0) return;
-    final lastAt = _lastTapAt;
-    final lastPos = _lastTapPosition;
-    if (lastAt != null &&
-        lastPos != null &&
-        event.timeStamp - lastAt <= kDoubleTapTimeout &&
-        (event.position - lastPos).distance <= 8.0) {
-      _lastTapAt = null;
-      _lastTapPosition = null;
-      widget.onReset();
-      return;
-    }
-    _lastTapAt = event.timeStamp;
-    _lastTapPosition = event.position;
-    _activePointer = event.pointer;
-    widget.onDragStart(event.position.dy);
-    setState(() => _dragging = true);
-  }
-
-  void _onPointerMove(PointerMoveEvent event) {
-    if (event.pointer != _activePointer) return;
-    if (_lastTapPosition != null &&
-        (event.position - _lastTapPosition!).distance > 8.0) {
-      _lastTapAt = null;
-      _lastTapPosition = null;
-    }
-    widget.onDragMove(event.position.dy);
-  }
-
-  void _finishDrag(int pointer) {
-    if (pointer != _activePointer) return;
-    _activePointer = null;
+  void _endDrag() {
     widget.onDragEnd();
     if (_dragging) setState(() => _dragging = false);
   }
@@ -398,13 +400,20 @@ class _PanelSplitterState extends State<_PanelSplitter> {
         cursor: SystemMouseCursors.resizeRow,
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
-        child: Listener(
+        child: GestureDetector(
           key: const ValueKey('desktop-room-panel-splitter'),
           behavior: HitTestBehavior.opaque,
-          onPointerDown: _onPointerDown,
-          onPointerMove: _onPointerMove,
-          onPointerUp: (event) => _finishDrag(event.pointer),
-          onPointerCancel: (event) => _finishDrag(event.pointer),
+          // 从按下的位置起算，高度按指针的绝对位置定，与指针 1:1 对应。
+          dragStartBehavior: DragStartBehavior.down,
+          onVerticalDragStart: (details) {
+            widget.onDragStart(details.globalPosition.dy);
+            setState(() => _dragging = true);
+          },
+          onVerticalDragUpdate: (details) =>
+              widget.onDragMove(details.globalPosition.dy),
+          onVerticalDragEnd: (_) => _endDrag(),
+          onVerticalDragCancel: _endDrag,
+          onDoubleTap: widget.onReset,
           child: SizedBox(
             height: DesktopRoomPanel.splitterHeight,
             child: Stack(

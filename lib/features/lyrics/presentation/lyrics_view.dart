@@ -31,7 +31,7 @@ const _holdAfterDrag = Duration(seconds: 3);
 
 // 用定时器而非 Ticker：Ticker 按屏幕刷新率出帧，120 Hz 屏上要多画一倍。
 // 行在滚动时按 60 帧/秒出帧；只是逐字点亮时，一个字要唱几百毫秒，30 帧/秒已经
-// 连贯，省下一半的重绘。
+// 连贯，省下一半的重绘。桌面上只有行在滚动时改用 Ticker，与显示器刷新对齐。
 const _scrollInterval = Duration(milliseconds: 16);
 const _sweepInterval = Duration(milliseconds: 33);
 
@@ -164,6 +164,7 @@ class _LyricsViewState extends ConsumerState<LyricsView>
       setState(() => _dragging = true);
       _requestFrame();
     } else if (notification is ScrollEndNotification && _dragging) {
+      _resume?.cancel();
       setState(() {
         _dragging = false;
         _resume = Timer(_holdAfterDrag, () {
@@ -201,7 +202,7 @@ class _LyricsViewState extends ConsumerState<LyricsView>
   }
 
   // 定时器只决定何时要帧，时间戳取自帧本身：单调且与屏幕同步，滚动和重绘也落在
-  // 同一帧内。桌面端改用 Ticker 直接对齐显示器 VSync。
+  // 同一帧内。
   void _onFrame(Duration stamp) {
     _frameQueued = false;
     _step(stamp);
@@ -254,7 +255,8 @@ class _LyricsViewState extends ConsumerState<LyricsView>
         _motion.active ||
         (_playing && _smooth && _animating(positionMs));
     if (continuous) {
-      if (isDesktopPlatform) {
+      final moving = _clock.busy || _motion.active;
+      if (isDesktopPlatform && moving) {
         _frames?.cancel();
         _frames = null;
         final ticker = _ticker ??= createTicker(_onTick);
@@ -262,9 +264,7 @@ class _LyricsViewState extends ConsumerState<LyricsView>
         return;
       }
       _ticker?.stop();
-      final interval = _clock.busy || _motion.active
-          ? _scrollInterval
-          : _sweepInterval;
+      final interval = moving ? _scrollInterval : _sweepInterval;
       if (_frames == null || interval != _framesEvery) {
         _frames?.cancel();
         _framesEvery = interval;
@@ -458,9 +458,13 @@ class _LyricsViewState extends ConsumerState<LyricsView>
     ref.listen(playbackControllerProvider, _onPlayback);
     _smoothShown = _smooth;
     if (lines.every((line) => line.isBlank)) {
-      return const EmptyState(
-        icon: AlistenIcons.microphoneStage,
-        title: '暂无歌词',
+      // 歌词页不显示滚动条，没有歌词时也一样。
+      return ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: const EmptyState(
+          icon: AlistenIcons.microphoneStage,
+          title: '暂无歌词',
+        ),
       );
     }
     return RepaintBoundary(

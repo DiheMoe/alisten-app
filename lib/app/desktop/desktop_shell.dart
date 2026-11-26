@@ -44,7 +44,7 @@ class DesktopShell extends ConsumerStatefulWidget {
 class _DesktopShellState extends ConsumerState<DesktopShell>
     with SingleTickerProviderStateMixin {
   bool _panelExpanded = true;
-  final _panelKey = GlobalKey();
+  double _queueFraction = DesktopRoomPanel.defaultQueueFraction;
   late final AnimationController _panelController = AnimationController(
     vsync: this,
     value: 1,
@@ -165,8 +165,17 @@ class _DesktopShellState extends ConsumerState<DesktopShell>
                                   DesktopShell._sidebarWidth -
                                   panelWidth >=
                               DesktopShell._minStageWidth;
+                      // 点歌等页面自己会滚动，滚动条贴着右边缘，开关不压在上面。
+                      final showToggle =
+                          canShowPanel &&
+                          !(segments.length > 2 &&
+                              _roomSubPages.contains(segments[2]));
                       final panel = RoomTheme(
-                        child: DesktopRoomPanel(key: _panelKey),
+                        child: DesktopRoomPanel(
+                          queueFraction: _queueFraction,
+                          onQueueFractionChanged: (fraction) =>
+                              setState(() => _queueFraction = fraction),
+                        ),
                       );
                       return AnimatedBuilder(
                         animation: _panelController,
@@ -184,6 +193,16 @@ class _DesktopShellState extends ConsumerState<DesktopShell>
                               DesktopShell._sidebarWidth -
                               shownWidth;
                           final collapsed = progress <= 0.001;
+                          // 面板滑动的途中，中间区域仍按面板展开时的宽度排歌词，
+                          // 停稳后才换成新的宽度。
+                          final settledStageWidth =
+                              constraints.maxWidth -
+                              DesktopShell._sidebarWidth -
+                              (canShowPanel &&
+                                      (_panelExpanded ||
+                                          _panelController.value > 0)
+                                  ? panelWidth
+                                  : 0);
                           return Stack(
                             fit: StackFit.expand,
                             children: [
@@ -210,7 +229,10 @@ class _DesktopShellState extends ConsumerState<DesktopShell>
                                           active: _sidebarPages.contains(
                                             location.path,
                                           ),
-                                          child: child,
+                                          child: SettledStageWidth(
+                                            width: settledStageWidth,
+                                            child: child,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -224,29 +246,34 @@ class _DesktopShellState extends ConsumerState<DesktopShell>
                                           offstage: collapsed,
                                           child: IgnorePointer(
                                             ignoring: !_panelExpanded,
-                                            child: ClipRect(
-                                              child: OverflowBox(
-                                                alignment: AlignmentDirectional
-                                                    .centerStart,
-                                                minWidth: panelWidth,
-                                                maxWidth: panelWidth,
-                                                child: Transform.translate(
-                                                  offset: Offset(
-                                                    (1 - progress) * 24,
-                                                    0,
-                                                  ),
-                                                  child: Transform.scale(
-                                                    scale: lerpDouble(
-                                                      0.96,
-                                                      1.0,
-                                                      progress,
-                                                    )!,
-                                                    alignment:
-                                                        AlignmentDirectional
-                                                            .centerEnd,
-                                                    child: Opacity(
-                                                      opacity: opacity,
-                                                      child: panelChild,
+                                            // 收起后 Tab 不应落到看不见的队列和输入框上。
+                                            child: ExcludeFocus(
+                                              excluding: !_panelExpanded,
+                                              child: ClipRect(
+                                                child: OverflowBox(
+                                                  alignment:
+                                                      AlignmentDirectional
+                                                          .centerStart,
+                                                  minWidth: panelWidth,
+                                                  maxWidth: panelWidth,
+                                                  child: Transform.translate(
+                                                    offset: Offset(
+                                                      (1 - progress) * 24,
+                                                      0,
+                                                    ),
+                                                    child: Transform.scale(
+                                                      scale: lerpDouble(
+                                                        0.96,
+                                                        1.0,
+                                                        progress,
+                                                      )!,
+                                                      alignment:
+                                                          AlignmentDirectional
+                                                              .centerEnd,
+                                                      child: Opacity(
+                                                        opacity: opacity,
+                                                        child: panelChild,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
@@ -258,7 +285,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell>
                                     ),
                                 ],
                               ),
-                              if (canShowPanel)
+                              if (showToggle)
                                 PositionedDirectional(
                                   end: shownWidth,
                                   top: 0,
@@ -307,7 +334,6 @@ class _PanelEdgeToggle extends StatefulWidget {
 
 class _PanelEdgeToggleState extends State<_PanelEdgeToggle> {
   bool _hovered = false;
-  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
@@ -317,68 +343,53 @@ class _PanelEdgeToggleState extends State<_PanelEdgeToggle> {
     final height = _hovered ? 64.0 : 56.0;
     final stroke = colors.onGlass.withValues(alpha: _hovered ? 0.22 : 0.12);
     const radius = Radius.circular(AlistenRadii.sm);
-    final borderRadius = const BorderRadiusDirectional.only(
+    const borderRadius = BorderRadiusDirectional.only(
       topStart: radius,
       bottomStart: radius,
     );
-    return Semantics(
-      button: true,
-      label: label,
-      child: Tooltip(
-        message: label,
-        excludeFromSemantics: true,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          onEnter: (_) => setState(() => _hovered = true),
-          onExit: (_) => setState(() => _hovered = false),
-          child: GestureDetector(
-            key: const ValueKey('desktop-panel-toggle'),
-            behavior: HitTestBehavior.opaque,
-            onTap: widget.onPressed,
-            onTapDown: (_) => setState(() => _pressed = true),
-            onTapUp: (_) => setState(() => _pressed = false),
-            onTapCancel: () => setState(() => _pressed = false),
-            child: AnimatedScale(
+    return Tooltip(
+      message: label,
+      excludeFromSemantics: true,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Pressable(
+          key: const ValueKey('desktop-panel-toggle'),
+          onPressed: widget.onPressed,
+          semanticLabel: label,
+          expanded: widget.expanded,
+          focusRadius: borderRadius.resolve(Directionality.of(context)),
+          child: ClipRect(
+            child: AnimatedContainer(
               duration: AlistenDurations.of(context, AlistenDurations.short),
               curve: AlistenCurves.standard,
-              scale: _pressed ? 0.94 : 1.0,
-              alignment: Alignment.centerRight,
-              child: ClipRect(
-                child: AnimatedContainer(
-                  duration: AlistenDurations.of(
-                    context,
-                    AlistenDurations.short,
+              width: width,
+              height: height,
+              child: OverflowBox(
+                alignment: AlignmentDirectional.centerStart,
+                minWidth: width + AlistenSizes.hairline,
+                maxWidth: width + AlistenSizes.hairline,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: _hovered ? colors.raised : colors.glassFill,
+                    borderRadius: borderRadius,
+                    border: Border.all(
+                      color: stroke,
+                      width: AlistenSizes.hairline,
+                    ),
                   ),
-                  curve: AlistenCurves.standard,
-                  width: width,
-                  height: height,
-                  child: OverflowBox(
-                    alignment: AlignmentDirectional.centerStart,
-                    minWidth: width + AlistenSizes.hairline,
-                    maxWidth: width + AlistenSizes.hairline,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: _hovered ? colors.raised : colors.glassFill,
-                        borderRadius: borderRadius,
-                        border: Border.all(
-                          color: stroke,
-                          width: AlistenSizes.hairline,
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                          end: AlistenSizes.hairline,
-                        ),
-                        child: Center(
-                          child: Transform.rotate(
-                            angle: lerpDouble(math.pi, 0.0, widget.progress)!,
-                            child: Icon(
-                              AlistenIcons.caretRight,
-                              size: 14,
-                              color: colors.onGlass.withValues(
-                                alpha: _hovered ? 0.95 : 0.72,
-                              ),
-                            ),
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      end: AlistenSizes.hairline,
+                    ),
+                    child: Center(
+                      child: Transform.rotate(
+                        angle: lerpDouble(math.pi, 0.0, widget.progress)!,
+                        child: Icon(
+                          AlistenIcons.caretRight,
+                          size: 14,
+                          color: colors.onGlass.withValues(
+                            alpha: _hovered ? 0.95 : 0.72,
                           ),
                         ),
                       ),
@@ -395,6 +406,7 @@ class _PanelEdgeToggleState extends State<_PanelEdgeToggle> {
 }
 
 const _sidebarPages = {'/playlists', '/history', '/settings'};
+const _roomSubPages = {'search', 'from-playlists', 'playlists'};
 
 class _Sidebar extends ConsumerWidget {
   const _Sidebar({required this.location});
