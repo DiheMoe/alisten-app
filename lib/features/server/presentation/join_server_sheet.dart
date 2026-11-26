@@ -3,6 +3,7 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/sheet_actions.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:flutter/material.dart';
 
@@ -97,19 +98,20 @@ class _JoinServerSheetState extends State<_JoinServerSheet> {
           onSubmitted: (_) => _join(),
         ),
         const SizedBox(height: AlistenSpacing.xl),
-        PillButton(
-          label: '加入',
-          icon: AlistenIcons.signIn,
-          large: true,
-          expand: true,
-          onPressed: _join,
-        ),
-        const SizedBox(height: AlistenSpacing.xs),
-        PillButton(
-          label: '取消',
-          style: PillButtonStyle.ghost,
-          expand: true,
-          onPressed: () => Navigator.of(context).pop(),
+        SheetActions(
+          children: [
+            PillButton(
+              label: '加入',
+              icon: AlistenIcons.signIn,
+              large: true,
+              onPressed: _join,
+            ),
+            PillButton(
+              label: '取消',
+              style: PillButtonStyle.ghost,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
         ),
       ],
     );

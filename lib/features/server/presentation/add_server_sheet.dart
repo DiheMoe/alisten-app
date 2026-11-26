@@ -8,6 +8,7 @@ import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/sheet_actions.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -85,29 +86,29 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
           _FoundServer(server: found),
         ],
         const SizedBox(height: AlistenSpacing.xl),
-        if (found == null)
-          PillButton(
-            label: '检测',
-            icon: AlistenIcons.globe,
-            large: true,
-            expand: true,
-            busy: state.checking,
-            onPressed: _typed ? _check : null,
-          )
-        else
-          PillButton(
-            label: '添加并切换',
-            icon: AlistenIcons.arrowsLeftRight,
-            large: true,
-            expand: true,
-            onPressed: () => Navigator.of(context).pop(found),
-          ),
-        const SizedBox(height: AlistenSpacing.xs),
-        PillButton(
-          label: '取消',
-          style: PillButtonStyle.ghost,
-          expand: true,
-          onPressed: () => Navigator.of(context).pop(),
+        SheetActions(
+          children: [
+            if (found == null)
+              PillButton(
+                label: '检测',
+                icon: AlistenIcons.globe,
+                large: true,
+                busy: state.checking,
+                onPressed: _typed ? _check : null,
+              )
+            else
+              PillButton(
+                label: '添加并切换',
+                icon: AlistenIcons.arrowsLeftRight,
+                large: true,
+                onPressed: () => Navigator.of(context).pop(found),
+              ),
+            PillButton(
+              label: '取消',
+              style: PillButtonStyle.ghost,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
         ),
       ],
     );

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/sheet_actions.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:flutter/widgets.dart';
 
@@ -101,26 +102,27 @@ class _ConfirmSheetState extends State<ConfirmSheet> {
           style: AlistenTypography.body.copyWith(color: colors.onGlassMuted),
         ),
         const SizedBox(height: AlistenSpacing.xl),
-        PillButton(
-          label: _busy
-              ? widget.busyLabel ?? widget.confirmLabel
-              : widget.confirmLabel,
-          icon: widget.confirmIcon,
-          style: widget.danger
-              ? PillButtonStyle.secondary
-              : PillButtonStyle.primary,
-          danger: widget.danger,
-          busy: _busy,
-          large: true,
-          expand: true,
-          onPressed: () => unawaited(_confirm()),
-        ),
-        const SizedBox(height: AlistenSpacing.xs),
-        PillButton(
-          label: widget.cancelLabel,
-          style: PillButtonStyle.ghost,
-          expand: true,
-          onPressed: () => Navigator.of(context).pop(false),
+        SheetActions(
+          children: [
+            PillButton(
+              label: _busy
+                  ? widget.busyLabel ?? widget.confirmLabel
+                  : widget.confirmLabel,
+              icon: widget.confirmIcon,
+              style: widget.danger
+                  ? PillButtonStyle.secondary
+                  : PillButtonStyle.primary,
+              danger: widget.danger,
+              busy: _busy,
+              large: true,
+              onPressed: () => unawaited(_confirm()),
+            ),
+            PillButton(
+              label: widget.cancelLabel,
+              style: PillButtonStyle.ghost,
+              onPressed: () => Navigator.of(context).pop(false),
+            ),
+          ],
         ),
       ],
     );

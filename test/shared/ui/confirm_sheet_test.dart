@@ -155,4 +155,27 @@ void main() {
       expect(navigator.currentState!.canPop(), isTrue);
     });
   }
+
+  testWidgets(
+    'in a desktop window cancelling sits beside confirming, to its left',
+    (tester) async {
+      final page = await pumpPages(tester);
+      unawaited(
+        showConfirmSheet(
+          page,
+          title: '退出房间？',
+          message: '退出后音乐会停止。',
+          confirmLabel: '退出',
+          danger: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final confirm = tester.getRect(find.widgetWithText(PillButton, '退出'));
+      final cancel = tester.getRect(find.widgetWithText(PillButton, '取消'));
+      expect(cancel.right, lessThan(confirm.left));
+      expect(cancel.top, confirm.top);
+      expect(cancel.height, confirm.height);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.linux),
+  );
 }

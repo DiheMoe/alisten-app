@@ -5,6 +5,7 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/sheet_actions.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:flutter/foundation.dart';
@@ -116,30 +117,30 @@ class _UpdateSheetState extends ConsumerState<UpdateSheet> {
           ),
         ],
         const SizedBox(height: AlistenSpacing.xl),
-        PillButton(
-          label: android ? '下载更新' : '前往发布页',
-          icon: android
-              ? AlistenIcons.downloadSimple
-              : AlistenIcons.arrowSquareOut,
-          busy: _opening,
-          large: true,
-          expand: true,
-          onPressed: () => unawaited(_open()),
-        ),
-        const SizedBox(height: AlistenSpacing.xs),
-        // 打开链接期间不能关闭面板，否则打不开时的提示会在面板关闭之后才出现。
-        PillButton(
-          label: '稍后',
-          style: PillButtonStyle.secondary,
-          expand: true,
-          onPressed: _opening ? null : () => Navigator.of(context).pop(),
-        ),
-        const SizedBox(height: AlistenSpacing.xs),
-        PillButton(
-          label: '跳过这个版本',
-          style: PillButtonStyle.ghost,
-          expand: true,
-          onPressed: _opening ? null : () => unawaited(_skip()),
+        SheetActions(
+          children: [
+            PillButton(
+              label: android ? '下载更新' : '前往发布页',
+              icon: android
+                  ? AlistenIcons.downloadSimple
+                  : AlistenIcons.arrowSquareOut,
+              busy: _opening,
+              large: true,
+              onPressed: () => unawaited(_open()),
+            ),
+            // 打开链接期间不能关闭面板，否则打不开时的提示会在面板关闭之后才
+            // 出现。
+            PillButton(
+              label: '稍后',
+              style: PillButtonStyle.secondary,
+              onPressed: _opening ? null : () => Navigator.of(context).pop(),
+            ),
+            PillButton(
+              label: '跳过这个版本',
+              style: PillButtonStyle.ghost,
+              onPressed: _opening ? null : () => unawaited(_skip()),
+            ),
+          ],
         ),
       ],
     );

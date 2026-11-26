@@ -9,6 +9,7 @@ import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/sheet_actions.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
 import 'package:flutter/material.dart';
@@ -120,23 +121,23 @@ class _PlaylistNameFormState<T> extends State<PlaylistNameForm<T>> {
             InlineMessage(text: problem.text, tone: problem.tone),
           ],
           const SizedBox(height: AlistenSpacing.xl),
-          PillButton(
-            label: _submitting ? widget.busyLabel : widget.confirmLabel,
-            icon: widget.confirmIcon,
-            large: true,
-            expand: true,
-            busy: _submitting,
-            onPressed: _ready ? () => unawaited(_submit()) : null,
+          SheetActions(
+            children: [
+              PillButton(
+                label: _submitting ? widget.busyLabel : widget.confirmLabel,
+                icon: widget.confirmIcon,
+                large: true,
+                busy: _submitting,
+                onPressed: _ready ? () => unawaited(_submit()) : null,
+              ),
+              if (cancel != null)
+                PillButton(
+                  label: '取消',
+                  style: PillButtonStyle.ghost,
+                  onPressed: _submitting ? null : cancel,
+                ),
+            ],
           ),
-          if (cancel != null) ...[
-            const SizedBox(height: AlistenSpacing.xs),
-            PillButton(
-              label: '取消',
-              style: PillButtonStyle.ghost,
-              expand: true,
-              onPressed: _submitting ? null : cancel,
-            ),
-          ],
         ],
       ),
     );

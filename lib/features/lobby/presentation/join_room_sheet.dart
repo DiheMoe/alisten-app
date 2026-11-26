@@ -6,6 +6,7 @@ import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/sheet_actions.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
 import 'package:flutter/material.dart';
@@ -158,20 +159,23 @@ class _JoinRoomSheetState extends ConsumerState<JoinRoomSheet> {
             ),
           ],
           const SizedBox(height: AlistenSpacing.lg),
-          PillButton(
-            label: '进入房间',
-            icon: AlistenIcons.signIn,
-            large: true,
-            expand: true,
-            busy: _submitting,
-            onPressed: _ready ? _submit : null,
-          ),
-          const SizedBox(height: AlistenSpacing.xs),
-          PillButton(
-            label: '取消',
-            style: PillButtonStyle.ghost,
-            expand: true,
-            onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+          SheetActions(
+            children: [
+              PillButton(
+                label: '进入房间',
+                icon: AlistenIcons.signIn,
+                large: true,
+                busy: _submitting,
+                onPressed: _ready ? _submit : null,
+              ),
+              PillButton(
+                label: '取消',
+                style: PillButtonStyle.ghost,
+                onPressed: _submitting
+                    ? null
+                    : () => Navigator.of(context).pop(),
+              ),
+            ],
           ),
         ],
       ),

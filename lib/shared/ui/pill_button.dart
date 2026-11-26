@@ -44,6 +44,21 @@ class PillButton extends StatelessWidget {
   /// 为 true 时图标在文字之后，比如“下一页 ›”。
   final bool iconAfter;
 
+  /// 同一个按钮换一种尺寸，供排版它的容器按平台决定。
+  PillButton sized({required bool large, required bool expand}) => PillButton(
+    key: key,
+    label: label,
+    onPressed: onPressed,
+    icon: icon,
+    style: style,
+    busy: busy,
+    large: large,
+    expand: expand,
+    expanded: expanded,
+    danger: danger,
+    iconAfter: iconAfter,
+  );
+
   /// 按标签只占一行计算。
   static double heightOf(BuildContext context, {bool large = false}) {
     final style = AlistenTypography.bodyStrong;
