@@ -12,6 +12,7 @@ import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
 import 'package:alisten/shared/ui/cover_flight.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/keyed_sliver_list.dart';
@@ -91,7 +92,7 @@ class QueueView extends ConsumerWidget {
   /// context 是这一行的，从它打开的面板沿用房间的配色。
   final SaveTrackCallback? onSaveToPlaylist;
 
-  Widget _menu(
+  _EntryMenu _menu(
     QueueEntry entry, {
     bool removable = false,
     VoidCallback? onRemove,
@@ -173,6 +174,15 @@ class QueueView extends ConsumerWidget {
         : snapshot.items;
     bool removable(QueueEntry entry) =>
         connected && !busy.entries.contains(entry.id);
+    final ValueChanged<RoomPlayMode>? changeMode =
+        connected && !busy.changingMode
+        ? (mode) {
+            if (mode == snapshot.playMode) return;
+            unawaited(
+              _setMode(queue, mode, _modes.firstWhere((m) => m.$1 == mode).$4),
+            );
+          }
+        : null;
     return RepaintBoundary(
       child: EdgeFade(
         top: _topFade,
@@ -182,39 +192,39 @@ class QueueView extends ConsumerWidget {
           // primary 控制器。
           primary: false,
           slivers: [
-            _faded(
-              _PlayModeRow(
-                selected: snapshot.playMode,
-                busy: busy.changingMode,
-                onChanged: connected && !busy.changingMode
-                    ? (mode) {
-                        if (mode == snapshot.playMode) return;
-                        unawaited(
-                          _setMode(
-                            queue,
-                            mode,
-                            _modes.firstWhere((m) => m.$1 == mode).$4,
-                          ),
-                        );
-                      }
-                    : null,
+            if (isDesktopPlatform)
+              // 桌面窗口的面板不高，播放模式不单占一行：收成图标，和第一个标题
+              // 同在一行。
+              _faded(
+                SectionHeader(
+                  playing != null ? '正在播放' : '播放模式',
+                  padding: _headerPadding.copyWith(top: _topFade),
+                  trailing: _PlayModeIcons(
+                    selected: snapshot.playMode,
+                    busy: busy.changingMode,
+                    onChanged: changeMode,
+                  ),
+                ),
+              )
+            else
+              _faded(
+                _PlayModeRow(
+                  selected: snapshot.playMode,
+                  busy: busy.changingMode,
+                  onChanged: changeMode,
+                ),
               ),
-            ),
             if (playing != null) ...[
-              _faded(const SectionHeader('正在播放', padding: _headerPadding)),
+              if (!isDesktopPlatform)
+                _faded(const SectionHeader('正在播放', padding: _headerPadding)),
               _faded(
                 _Panel(
                   child: _EntryRow(
                     entry: playing,
                     mine: mine,
                     onCopyTitle: onCopyTitle,
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _Playing(likes: playing.likes),
-                        _menu(playing),
-                      ],
-                    ),
+                    trailing: _Playing(likes: playing.likes),
+                    menu: _menu(playing),
                   ),
                 ),
               ),
@@ -235,20 +245,15 @@ class QueueView extends ConsumerWidget {
                     entry: pending,
                     mine: mine,
                     onCopyTitle: onCopyTitle,
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _LikeCount(likes: pending.likes),
-                        _menu(
-                          pending,
-                          removable: true,
-                          onRemove: removable(pending)
-                              ? () => unawaited(
-                                  _remove(context, queue, pending, next: true),
-                                )
-                              : null,
-                        ),
-                      ],
+                    trailing: _LikeCount(likes: pending.likes),
+                    menu: _menu(
+                      pending,
+                      removable: true,
+                      onRemove: removable(pending)
+                          ? () => unawaited(
+                              _remove(context, queue, pending, next: true),
+                            )
+                          : null,
                     ),
                   ),
                 ),
@@ -303,28 +308,23 @@ class QueueView extends ConsumerWidget {
                             entry: entry,
                             mine: mine,
                             onCopyTitle: onCopyTitle,
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _LikeButton(
-                                  likes: entry.likes,
-                                  label:
-                                      '点赞《${entry.meta.title}》，${entry.likes} 个赞',
-                                  busy: inFlight,
-                                  onPressed: enabled
-                                      ? () => _like(queue, entry)
-                                      : null,
-                                ),
-                                _menu(
-                                  entry,
-                                  removable: true,
-                                  onRemove: enabled
-                                      ? () => unawaited(
-                                          _remove(context, queue, entry),
-                                        )
-                                      : null,
-                                ),
-                              ],
+                            trailing: _LikeButton(
+                              likes: entry.likes,
+                              label:
+                                  '点赞《${entry.meta.title}》，${entry.likes} 个赞',
+                              busy: inFlight,
+                              onPressed: enabled
+                                  ? () => _like(queue, entry)
+                                  : null,
+                            ),
+                            menu: _menu(
+                              entry,
+                              removable: true,
+                              onRemove: enabled
+                                  ? () => unawaited(
+                                      _remove(context, queue, entry),
+                                    )
+                                  : null,
                             ),
                           ),
                         ),
@@ -407,6 +407,41 @@ class _PlayModeRow extends StatelessWidget {
   }
 }
 
+class _PlayModeIcons extends StatelessWidget {
+  const _PlayModeIcons({
+    required this.selected,
+    required this.busy,
+    required this.onChanged,
+  });
+
+  final RoomPlayMode selected;
+  final bool busy;
+  final ValueChanged<RoomPlayMode>? onChanged;
+
+  static const _width = 3 * AlistenSizes.iconButton;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _width,
+      child: Semantics(
+        container: true,
+        label: '播放模式',
+        value: busy ? busySemanticValue : null,
+        child: SegmentedPills<RoomPlayMode>(
+          segments: [
+            for (final (mode, label, icon, _) in _modes)
+              PillSegment(value: mode, label: label, icon: icon),
+          ],
+          selected: selected,
+          onChanged: onChanged,
+          showLabels: false,
+        ),
+      ),
+    );
+  }
+}
+
 // 同一列表的各行拼成一整块面板：首行圆上角，末行圆下角，行间有细分隔线。
 // 队列的行直接排在房间背景上，只用细线隔开，不再套一层玻璃卡片。
 class _Panel extends StatelessWidget {
@@ -462,6 +497,7 @@ class _EntryRow extends StatelessWidget {
     required this.mine,
     required this.onCopyTitle,
     this.trailing,
+    this.menu,
   });
 
   final QueueEntry entry;
@@ -471,13 +507,19 @@ class _EntryRow extends StatelessWidget {
   final ValueChanged<String> onCopyTitle;
   final Widget? trailing;
 
+  /// 排在 [trailing] 之后的“更多”。桌面窗口里它只在鼠标指着这一行时显示，
+  /// 在这一行上按右键也打开同样的菜单。
+  final _EntryMenu? menu;
+
   @override
   Widget build(BuildContext context) {
     final by = entry.requestedBy;
     final who = by == null
         ? (entry.auto ? '自动推荐' : null)
         : (by.id == mine ? '我' : by.name);
-    return TrackRow(
+    final menu = this.menu;
+    final pointed = isDesktopPlatform && menu != null;
+    final row = TrackRow(
       title: entry.meta.title,
       subtitle: who == null ? entry.meta.artist : '$who · ${entry.meta.artist}',
       coverMark: entry.id,
@@ -494,10 +536,98 @@ class _EntryRow extends StatelessWidget {
             )
           : null,
       coverUrl: entry.meta.coverUrl,
-      onLongPress: () => onCopyTitle(entry.meta.title),
+      // 桌面窗口里右键出菜单，复制歌名在菜单里。
+      onLongPress: pointed ? null : () => onCopyTitle(entry.meta.title),
       longPressHint: copyTitleHint,
-      trailing: trailing,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ?trailing,
+          if (menu != null) pointed ? _ShownWhenPointed(child: menu) : menu,
+        ],
+      ),
       padding: _rowPadding,
+    );
+    if (!pointed) return row;
+    return _Pointed(
+      child: Builder(
+        builder: (context) =>
+            ContextMenuRegion(entries: menu.entries(context), child: row),
+      ),
+    );
+  }
+}
+
+// 鼠标指着这一行，或焦点在行内。
+class _Pointed extends StatefulWidget {
+  const _Pointed({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_Pointed> createState() => _PointedState();
+}
+
+class _PointedState extends State<_Pointed> {
+  final _active = ValueNotifier(false);
+  bool _hovered = false;
+  bool _focused = false;
+
+  void _sync() => _active.value = _hovered || _focused;
+
+  @override
+  void dispose() {
+    _active.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      opaque: false,
+      onEnter: (_) {
+        _hovered = true;
+        _sync();
+      },
+      onExit: (_) {
+        _hovered = false;
+        _sync();
+      },
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onFocusChange: (focused) {
+          _focused = focused;
+          _sync();
+        },
+        child: _PointedScope(notifier: _active, child: widget.child),
+      ),
+    );
+  }
+}
+
+class _PointedScope extends InheritedNotifier<ValueNotifier<bool>> {
+  const _PointedScope({required super.notifier, required super.child});
+}
+
+// 位置一直留着，显示和隐藏时行里的字不会挪动。
+class _ShownWhenPointed extends StatelessWidget {
+  const _ShownWhenPointed({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final pointed = context
+        .dependOnInheritedWidgetOfExactType<_PointedScope>()!
+        .notifier!
+        .value;
+    return AnimatedOpacity(
+      opacity: pointed ? 1 : 0,
+      duration: AlistenDurations.of(context, AlistenDurations.short),
+      // 看不见时读屏仍要读得到它。
+      alwaysIncludeSemantics: true,
+      child: child,
     );
   }
 }
@@ -519,35 +649,39 @@ class _EntryMenu extends StatelessWidget {
   final bool removable;
   final VoidCallback? onRemove;
 
-  @override
-  Widget build(BuildContext context) {
+  List<ActionMenuEntry> entries(BuildContext context) {
     final title = entry.meta.title;
     final save = onSaveToPlaylist;
     final remove = onRemove;
-    return ActionMenuButton(
-      semanticLabel: '《$title》的更多操作',
-      iconSize: AlistenSizes.iconSm,
-      entries: [
-        if (save != null)
-          ActionMenuEntry(
-            icon: AlistenIcons.listPlus,
-            label: '保存到歌单',
-            onSelected: () => save(context, entry.track, title),
-          ),
+    return [
+      if (save != null)
         ActionMenuEntry(
-          icon: AlistenIcons.copy,
-          label: copyTitleHint,
-          onSelected: () => onCopyTitle(title),
+          icon: AlistenIcons.listPlus,
+          label: '保存到歌单',
+          onSelected: () => save(context, entry.track, title),
         ),
-        if (removable)
-          ActionMenuEntry(
-            icon: AlistenIcons.minusCircle,
-            label: '移除',
-            danger: true,
-            enabled: remove != null,
-            onSelected: () => remove?.call(),
-          ),
-      ],
+      ActionMenuEntry(
+        icon: AlistenIcons.copy,
+        label: copyTitleHint,
+        onSelected: () => onCopyTitle(title),
+      ),
+      if (removable)
+        ActionMenuEntry(
+          icon: AlistenIcons.minusCircle,
+          label: '移除',
+          danger: true,
+          enabled: remove != null,
+          onSelected: () => remove?.call(),
+        ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionMenuButton(
+      semanticLabel: '《${entry.meta.title}》的更多操作',
+      iconSize: AlistenSizes.iconSm,
+      entries: entries(context),
     );
   }
 }

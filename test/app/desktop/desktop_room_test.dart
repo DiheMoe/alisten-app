@@ -982,6 +982,79 @@ void main() {
     expect(tester.getSize(queue).height, lessThan(before));
   }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 
+  group('the queue in the panel', () {
+    testWidgets(
+      'offers the play mode as icons on the line of its first heading',
+      (tester) async {
+        await enterRoom(tester, size: _wideDesktop);
+        final queue = find.byType(QueueView);
+        Finder inQueue(Finder what) =>
+            find.descendant(of: queue, matching: what);
+
+        expect(inQueue(find.text('播放模式')), findsNothing);
+        expect(inQueue(find.text('顺序')), findsNothing);
+        final modes = inQueue(find.bySemanticsLabel('播放模式'));
+        expect(modes, findsOneWidget);
+        expect(
+          tester.getCenter(modes).dy,
+          closeTo(tester.getCenter(inQueue(find.text('正在播放'))).dy, 12),
+        );
+        expect(
+          tester.getRect(modes).left,
+          greaterThan(tester.getRect(inQueue(find.text('正在播放'))).right),
+        );
+        expect(inQueue(find.bySemanticsLabel('轮流')), findsOneWidget);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+
+    testWidgets(
+      'shows the button for more only on the row under the mouse, and '
+      'opens the same menu on a right click',
+      (tester) async {
+        final (:settle, router: _, rooms: _) = await enterRoom(
+          tester,
+          size: _wideDesktop,
+        );
+        final more = find.descendant(
+          of: find.byType(QueueView),
+          matching: find.bySemanticsLabel(RegExp('的更多操作\$')),
+        );
+        double shown(Finder button) => tester
+            .widget<AnimatedOpacity>(
+              find
+                  .ancestor(of: button, matching: find.byType(AnimatedOpacity))
+                  .first,
+            )
+            .opacity;
+        expect(more, findsWidgets);
+        expect(shown(more.first), 0);
+
+        final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+        await mouse.addPointer(location: const Offset(200, 200));
+        addTearDown(mouse.removePointer);
+        final row = tester.getRect(
+          find.ancestor(of: more.first, matching: find.byType(TrackRow)).first,
+        );
+        await mouse.moveTo(row.centerLeft + const Offset(80, 0));
+        await settle();
+        expect(shown(more.first), 1);
+        await mouse.moveTo(const Offset(200, 200));
+        await settle();
+        expect(shown(more.first), 0);
+
+        await tester.tapAt(
+          row.centerLeft + const Offset(80, 0),
+          buttons: kSecondaryMouseButton,
+          kind: PointerDeviceKind.mouse,
+        );
+        await settle();
+        expect(find.text('复制歌名'), findsOneWidget);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+  });
+
   group('the sidebar', () {
     testWidgets(
       'is a narrow rail of icons without words that still leads to each page',
