@@ -13,7 +13,10 @@ import 'package:alisten/core/cache/disk_cover_cache.dart';
 import 'package:alisten/core/realtime/connectivity.dart';
 import 'package:alisten/core/realtime/websocket_room_transport.dart';
 import 'package:alisten/core/storage/preferences.dart';
+import 'package:alisten/domain/member/github.dart';
 import 'package:alisten/domain/release/release_version.dart';
+import 'package:alisten/features/account/data/browser_github_authorizer.dart';
+import 'package:alisten/features/account/data/url_scheme_registrar.dart';
 import 'package:alisten/features/account/data/web_auth_github_authorizer.dart';
 import 'package:alisten/features/account/index.dart';
 import 'package:alisten/features/admin/data/dio_qr_image_loader.dart';
@@ -67,6 +70,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 final notificationGatewayProvider = Provider<NotificationGateway>((ref) {
   throw UnimplementedError('notificationGateway 未注入');
@@ -349,7 +353,17 @@ List<Override> platformAdapters({
       return GitHubReleaseSource(dio);
     }),
     releaseOpenerProvider.overrideWithValue(PlatformReleaseOpener()),
-    githubAuthorizerProvider.overrideWithValue(const WebAuthGithubAuthorizer()),
+    githubAuthorizerProvider.overrideWith(
+      (ref) => switch (defaultTargetPlatform) {
+        TargetPlatform.linux ||
+        TargetPlatform.windows => BrowserGithubAuthorizer(
+          links: ref.watch(appLinkSourceProvider).uriLinkStream,
+          register: () => registerUrlScheme(githubCallbackScheme),
+          open: (url) => launchUrl(url, mode: LaunchMode.externalApplication),
+        ),
+        _ => const WebAuthGithubAuthorizer(),
+      },
+    ),
   ];
 }
 

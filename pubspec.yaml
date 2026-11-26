@@ -34,6 +34,7 @@ dependencies:
   url_launcher: ^6.3.3
   wakelock_plus: ^1.8.2
   web_socket_channel: ^3.0.3
+  win32_registry: ^3.0.3
   window_to_front: ^0.0.4
 
 dev_dependencies:

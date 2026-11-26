@@ -2,8 +2,9 @@
 Type=Application
 Name=Alisten
 Comment=和朋友一起听歌
-Exec=alisten
+Exec=alisten %u
 Icon=moe.dihe.alisten
 Categories=AudioVideo;Audio;Player;
+MimeType=x-scheme-handler/moe.dihe.alisten;
 StartupWMClass=moe.dihe.alisten
 Terminal=false
