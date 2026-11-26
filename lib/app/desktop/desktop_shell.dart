@@ -333,69 +333,37 @@ class _PanelEdgeToggle extends StatefulWidget {
 }
 
 class _PanelEdgeToggleState extends State<_PanelEdgeToggle> {
+  static const _size = Size(16, 48);
+  static const _iconSize = 12.0;
+
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
-    final label = widget.expanded ? '收起队列与聊天' : '展开队列与聊天';
-    final width = _hovered ? 28.0 : (widget.expanded ? 20.0 : 24.0);
-    final height = _hovered ? 64.0 : 56.0;
-    final stroke = colors.onGlass.withValues(alpha: _hovered ? 0.22 : 0.12);
     const radius = Radius.circular(AlistenRadii.sm);
-    const borderRadius = BorderRadiusDirectional.only(
-      topStart: radius,
-      bottomStart: radius,
-    );
-    return Tooltip(
-      message: label,
-      excludeFromSemantics: true,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: Pressable(
-          key: const ValueKey('desktop-panel-toggle'),
-          onPressed: widget.onPressed,
-          semanticLabel: label,
-          expanded: widget.expanded,
-          focusRadius: borderRadius.resolve(Directionality.of(context)),
-          child: ClipRect(
-            child: AnimatedContainer(
-              duration: AlistenDurations.of(context, AlistenDurations.short),
-              curve: AlistenCurves.standard,
-              width: width,
-              height: height,
-              child: OverflowBox(
-                alignment: AlignmentDirectional.centerStart,
-                minWidth: width + AlistenSizes.hairline,
-                maxWidth: width + AlistenSizes.hairline,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: _hovered ? colors.raised : colors.glassFill,
-                    borderRadius: borderRadius,
-                    border: Border.all(
-                      color: stroke,
-                      width: AlistenSizes.hairline,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.only(
-                      end: AlistenSizes.hairline,
-                    ),
-                    child: Center(
-                      child: Transform.rotate(
-                        angle: lerpDouble(math.pi, 0.0, widget.progress)!,
-                        child: Icon(
-                          AlistenIcons.caretRight,
-                          size: 14,
-                          color: colors.onGlass.withValues(
-                            alpha: _hovered ? 0.95 : 0.72,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Pressable(
+        key: const ValueKey('desktop-panel-toggle'),
+        onPressed: widget.onPressed,
+        semanticLabel: widget.expanded ? '收起队列与聊天' : '展开队列与聊天',
+        expanded: widget.expanded,
+        focusRadius: const BorderRadiusDirectional.only(
+          topStart: radius,
+          bottomStart: radius,
+        ).resolve(Directionality.of(context)),
+        child: SizedBox.fromSize(
+          size: _size,
+          child: Center(
+            child: Transform.rotate(
+              angle: lerpDouble(math.pi, 0.0, widget.progress)!,
+              child: Icon(
+                AlistenIcons.caretRight,
+                size: _iconSize,
+                // 平时只是一个很淡的箭头，鼠标指着才醒目。
+                color: colors.onGlass.withValues(alpha: _hovered ? 0.8 : 0.3),
               ),
             ),
           ),

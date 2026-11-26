@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/identity/index.dart';
@@ -426,22 +427,50 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
             AlistenSpacing.page,
             bottom + AlistenSpacing.page,
           ),
-          sliver: SliverGrid.builder(
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: _roomCardWidth,
-              mainAxisExtent: _roomCardHeight,
-              crossAxisSpacing: AlistenSpacing.sm,
-              mainAxisSpacing: AlistenSpacing.sm,
-            ),
-            itemCount: rooms.length,
-            itemBuilder: (context, index) => DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.glassFill,
-                borderRadius: BorderRadius.circular(AlistenRadii.md),
-                border: Border.all(color: colors.glassStroke),
-              ),
-              child: row(rooms[index]),
-            ),
+          sliver: SliverLayoutBuilder(
+            builder: (context, constraints) {
+              const gap = AlistenSpacing.sm;
+              final perRow = math.max(
+                1,
+                (constraints.crossAxisExtent + gap) ~/
+                    (_roomCardMinWidth + gap),
+              );
+              return SliverList.separated(
+                itemCount: (rooms.length / perRow).ceil(),
+                separatorBuilder: (_, _) => const SizedBox(height: gap),
+                itemBuilder: (context, index) {
+                  final first = index * perRow;
+                  // 卡片的高度随内容变（简介可能两行，标签可能换行），同一排
+                  // 取最高的那张。
+                  return IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var at = first; at < first + perRow; at++) ...[
+                          if (at > first) const SizedBox(width: gap),
+                          Expanded(
+                            child: at < rooms.length
+                                ? DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: colors.glassFill,
+                                      borderRadius: BorderRadius.circular(
+                                        AlistenRadii.md,
+                                      ),
+                                      border: Border.all(
+                                        color: colors.glassStroke,
+                                      ),
+                                    ),
+                                    child: row(rooms[at]),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
           ),
         ),
       ];
@@ -481,8 +510,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
 }
 
 const _desktopContentWidth = 1120.0;
-const _roomCardWidth = 380.0;
-const _roomCardHeight = 92.0;
+const _roomCardMinWidth = 300.0;
 
 // 吸顶头部的高度须预先算出并随系统字号变化：操作栏按胶囊按钮的高度算（栏内
 // 小标题与它同字号），大标题区按字号算。

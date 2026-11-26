@@ -117,17 +117,8 @@ class DesktopRoomStage extends ConsumerWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: AlistenSpacing.md),
-              child: LayoutBuilder(
-                builder: (context, constraints) => Center(
-                  child: SizedBox(
-                    width: math.min(
-                      constraints.maxWidth,
-                      SettledStageWidth.maybeOf(context) ??
-                          constraints.maxWidth,
-                    ),
-                    child: const LyricsView(),
-                  ),
-                ),
+              child: LyricsView(
+                columnWidth: SettledStageWidth.maybeOf(context),
               ),
             ),
           ),

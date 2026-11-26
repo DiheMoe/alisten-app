@@ -255,6 +255,10 @@ void main() {
 
       expect(panel, findsOneWidget);
       expect(toggle, findsOneWidget);
+      expect(
+        find.ancestor(of: toggle, matching: find.byType(Tooltip)),
+        findsNothing,
+      );
 
       final expandedStageWidth = tester.getSize(stage).width;
       final panelRect = tester.getRect(panel);
@@ -374,12 +378,12 @@ void main() {
   );
 
   testWidgets(
-    'while the panel slides the lyrics keep the width they have beside it, '
-    'and the edge toggle stays off pages that scroll',
+    'while the panel slides the lyric lines keep the width they have beside '
+    'it, and the edge toggle stays off pages that scroll',
     (tester) async {
       final (:settle, :router, rooms: _) = await enterRoom(
         tester,
-        size: const Size(1100, 700),
+        size: const Size(1000, 700),
         overrides: [
           lyricsProvider.overrideWithValue(const [
             LyricLine(timeMs: 0, text: '第一行歌词'),
@@ -387,23 +391,22 @@ void main() {
           ]),
         ],
       );
-      final lyrics = find.byType(LyricsView);
+      final line = find.byType(LyricLineRow).first;
       final toggle = find.byKey(const ValueKey('desktop-panel-toggle'));
-      final beside = tester.getSize(lyrics).width;
+      final beside = tester.getSize(line).width;
 
       await tester.tap(toggle);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 140));
-      expect(tester.getSize(lyrics).width, beside, reason: 'collapsing');
+      expect(tester.getSize(line).width, beside, reason: 'collapsing');
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pump();
-      final alone = tester.getSize(lyrics).width;
-      expect(alone, greaterThan(beside));
+      expect(tester.getSize(line).width, greaterThan(beside));
 
       await tester.tap(toggle);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
-      expect(tester.getSize(lyrics).width, beside, reason: 'expanding');
+      expect(tester.getSize(line).width, beside, reason: 'expanding');
       await tester.pump(const Duration(milliseconds: 500));
       await settle();
 
@@ -412,6 +415,37 @@ void main() {
       await settle();
       expect(toggle, findsNothing);
       expect(find.byType(DesktopRoomPanel), findsOneWidget);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  testWidgets(
+    'with no lyrics, the note that says so stays where it is while the panel '
+    'slides away and back',
+    (tester) async {
+      final (:settle, rooms: _, router: _) = await enterRoom(
+        tester,
+        size: const Size(1000, 700),
+      );
+      final toggle = find.byKey(const ValueKey('desktop-panel-toggle'));
+      Offset note() => tester.getTopLeft(find.text('暂无歌词'));
+      final resting = note();
+
+      await tester.tap(toggle);
+      await tester.pump();
+      for (final step in const [60, 80, 120, 200]) {
+        await tester.pump(Duration(milliseconds: step));
+        expect(note(), resting, reason: 'collapsing, after another $step ms');
+      }
+      await settle();
+      expect(note(), resting);
+
+      await tester.tap(toggle);
+      await tester.pump();
+      for (final step in const [60, 80, 120, 200]) {
+        await tester.pump(Duration(milliseconds: step));
+        expect(note(), resting, reason: 'expanding, after another $step ms');
+      }
     },
     variant: TargetPlatformVariant.only(TargetPlatform.windows),
   );

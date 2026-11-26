@@ -51,7 +51,11 @@ const _maxLyricWidth = 560.0;
 ///
 /// 逐帧的变化都走绘制阶段：列表不重建，只有当前行和过渡中的行重绘。
 class LyricsView extends ConsumerStatefulWidget {
-  const LyricsView({super.key});
+  const LyricsView({this.columnWidth, super.key});
+
+  /// 歌词列最宽到这里。所在区域的宽度在动画里逐帧变化时，由上层给出停稳后的
+  /// 宽度，歌词不必跟着逐帧重排。
+  final double? columnWidth;
 
   @override
   ConsumerState<LyricsView> createState() => _LyricsViewState();
@@ -475,7 +479,14 @@ class _LyricsViewState extends ConsumerState<LyricsView>
           onNotification: _onScroll,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              _resetWidth(math.min(constraints.maxWidth, _maxLyricWidth));
+              final column = math.min(
+                math.min(
+                  constraints.maxWidth,
+                  widget.columnWidth ?? double.infinity,
+                ),
+                _maxLyricWidth,
+              );
+              _resetWidth(column);
               _sizeSnapshots(constraints.maxHeight);
               _contentInset = constraints.hasBoundedHeight
                   ? constraints.maxHeight / 2
@@ -496,9 +507,7 @@ class _LyricsViewState extends ConsumerState<LyricsView>
                     child: Align(
                       alignment: Alignment.topCenter,
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: _maxLyricWidth,
-                        ),
+                        constraints: BoxConstraints(maxWidth: column),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
