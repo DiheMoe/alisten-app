@@ -144,6 +144,7 @@ class SharedPlaylistScreen extends ConsumerWidget {
                 title: meta.title,
                 subtitle: playlistSongSubtitle(meta),
                 coverUrl: meta.coverUrl,
+                coverMark: trackKey(item.track),
                 onLongPress: () => onCopyTitle(meta.title),
                 longPressHint: copyTitleHint,
                 padding: const EdgeInsetsDirectional.fromSTEB(

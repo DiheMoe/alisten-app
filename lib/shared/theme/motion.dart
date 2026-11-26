@@ -55,6 +55,11 @@ abstract final class AlistenSprings {
     bounce: 0.15,
   );
 
+  /// 点的歌的封面飞进队列，正落在那一行上，不回弹。
+  static final coverFlight = SpringDescription.withDurationAndBounce(
+    duration: const Duration(milliseconds: 450),
+  );
+
   /// 菜单展开后外框从胶囊收成卡片圆角。
   static final menuCorners = SpringDescription.withDampingRatio(
     mass: 1,

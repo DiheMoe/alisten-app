@@ -11,6 +11,7 @@ import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
+import 'package:alisten/shared/ui/cover_flight.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/keyed_sliver_list.dart';
@@ -23,6 +24,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// [success] 是变更成功时展示的文字。结果须展示在不随页面消失的地方，如提示。
+/// 点的歌的封面飞进队列时圈住落点的区域，见 [FlightMark.fly]；每一行的封面以
+/// 条目的 id 为标记。
+const queueFlightArea = (flightArea: 'queue');
+
 typedef QueueResultCallback = void Function(
   MutationResult<Object?> result,
   String success,
@@ -475,6 +480,7 @@ class _EntryRow extends StatelessWidget {
     return TrackRow(
       title: entry.meta.title,
       subtitle: who == null ? entry.meta.artist : '$who · ${entry.meta.artist}',
+      coverMark: entry.id,
       subtitleLeading: by != null
           ? MemberAvatar(
               name: by.name,

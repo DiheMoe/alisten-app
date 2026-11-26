@@ -24,6 +24,7 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
+import 'package:alisten/shared/ui/track_row.dart';
 import 'package:alisten/shared/ui/zoom_frame.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -34,6 +35,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../domain/room/room_fixtures.dart';
 import '../../features/lobby/lobby_test_doubles.dart';
 import '../../features/room/room_test_doubles.dart';
+import '../../features/search/search_test_doubles.dart';
 import '../app_test_harness.dart';
 
 const _wideDesktop = Size(1600, 900);
@@ -619,6 +621,89 @@ void main() {
       expect(tester.getRect(stage), whole);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  testWidgets(
+    'the cover of a picked song flies from the results into the queue',
+    (tester) async {
+      final (:settle, :router, :rooms) = await enterRoom(
+        tester,
+        size: _wideDesktop,
+      );
+      rooms.last.responses
+        ..addAll(defaultSearchAnswers())
+        ..['queue.add'] = {'entry': entryJson('track-1')};
+      router.go('/r/listen/search');
+      await settle();
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(SearchScreen),
+          matching: find.byType(EditableText),
+        ),
+        '夜曲',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await settle();
+
+      Finder coverIn(Type list) => find.descendant(
+        of: find.descendant(
+          of: find.byType(list),
+          matching: find.widgetWithText(TrackRow, 'track-1'),
+        ),
+        matching: find.byType(CoverArt),
+      );
+      final flying = find.descendant(
+        of: find.byType(FittedBox),
+        matching: find.byType(CoverArt),
+      );
+      final from = tester.getRect(coverIn(SearchScreen));
+      expect(flying, findsNothing);
+
+      await tester.tap(find.bySemanticsLabel('点歌《track-1》'));
+      await tester.pump();
+      rooms.last.emit(
+        const RoomEventReceived(
+          QueueUpdatedEvent(
+            term: 1,
+            seq: 2,
+            pending: null,
+            items: [
+              QueueEntry(
+                id: 'entry-track-1',
+                track: Track(source: TrackSource.netease, id: 'track-1'),
+                meta: TrackMeta(
+                  title: 'track-1',
+                  artist: 'artist',
+                  album: 'album',
+                  coverUrl: '',
+                  pageUrl: '',
+                  durationMs: 1000,
+                ),
+                requestedBy: null,
+                auto: false,
+                likes: 0,
+                status: QueueEntryStatus.ready,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 120));
+      final to = tester.getRect(coverIn(QueueView));
+      expect(to.left, greaterThan(from.right));
+      expect(flying, findsOneWidget);
+      final midway = tester.getRect(flying).center;
+      expect(midway.dx, greaterThan(from.center.dx));
+      expect(midway.dx, lessThan(to.center.dx));
+
+      await settle();
+      expect(flying, findsNothing);
+      expect(tester.getRect(coverIn(SearchScreen)), from);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.linux),
   );
 
   testWidgets(

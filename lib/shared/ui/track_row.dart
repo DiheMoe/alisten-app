@@ -1,6 +1,8 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
+import 'package:alisten/shared/ui/cover_flight.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/widgets.dart';
@@ -19,6 +21,7 @@ class TrackRow extends StatelessWidget {
     this.longPressHint,
     this.semanticActions,
     this.coverSize = AlistenSizes.rowCover,
+    this.coverMark,
     this.padding = const EdgeInsets.symmetric(
       horizontal: AlistenSpacing.page,
       vertical: AlistenSpacing.xs,
@@ -36,6 +39,9 @@ class TrackRow extends StatelessWidget {
   final String? longPressHint;
   final Map<CustomSemanticsAction, VoidCallback>? semanticActions;
   final double coverSize;
+
+  /// 封面的 [FlightMark] 标记：桌面窗口里点的歌的封面从结果飞进队列。
+  final Object? coverMark;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -47,7 +53,13 @@ class TrackRow extends StatelessWidget {
       padding: padding,
       child: Row(
         children: [
-          CoverArt(url: coverUrl, size: coverSize),
+          if (coverMark case final mark? when isDesktopPlatform)
+            FlightMark(
+              tag: mark,
+              child: CoverArt(url: coverUrl, size: coverSize),
+            )
+          else
+            CoverArt(url: coverUrl, size: coverSize),
           const SizedBox(width: AlistenSpacing.sm),
           Expanded(
             child: Column(

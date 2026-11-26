@@ -216,6 +216,7 @@ class _MyPlaylistsPickerState extends ConsumerState<MyPlaylistsPicker> {
           title: meta.title,
           subtitle: playlistSongSubtitle(meta),
           coverUrl: meta.coverUrl,
+          coverMark: trackKey(item.track),
           trailing: PlaylistPickControl(
             track: item.track,
             title: meta.title,

@@ -17,6 +17,7 @@ import 'package:alisten/features/search/presentation/playlist_screen.dart';
 import 'package:alisten/features/search/presentation/song_row.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/cover_flight.dart';
 import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
@@ -1036,6 +1037,14 @@ class _BestMatch extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     final meta = song.meta;
+    final art = CoverArt(
+      url: meta.coverUrl,
+      size: AlistenSizes.featureCover,
+      radius: AlistenRadii.md,
+    );
+    final cover = isDesktopPlatform
+        ? FlightMark(tag: trackKey(song.track), child: art)
+        : art;
     final shape = BorderRadius.circular(AlistenRadii.lg);
     return DecoratedBox(
       position: DecorationPosition.foreground,
@@ -1061,11 +1070,7 @@ class _BestMatch extends StatelessWidget {
                 padding: const EdgeInsets.all(AlistenSpacing.md),
                 child: Row(
                   children: [
-                    CoverArt(
-                      url: meta.coverUrl,
-                      size: AlistenSizes.featureCover,
-                      radius: AlistenRadii.md,
-                    ),
+                    cover,
                     const SizedBox(width: AlistenSpacing.md),
                     Expanded(
                       child: Column(

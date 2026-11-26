@@ -702,6 +702,7 @@ class _Song extends StatelessWidget {
                   title: meta.title,
                   subtitle: subtitle,
                   coverUrl: meta.coverUrl,
+                  coverMark: trackKey(item.track),
                   onPressed: editing ? onToggle : null,
                   onLongPress: editing ? null : copy,
                   padding: const EdgeInsetsDirectional.fromSTEB(

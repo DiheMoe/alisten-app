@@ -16,6 +16,7 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
+import 'package:alisten/shared/ui/cover_flight.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:flutter/gestures.dart';
@@ -498,19 +499,22 @@ class _PanelState extends ConsumerState<_Panel> {
                 children: [
                   SizedBox(
                     height: queueHeight,
-                    child: QueueView(
-                      onResult: (result, success) => reportMutation(
-                        toasts,
-                        result,
-                        success: (_) => success,
-                      ),
-                      onCopyTitle: (title) => copySongTitle(toasts, title),
-                      onSaveToPlaylist: (context, track, title) => unawaited(
-                        showSaveToPlaylistSheet(
-                          context,
-                          SaveOneTrack(track: track, title: title),
-                          onOpenAccount: openAccount,
-                          onNotice: toasts.show,
+                    child: FlightMark(
+                      tag: queueFlightArea,
+                      child: QueueView(
+                        onResult: (result, success) => reportMutation(
+                          toasts,
+                          result,
+                          success: (_) => success,
+                        ),
+                        onCopyTitle: (title) => copySongTitle(toasts, title),
+                        onSaveToPlaylist: (context, track, title) => unawaited(
+                          showSaveToPlaylistSheet(
+                            context,
+                            SaveOneTrack(track: track, title: title),
+                            onOpenAccount: openAccount,
+                            onNotice: toasts.show,
+                          ),
                         ),
                       ),
                     ),

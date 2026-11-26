@@ -10,6 +10,8 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/animated_resize.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
+import 'package:alisten/shared/ui/cover_flight.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart'
     show clockText, spokenDuration;
 import 'package:alisten/shared/ui/pressable.dart';
@@ -45,6 +47,16 @@ Future<MutationResult<QueueEntry>?> pickSong(
     _ => title,
   };
   onResult(result, named.isEmpty ? '已点歌' : '已点歌《$named》');
+  // 桌面窗口里结果和队列同时看得见，封面从这一行飞进队列。
+  if (isDesktopPlatform) {
+    if (result case MutationSucceeded(:final value)) {
+      FlightMark.fly(
+        from: trackKey(track),
+        to: value.id,
+        area: queueFlightArea,
+      );
+    }
+  }
   return result;
 }
 
@@ -92,6 +104,7 @@ class SongRow extends ConsumerWidget {
       title: meta.title,
       subtitle: songSubtitle(meta),
       coverUrl: meta.coverUrl,
+      coverMark: trackKey(song.track),
       onLongPress: meta.pageUrl.isEmpty ? null : () => onOpen(meta.pageUrl),
       longPressHint: openOriginalHint,
       padding: const EdgeInsets.fromLTRB(
