@@ -96,9 +96,15 @@ abstract final class TapOrigin {
 
 /// 页面关闭时优先缩回的元素，按 [tag] 查找，比如房间收进迷你播放条。
 class ZoomTarget extends StatefulWidget {
-  const ZoomTarget({required this.tag, required this.child, super.key});
+  const ZoomTarget({
+    required this.tag,
+    required this.child,
+    this.radius = 0,
+    super.key,
+  });
 
   final String tag;
+  final double radius;
   final Widget child;
 
   static final _targets = <String, _ZoomTargetState>{};
@@ -109,6 +115,8 @@ class ZoomTarget extends StatefulWidget {
     if (box is! RenderBox || !box.attached || !box.hasSize) return null;
     return _globalRect(box);
   }
+
+  static double? radiusOf(String tag) => _targets[tag]?.widget.radius;
 
   /// 同 [ZoomSourceHandle.hide]：都放开才重新画出来。
   static void hide(String tag, Object by) => _targets[tag]?._hide(by);

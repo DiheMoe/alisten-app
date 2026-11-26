@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:alisten/app/app_theme.dart';
+import 'package:alisten/app/desktop/desktop_playback_controls.dart';
 import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/playback/index.dart';
@@ -10,6 +11,7 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/edge_track.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/playback_progress_bar.dart';
@@ -25,11 +27,19 @@ class MiniPlayerHost extends ConsumerWidget {
   const MiniPlayerHost({
     required this.location,
     required this.child,
+    this.show = true,
+    this.insideRoom = false,
     super.key,
   });
 
   final Uri location;
   final Widget child;
+
+  /// 为 false 时不显示：桌面窗口的房间页自带播放控制。
+  final bool show;
+
+  /// 在房间的窗口里面：房间收起时不缩回这一个，也不从它长出。
+  final bool insideRoom;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -42,6 +52,7 @@ class MiniPlayerHost extends ConsumerWidget {
         : null;
     final media = MediaQuery.of(context);
     final shown =
+        show &&
         roomId != null &&
         media.viewInsets.bottom == 0 &&
         (routeRoom == null ||
@@ -73,7 +84,10 @@ class MiniPlayerHost extends ConsumerWidget {
               constraints: const BoxConstraints(
                 maxWidth: AlistenSizes.sheetMaxWidth,
               ),
-              child: _MiniPlayerSlot(roomId: shown ? roomId : null),
+              child: _MiniPlayerSlot(
+                roomId: shown ? roomId : null,
+                insideRoom: insideRoom,
+              ),
             ),
           ),
         ),
@@ -85,9 +99,10 @@ class MiniPlayerHost extends ConsumerWidget {
 // 由这里读取房间再传给 [MiniPlayer]：淡出中的迷你播放器仍在组件树中，
 // 若自行读取，房间清空后它会变样；传入最后显示的内容才能原样淡出。
 class _MiniPlayerSlot extends ConsumerWidget {
-  const _MiniPlayerSlot({required this.roomId});
+  const _MiniPlayerSlot({required this.roomId, required this.insideRoom});
 
   final String? roomId;
+  final bool insideRoom;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -103,6 +118,18 @@ class _MiniPlayerSlot extends ConsumerWidget {
       ),
     );
     final roomId = this.roomId;
+    final player = roomId == null
+        ? null
+        : RoomTheme(
+            child: MiniPlayer(
+              roomId: roomId,
+              status: status,
+              failure: failure,
+              errorMessage: errorMessage,
+              roomName: roomName,
+              nowPlaying: nowPlaying,
+            ),
+          );
     return AnimatedSwitcher(
       duration: AlistenDurations.of(context, AlistenDurations.medium),
       switchInCurve: AlistenCurves.standard,
@@ -129,23 +156,15 @@ class _MiniPlayerSlot extends ConsumerWidget {
           ),
         ),
       ),
-      child: roomId == null
+      child: player == null
           ? const SizedBox(width: double.infinity)
+          : insideRoom
+          ? player
           : ZoomTarget(
               tag: roomZoomTag,
+              radius: AlistenRadii.md,
               // 房间页从迷你播放条长出来。
-              child: ZoomSource(
-                child: RoomTheme(
-                  child: MiniPlayer(
-                    roomId: roomId,
-                    status: status,
-                    failure: failure,
-                    errorMessage: errorMessage,
-                    roomName: roomName,
-                    nowPlaying: nowPlaying,
-                  ),
-                ),
-              ),
+              child: ZoomSource(child: player),
             ),
     );
   }
@@ -232,6 +251,7 @@ class MiniPlayer extends StatelessWidget {
       child: Pressable(
         onPressed: open,
         semanticLabel: '打开房间${roomName == null ? '' : ' $roomName'}',
+        hover: PressableHover.glow,
         focusRadius: BorderRadius.circular(AlistenRadii.md),
         // 浮在所有页面之外，上层没有默认文字样式。
         child: DefaultTextStyle(
@@ -299,7 +319,16 @@ class MiniPlayer extends StatelessWidget {
                       if (closable)
                         const _Close()
                       else if (nowPlaying != null)
-                        const _LocalPause(),
+                        isDesktopPlatform
+                            // 已投过票的按钮不可用，点在它上面不该打开房间。
+                            ? GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () {},
+                                child: const DesktopPlaybackControls(
+                                  gap: AlistenSpacing.xxs,
+                                ),
+                              )
+                            : const _LocalPause(),
                     ],
                   ),
                 ),

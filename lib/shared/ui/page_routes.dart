@@ -65,6 +65,7 @@ final class AlistenPage<T> extends Page<T> {
     required this.child,
     this.task = false,
     this.push = false,
+    this.fade = false,
     this.returnTo,
     super.key,
     super.name,
@@ -80,6 +81,10 @@ final class AlistenPage<T> extends Page<T> {
   /// 从 [ZoomSource] 里点开的页面也都普通推入。
   final bool push;
 
+  /// 原地换页：旧的一页先淡出，新的一页再淡入。桌面窗口里并排着侧栏或面板的
+  /// 页面用它，不从点按处长出，也不从边缘滑入。
+  final bool fade;
+
   /// 关闭时优先缩回的 [ZoomTarget]，比如房间收进迷你播放条。
   final String? returnTo;
 
@@ -87,8 +92,7 @@ final class AlistenPage<T> extends Page<T> {
   Route<T> createRoute(BuildContext context) {
     // 普通导航也要取走这次点按，免得之后的页面从它长出。
     final origin = TapOrigin.take();
-    // 桌面窗口里页面原地换上，不从点按处长出，也不从边缘滑入。
-    if (isDesktopPlatform) return _FadePageRoute<T>(this);
+    if (fade) return _FadePageRoute<T>(this);
     if (!task) {
       if (push) return PushPageRoute<T>._(this);
       final source = origin?.source;
@@ -130,7 +134,7 @@ final class _FadePageRoute<T> extends PageRoute<T> {
   bool get maintainState => true;
 
   @override
-  Duration get transitionDuration => AlistenDurations.short;
+  Duration get transitionDuration => AlistenMotion.fadeThrough;
 
   @override
   Widget buildPage(
@@ -145,10 +149,40 @@ final class _FadePageRoute<T> extends PageRoute<T> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
     Widget child,
-  ) => FadeTransition(
-    opacity: CurveTween(curve: AlistenCurves.standard).animate(animation),
-    child: child,
-  );
+  ) {
+    // 页面可能是透明的（叠在房间的背景上）：旧的一页先淡出，新的一页才淡入并
+    // 升到位，两页的内容不会叠在一起。只位移不缩放：缩放途中每一帧都得按新的
+    // 大小把文字重画一遍。
+    final arriving = CurveTween(
+      curve: const Interval(
+        AlistenMotion.fadeThroughOutShare,
+        1,
+        curve: AlistenCurves.standard,
+      ),
+    );
+    final leaving = CurveTween(
+      curve: const Interval(
+        0,
+        AlistenMotion.fadeThroughOutShare,
+        curve: AlistenCurves.exit,
+      ),
+    );
+    final rise = animation.drive(
+      Tween(begin: AlistenMotion.fadeThroughRise, end: 0.0).chain(arriving),
+    );
+    return FadeTransition(
+      opacity: animation.drive(arriving),
+      child: AnimatedBuilder(
+        animation: rise,
+        builder: (context, child) =>
+            Transform.translate(offset: Offset(0, rise.value), child: child),
+        child: FadeTransition(
+          opacity: ReverseAnimation(secondaryAnimation.drive(leaving)),
+          child: child,
+        ),
+      ),
+    );
+  }
 }
 
 /// 从刚点的元素长出、关闭时缩回去、可以用手指拖走的页面。
@@ -187,6 +221,9 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
   /// 没有起点、或要缩回的元素已不在屏幕上时，外框从哪长出、缩到哪去；[page]
   /// 是页面此刻的外框。为 null 时从底部升起。
   Rect? _fallback(Size screen, Rect page);
+
+  /// [_fallback] 是否像元素那样长出、缩回：外框和内容淡入淡出，而不是整页移动。
+  bool get _fallbackMorphs => false;
 
   /// 能否缩回 [rect] 处的元素。向下拖关闭的页面不缩回上方的元素。
   bool _returnsTo(Rect rect, Size screen) => true;
@@ -230,6 +267,32 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
   }
 
   bool _disposed = false;
+
+  // 桌面窗口里没有入口卡片的页面从返回目标长出。只认打开那一刻已在屏幕上的
+  // 目标：打开途中才出现的（刚进房间时的迷你播放条）会让外框中途换起点。
+  bool _opensFromReturnTarget = false;
+
+  // 桌面窗口大，页面缩放途中每一帧都得按新的大小把文字重画一遍，跟不上。转场
+  // 途中画的是页面的一张快照，停稳后才照常画。
+  final _snapshot = SnapshotController();
+
+  @override
+  void install() {
+    super.install();
+    if (isDesktopPlatform) animation!.addStatusListener(_snapshotWhileMoving);
+  }
+
+  void _snapshotWhileMoving(AnimationStatus status) {
+    if (!status.isAnimating) {
+      _snapshot.allowSnapshotting = false;
+      return;
+    }
+    // 起步的这一帧照常画：共享元素这一帧之后才离开页面，快照里不该留着它。
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || !animation!.isAnimating) return;
+      _snapshot.allowSnapshotting = true;
+    });
+  }
 
   Widget _pausable(Widget child) => ValueListenableBuilder<bool>(
     valueListenable: _underTask,
@@ -398,7 +461,7 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
   /// 外框此刻的起点：关闭时先找返回目标，再找起点元素现在的位置，都不在屏幕
   /// 上就用兜底。打开时元素若已不在树上，用点按时的位置。[element] 表示起点是
   /// 屏幕上的元素，[source] 表示它就是起飞时的入口卡片。
-  ({Rect? rect, bool element, bool source}) _start(
+  ({Rect? rect, bool element, bool source, double? radius}) _start(
     Size screen, {
     required bool closing,
     required Rect page,
@@ -406,18 +469,34 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
     final bounds = Offset.zero & screen;
     bool visible(Rect? rect) =>
         rect != null && rect.overlaps(bounds) && _returnsTo(rect, screen);
-    if (closing) {
+    if (closing || _opensFromReturnTarget) {
       final tag = _page.returnTo;
       final target = tag == null ? null : ZoomTarget.rectOf(tag);
-      if (visible(target)) return (rect: target, element: true, source: false);
+      if (visible(target)) {
+        return (
+          rect: target,
+          element: true,
+          source: false,
+          radius: ZoomTarget.radiusOf(tag!),
+        );
+      }
     }
     final origin = _origin;
     if (origin != null) {
       final now = origin.current;
-      if (visible(now)) return (rect: now, element: true, source: true);
-      if (!closing) return (rect: origin.rect, element: true, source: true);
+      if (visible(now)) {
+        return (rect: now, element: true, source: true, radius: null);
+      }
+      if (!closing) {
+        return (rect: origin.rect, element: true, source: true, radius: null);
+      }
     }
-    return (rect: _fallback(screen, page), element: false, source: false);
+    return (
+      rect: _fallback(screen, page),
+      element: _fallbackMorphs,
+      source: false,
+      radius: null,
+    );
   }
 
   double _growthOf(double shown) {
@@ -439,7 +518,14 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
     final surface = Theme.of(context).colorScheme.surface;
     return AnimatedBuilder(
       animation: Listenable.merge([animation, _pull, _cross]),
-      child: page,
+      child: isDesktopPlatform
+          ? SnapshotWidget(
+              controller: _snapshot,
+              mode: SnapshotMode.permissive,
+              autoresize: true,
+              child: page,
+            )
+          : page,
       builder: (context, page) {
         final closing =
             _shrinkFrom != null || animation.status == AnimationStatus.reverse;
@@ -464,7 +550,7 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
         final picture = start.source ? _picture : null;
         final (double solid, double shown, double pictured) = switch (start) {
           // 从底部升起、滑进滑出时页面一直是实的。
-          (element: false, rect: _, source: _) => (1, 1, 0),
+          (element: false, rect: _, source: _, radius: _) => (1, 1, 0),
           _ when picture == null => (
             morphSolid(growth),
             morphContent(growth, closing: closing),
@@ -486,7 +572,7 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
           from: start.rect,
           riseBy: screen.height,
           fromRadius: start.element
-              ? _origin?.radius ?? restRadius.topLeft.x
+              ? _origin?.radius ?? start.radius ?? restRadius.topLeft.x
               : restRadius.topLeft.x,
           toRadius: restRadius,
           clipAtRest: _clipAtRest,
@@ -527,6 +613,7 @@ sealed class _ZoomRoute<T> extends PageRoute<T> {
     _crossFollower?.dispose();
     _pull.dispose();
     _cross.dispose();
+    _snapshot.dispose();
     _origin?.source?.show(this);
     _picture?.dispose();
     _underTask.dispose();
@@ -545,6 +632,12 @@ final class ZoomPageRoute<T> extends _ZoomRoute<T> {
   @override
   void install() {
     super.install();
+    final tag = _page.returnTo;
+    _opensFromReturnTarget =
+        isDesktopPlatform &&
+        _origin == null &&
+        tag != null &&
+        ZoomTarget.rectOf(tag) != null;
     _origin?.source?.hide(this);
     animation!.addStatusListener(_showSourceWhenClosed);
   }
@@ -598,9 +691,18 @@ final class ZoomPageRoute<T> extends _ZoomRoute<T> {
     return (Offset(pull, _cross.value), 1 - AlistenMotion.dragShrink * away);
   }
 
+  // 整个桌面窗口从右边滑入太重，原地略微放大、淡入。
   @override
-  Rect? _fallback(Size screen, Rect page) =>
-      page.shift(Offset(screen.width, 0));
+  Rect? _fallback(Size screen, Rect page) => isDesktopPlatform
+      ? Rect.fromCenter(
+          center: page.center,
+          width: page.width * AlistenMotion.windowRise,
+          height: page.height * AlistenMotion.windowRise,
+        )
+      : page.shift(Offset(screen.width, 0));
+
+  @override
+  bool get _fallbackMorphs => isDesktopPlatform;
 
   @override
   BorderRadius _restRadius(BuildContext context) =>
@@ -983,6 +1085,8 @@ final class _DismissGestureState extends State<_DismissGesture> {
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (event) {
+        // 桌面窗口里鼠标拖动是选字、拖滑块，不拖走页面；触摸屏照常。
+        if (isDesktopPlatform && event.kind == PointerDeviceKind.mouse) return;
         if (widget.route._mayDrag) _recognizer.addPointer(event);
       },
       child: widget.child,

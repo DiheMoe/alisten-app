@@ -1,8 +1,14 @@
 import 'dart:async';
 
-import 'package:alisten/app/desktop/desktop_player_bar.dart';
 import 'package:alisten/app/desktop/desktop_room.dart';
+import 'package:alisten/app/desktop/desktop_room_shell.dart';
+import 'package:alisten/app/desktop/desktop_room_transport.dart';
+import 'package:alisten/app/mini_player.dart';
+import 'package:alisten/core/realtime/room_transport.dart';
+import 'package:alisten/domain/member/member.dart';
 import 'package:alisten/domain/playback/lrc.dart';
+import 'package:alisten/domain/room/room.dart';
+import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/chat/index.dart';
 import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/lyrics/presentation/render_lyric_line.dart';
@@ -10,17 +16,24 @@ import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/room/index.dart';
+import 'package:alisten/features/settings/index.dart';
+import 'package:alisten/features/search/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
-import 'package:alisten/shared/ui/playback_progress_bar.dart';
+import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
+import 'package:alisten/shared/ui/member_avatar.dart';
+import 'package:alisten/shared/ui/zoom_frame.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../domain/room/room_fixtures.dart';
+import '../../features/lobby/lobby_test_doubles.dart';
+import '../../features/room/room_test_doubles.dart';
 import '../app_test_harness.dart';
 
 const _wideDesktop = Size(1600, 900);
@@ -63,23 +76,24 @@ void main() {
         ],
       );
 
-      // 房间名只在左侧栏的卡片上。
-      expect(find.text('一起听'), findsOneWidget);
+      // 房间名在页面顶上，封面在歌词左边；歌词页没有滚动条。
       expect(
         find.descendant(
           of: find.byType(DesktopRoomStage),
           matching: find.text('一起听'),
         ),
-        findsNothing,
+        findsOneWidget,
       );
-
-      // 舞台上没有大封面，歌词页没有滚动条。
       expect(
-        find.descendant(
-          of: find.byType(DesktopRoomStage),
-          matching: find.byType(CoverArt),
-        ),
-        findsNothing,
+        tester
+            .getRect(
+              find.descendant(
+                of: find.byType(DesktopRoomStage),
+                matching: find.byType(CoverArt),
+              ),
+            )
+            .right,
+        lessThan(tester.getRect(find.byType(LyricsView)).left),
       );
       expect(find.byType(LyricsView), findsOneWidget);
       expect(
@@ -170,38 +184,32 @@ void main() {
   );
 
   testWidgets(
-    'clicking the bottom-left player bar cover returns to the room and save '
-    'button stays anchored on the right',
+    'the room page fills the window with its own playback controls over the '
+    'cover backdrop; other pages are plain, with the sidebar and the mini '
+    'player that leads back to the room',
     (tester) async {
       final (:settle, :router, rooms: _) = await enterRoom(
         tester,
         size: _wideDesktop,
       );
+      final stage = find.byType(DesktopRoomStage);
+      final transport = find.byType(DesktopRoomTransport);
 
-      final bar = find.byType(DesktopPlayerBar);
-      final saveButton = find.descendant(
-        of: bar,
-        matching: find.byType(SaveToPlaylistButton),
-      );
-      final progress = find.descendant(
-        of: bar,
-        matching: find.byType(PlaybackProgressBar),
-      );
-      expect(saveButton, findsOneWidget);
-      expect(
-        tester.getRect(saveButton).left,
-        greaterThan(tester.getRect(progress).right),
-      );
+      expect(tester.getRect(stage).left, 0);
+      expect(transport, findsOneWidget);
+      expect(find.byType(MiniPlayer), findsNothing);
+      expect(find.byType(FlowingCoverBackdrop), findsOneWidget);
+      expect(find.bySemanticsLabel('我的歌单'), findsNothing);
 
       router.go('/settings');
       await settle();
-      expect(router.state.uri.path, '/settings');
+      expect(transport, findsNothing);
+      expect(find.byType(FlowingCoverBackdrop), findsNothing);
+      expect(find.bySemanticsLabel('我的歌单'), findsOneWidget);
 
-      final cover = find.descendant(of: bar, matching: find.byType(CoverArt));
-      expect(cover, findsOneWidget);
-      await tester.tap(cover);
+      await tester.tap(find.byType(MiniPlayer));
       await settle();
-      expect(router.state.uri.path, '/r/listen');
+      expect(stage, findsOneWidget);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.windows),
   );
@@ -287,12 +295,12 @@ void main() {
       await tester.pump(const Duration(milliseconds: 140));
       final midStageWidth = tester.getSize(stage).width;
       expect(midStageWidth, greaterThan(expandedStageWidth));
-      expect(midStageWidth, lessThan(_wideDesktop.width - 208));
+      expect(midStageWidth, lessThan(_wideDesktop.width));
 
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump();
       expect(panel, findsNothing);
-      expect(tester.getSize(stage).width, closeTo(_wideDesktop.width - 208, 1));
+      expect(tester.getSize(stage).width, closeTo(_wideDesktop.width, 1));
       final collapsedToggleRect = tester.getRect(toggle);
       expect(collapsedToggleRect.right, closeTo(_wideDesktop.width, 0.5));
       expect(collapsedToggleRect.center.dy, closeTo(panelRect.center.dy, 1.0));
@@ -537,6 +545,614 @@ void main() {
 
       expect(find.text('退出这个房间？'), findsNothing);
       expect(router.state.uri.path, '/r/listen');
+    }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+  });
+
+  testWidgets(
+    'the pages for adding songs keep the room backdrop behind them; pages '
+    'outside the room have their own ground',
+    (tester) async {
+      final (:settle, :router, rooms: _) = await enterRoom(
+        tester,
+        size: _wideDesktop,
+      );
+      Finder ground(Type page) => find.descendant(
+        of: find.byType(page),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is ColoredBox &&
+              widget.color ==
+                  Theme.of(tester.element(find.byType(page)))
+                      .colorScheme
+                      .surface,
+        ),
+      );
+
+      unawaited(router.push<void>('/r/listen/search'));
+      await settle();
+      await settle();
+      expect(find.byType(SearchScreen), findsOneWidget);
+      expect(ground(SearchScreen), findsNothing);
+
+      router.go('/settings');
+      await settle();
+      await settle();
+      expect(ground(SettingsScreen), findsOneWidget);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  testWidgets(
+    'the room grows out of the mini player, and the buttons for adding songs '
+    'and for the room sit at the far end of its top bar',
+    (tester) async {
+      final (:settle, :router, rooms: _) = await enterRoom(
+        tester,
+        size: _wideDesktop,
+      );
+      final stage = find.byType(DesktopRoomStage);
+      final whole = tester.getRect(stage);
+      expect(
+        tester.getRect(find.bySemanticsLabel('搜歌')).left,
+        greaterThan(whole.center.dx),
+      );
+      expect(
+        tester.getRect(find.bySemanticsLabel('退出房间')).right,
+        greaterThan(whole.right - 80),
+      );
+
+      router.go('/');
+      await settle();
+      await settle();
+      final mini = tester.getRect(find.byType(MiniPlayer));
+
+      await tester.tap(find.byType(MiniPlayer));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      final growing = tester.getRect(stage);
+      expect(growing.width, lessThan(whole.width));
+      expect(growing.center.dy, greaterThan(whole.center.dy));
+      expect(growing.overlaps(mini.inflate(200)), isTrue);
+
+      await settle();
+      await settle();
+      expect(tester.getRect(stage), whole);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  testWidgets(
+    'saving the playing song sits beside its title, not in the transport',
+    (tester) async {
+      await enterRoom(tester, size: _wideDesktop);
+      final save = find.bySemanticsLabel(RegExp('保存到歌单'));
+      expect(save, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(DesktopRoomTransport),
+          matching: find.byType(SaveToPlaylistButton),
+        ),
+        findsNothing,
+      );
+      final stage = find.byType(DesktopRoomStage);
+      final cover = tester.getRect(
+        find.descendant(of: stage, matching: find.byType(CoverArt)),
+      );
+      final button = tester.getRect(
+        find.descendant(of: stage, matching: find.byType(SaveToPlaylistButton)),
+      );
+      expect(button.top, greaterThan(cover.bottom));
+      expect(button.right, closeTo(cover.right, 12));
+      expect(button.top, lessThan(cover.bottom + 80));
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.linux),
+  );
+
+  testWidgets(
+    'the mini player also offers the vote to skip, and a vote cast in the '
+    'room still shows there',
+    (tester) async {
+      final (:settle, :router, :rooms) = await enterRoom(
+        tester,
+        size: _wideDesktop,
+      );
+      rooms.last.responses['playback.voteSkip'] = {
+        'votes': 1,
+        'required': 2,
+        'skipped': false,
+      };
+      await tester.tap(
+        find.descendant(
+          of: find.byType(DesktopRoomTransport),
+          matching: find.bySemanticsLabel('投票切歌'),
+        ),
+      );
+      await settle();
+      expect(
+        rooms.last.requests.where(
+          (request) => request['type'] == 'playback.voteSkip',
+        ),
+        hasLength(1),
+      );
+
+      router.go('/');
+      await settle();
+      await settle();
+      final vote = find.descendant(
+        of: find.byType(MiniPlayer),
+        matching: find.bySemanticsLabel('投票切歌'),
+      );
+      expect(vote, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(MiniPlayer),
+          matching: find.bySemanticsLabel('暂停本机播放'),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.getSemantics(vote), isSemantics(value: '已投 1/2'));
+
+      // 每次播放只能投一票。
+      await tester.tap(vote, warnIfMissed: false);
+      await settle();
+      expect(
+        rooms.last.requests.where(
+          (request) => request['type'] == 'playback.voteSkip',
+        ),
+        hasLength(1),
+      );
+      expect(router.state.uri.path, '/');
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.linux),
+  );
+
+  testWidgets(
+    'the panel slides away at its own size, without shrinking its text',
+    (tester) async {
+      await enterRoom(tester, size: _wideDesktop);
+      final panel = find.byType(DesktopRoomPanel);
+      final resting = tester.getRect(panel);
+
+      await tester.tap(find.bySemanticsLabel('收起队列与聊天'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 120));
+      final sliding = tester.getRect(panel);
+      expect(sliding.size, resting.size);
+      expect(sliding.left, greaterThan(resting.left));
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.linux),
+  );
+
+  testWidgets('on a large window the cover and the lyrics are larger', (
+    tester,
+  ) async {
+    await enterRoom(tester, size: const Size(2400, 1350));
+    final stage = find.byType(DesktopRoomStage);
+    final cover = tester.getSize(
+      find.descendant(of: stage, matching: find.byType(CoverArt)),
+    );
+    expect(cover.width, greaterThan(360));
+    final lyrics = tester.element(find.byType(LyricsView));
+    expect(MediaQuery.textScalerOf(lyrics).scale(10), greaterThan(11));
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
+  testWidgets('when the song changes the title fades to the next one', (
+    tester,
+  ) async {
+    final (settle: _, router: _, :rooms) = await enterRoom(
+      tester,
+      size: _wideDesktop,
+    );
+    final stage = find.byType(DesktopRoomStage);
+    Finder title(String text) =>
+        find.descendant(of: stage, matching: find.text(text));
+    expect(title('歌曲'), findsOneWidget);
+
+    const next = QueueEntry(
+      id: 'entry-next',
+      track: Track(source: TrackSource.netease, id: 'next'),
+      meta: TrackMeta(
+        title: '下一首歌',
+        artist: '歌手',
+        album: '专辑',
+        coverUrl: '',
+        pageUrl: '',
+        durationMs: 1000,
+      ),
+      requestedBy: null,
+      auto: false,
+      likes: 0,
+      status: QueueEntryStatus.ready,
+    );
+    rooms.last.emit(
+      const RoomEventReceived(
+        PlaybackUpdatedEvent(
+          term: 1,
+          seq: 2,
+          nowPlaying: NowPlaying(
+            entry: next,
+            mediaUrl: '/media/netease/next',
+            startedAtMs: 2000000,
+            durationMs: 180000,
+            gain: 1,
+            lyric: '',
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(title('歌曲'), findsOneWidget);
+    expect(title('下一首歌'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    expect(title('歌曲'), findsNothing);
+    expect(title('下一首歌'), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
+  testWidgets(
+    'Alt with the left and right arrows goes back and forward like the '
+    'side buttons',
+    (tester) async {
+      final (:settle, :router, rooms: _) = await enterRoom(
+        tester,
+        size: _wideDesktop,
+      );
+      Future<void> altArrow(LogicalKeyboardKey arrow) async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+        await tester.sendKeyEvent(arrow);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+        await settle();
+      }
+
+      await altArrow(LogicalKeyboardKey.arrowLeft);
+      expect(router.state.uri.path, '/');
+      await altArrow(LogicalKeyboardKey.arrowRight);
+      expect(router.state.uri.path, '/r/listen');
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.linux),
+  );
+
+  testWidgets('with the splitter focused the arrow keys move it', (
+    tester,
+  ) async {
+    await enterRoom(tester, size: _wideDesktop);
+    final splitter = find.byKey(const ValueKey('desktop-room-panel-splitter'));
+    final queue = find.byType(QueueView);
+    final before = tester.getSize(queue).height;
+
+    Focus.of(tester.element(splitter)).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    final lower = tester.getSize(queue).height;
+    expect(lower, greaterThan(before));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+    expect(tester.getSize(queue).height, lessThan(before));
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
+  group('the sidebar', () {
+    testWidgets(
+      'is a narrow rail of icons without words that still leads to each page',
+      (tester) async {
+        final (:settle, :router, rooms: _) = await enterRoom(
+          tester,
+          size: _wideDesktop,
+        );
+        router.go('/');
+        await settle();
+        await settle();
+
+        for (final label in ['大厅', '我的歌单', '播放历史', '设置']) {
+          final item = find.bySemanticsLabel(label);
+          expect(item, findsOneWidget, reason: label);
+          expect(tester.getRect(item).right, lessThan(80), reason: label);
+          expect(find.text(label), findsNothing, reason: label);
+        }
+        expect(
+          tester.getSemantics(find.bySemanticsLabel('大厅')),
+          isSemantics(isSelected: true),
+        );
+
+        await tester.tap(find.bySemanticsLabel('播放历史'));
+        await settle();
+        expect(router.state.uri.path, '/history');
+        expect(
+          tester.getSemantics(find.bySemanticsLabel('播放历史').first),
+          isSemantics(isSelected: true),
+        );
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+
+    testWidgets('shows no words when the mouse rests on an item', (
+      tester,
+    ) async {
+      final (:settle, :router, rooms: _) = await enterRoom(
+        tester,
+        size: _wideDesktop,
+      );
+      router.go('/');
+      await settle();
+      await settle();
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: const Offset(800, 450));
+      addTearDown(mouse.removePointer);
+
+      await mouse.moveTo(tester.getCenter(find.bySemanticsLabel('我的歌单')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('我的歌单'), findsNothing);
+    }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
+    testWidgets(
+      'shows the member\'s avatar at the size used for people elsewhere',
+      (tester) async {
+        tester.view
+          ..physicalSize = _wideDesktop * 2
+          ..devicePixelRatio = 2;
+        addTearDown(tester.view.reset);
+        await pumpAlistenApp(
+          tester,
+          api: FakeAlistenApi()
+            ..me = const Member(id: 'member-id', name: '听众', avatarHash: 'abc'),
+          credentials: FakeCredentialStore()..memberToken = 'member-token',
+        );
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+
+        final avatar = find.descendant(
+          of: find.bySemanticsLabel('设置'),
+          matching: find.byType(MemberAvatar),
+        );
+        expect(tester.getSize(avatar), const Size.square(AlistenSizes.avatar));
+        // 没有头像图片时显示名字的首字，而不是一个空圆。
+        expect(
+          find.descendant(of: avatar, matching: find.text('听')),
+          findsOneWidget,
+        );
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+  });
+
+  testWidgets(
+    'the buttons at the top of the room show no words under the mouse',
+    (tester) async {
+      await enterRoom(tester, size: _wideDesktop);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: const Offset(800, 450));
+      addTearDown(mouse.removePointer);
+
+      await mouse.moveTo(tester.getCenter(find.bySemanticsLabel('搜歌')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('搜歌'), findsNothing);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.linux),
+  );
+
+  group('the room window', () {
+    testWidgets(
+      'joined while it is still opening, lays out the room only once it has '
+      'settled, then fades it in',
+      (tester) async {
+        tester.view
+          ..physicalSize = _wideDesktop * 2
+          ..devicePixelRatio = 2;
+        addTearDown(tester.view.reset);
+        final rooms = FakeRoomTransportFactory();
+        await pumpAlistenApp(
+          tester,
+          api: FakeAlistenApi()
+            ..rooms = [roomListing(id: testRoomId, slug: 'listen')],
+          credentials: FakeCredentialStore()
+            ..tickets[testRoomId] = 'saved-ticket',
+          rooms: rooms,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+
+        await tester.tap(find.text('一起听'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 48));
+        // 还没连上时没有队列和聊天可显示。
+        expect(find.byType(DesktopRoomPanel), findsNothing);
+        rooms.last.emitHello(
+          testRoomSnapshot().copyWith(
+            term: 1,
+            seq: 1,
+            room: const RoomInfo(
+              id: testRoomId,
+              name: '一起听',
+              description: '',
+              kind: RoomKind.ephemeral,
+              capacity: 16,
+            ),
+            nowPlaying: testNowPlaying,
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 16));
+        final stage = find.byType(DesktopRoomStage);
+        final inside = find.descendant(
+          of: stage,
+          matching: find.byType(DesktopRoomTransport),
+        );
+        expect(stage, findsOneWidget);
+        expect(inside, findsNothing);
+        expect(find.byType(DesktopRoomPanel), findsOneWidget);
+        expect(find.byType(QueueView), findsNothing);
+
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump();
+        expect(inside, findsOneWidget);
+        expect(find.byType(QueueView), findsOneWidget);
+        double shown() => tester
+            .widget<Opacity>(
+              find.ancestor(of: inside, matching: find.byType(Opacity)).first,
+            )
+            .opacity;
+        expect(shown(), lessThan(1));
+        await tester.pump(const Duration(seconds: 1));
+        expect(shown(), 1);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+
+    testWidgets(
+      'shrinks into the mini player after a page inside it has shown its own',
+      (tester) async {
+        final (:settle, :router, rooms: _) = await enterRoom(
+          tester,
+          size: _wideDesktop,
+        );
+        final window = find.byType(DesktopRoomShell);
+        final whole = tester.getRect(window);
+
+        await tester.tap(find.bySemanticsLabel('搜歌'));
+        await settle();
+        await settle();
+        router.pop();
+        await settle();
+        await settle();
+
+        await tester.tap(find.bySemanticsLabel('收起房间'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 120));
+        final shrinking = tester.getRect(window);
+        expect(shrinking.width, lessThan(whole.width * 0.9));
+        expect(shrinking.center.dy, greaterThan(whole.center.dy + 20));
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+
+    testWidgets(
+      'grows out of the mini player when it is opened without a click',
+      (tester) async {
+        final (:settle, :router, rooms: _) = await enterRoom(
+          tester,
+          size: _wideDesktop,
+        );
+        final window = find.byType(DesktopRoomShell);
+        final whole = tester.getRect(window);
+        router.go('/');
+        await settle();
+        await settle();
+        final mini = tester.getRect(find.byType(MiniPlayer));
+
+        router.go('/r/listen');
+        await tester.pump();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 60));
+        final growing = tester.getRect(window);
+        expect(growing.width, lessThan(whole.width));
+        expect(growing.overlaps(mini.inflate(200)), isTrue);
+        expect(growing.center.dy, greaterThan(whole.center.dy));
+        // 外框从迷你播放条的圆角长起。
+        expect(
+          tester
+              .widget<ZoomFrame>(
+                find.ancestor(of: window, matching: find.byType(ZoomFrame)),
+              )
+              .fromRadius,
+          AlistenRadii.md,
+        );
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+
+    testWidgets(
+      'is drawn from one picture of itself while it grows and shrinks',
+      (tester) async {
+        final (:settle, router: _, rooms: _) = await enterRoom(
+          tester,
+          size: _wideDesktop,
+        );
+        final window = find.byType(DesktopRoomShell);
+        bool pictured() => tester
+            .widget<SnapshotWidget>(
+              find.ancestor(of: window, matching: find.byType(SnapshotWidget)),
+            )
+            .controller
+            .allowSnapshotting;
+        await settle();
+        expect(pictured(), isFalse);
+
+        await tester.tap(find.bySemanticsLabel('收起房间'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 60));
+        expect(pictured(), isTrue);
+        await settle();
+        await settle();
+
+        await tester.tap(find.byType(MiniPlayer));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 60));
+        expect(pictured(), isTrue);
+        await settle();
+        await settle();
+        expect(pictured(), isFalse);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+
+    testWidgets('stays put when the mouse drags across it', (tester) async {
+      await enterRoom(tester, size: _wideDesktop);
+      final window = find.byType(DesktopRoomShell);
+      final whole = tester.getRect(window);
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(LyricsView)),
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.moveBy(const Offset(120, 0));
+      await gesture.moveBy(const Offset(120, 0));
+      await tester.pump();
+      expect(tester.getRect(window), whole);
+      await gesture.up();
+      await tester.pump();
+    }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
+    testWidgets('fades in where it stands when there is nothing to grow from', (
+      tester,
+    ) async {
+      final (:settle, :router, rooms: _) = await enterRoom(
+        tester,
+        size: _wideDesktop,
+      );
+      final window = find.byType(DesktopRoomShell);
+      final whole = tester.getRect(window);
+      router.go('/');
+      unawaited(
+        appContainer(tester).read(roomControllerProvider.notifier).leaveRoom(),
+      );
+      await settle();
+      await settle();
+      expect(find.byType(MiniPlayer), findsNothing);
+
+      router.go('/r/listen');
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      final arriving = tester.getRect(window);
+      expect(arriving.center.dx, closeTo(whole.center.dx, 1));
+      expect(arriving.center.dy, closeTo(whole.center.dy, 1));
+      expect(arriving.width, lessThan(whole.width));
+      expect(
+        tester
+            .widgetList<Opacity>(
+              find.ancestor(of: window, matching: find.byType(Opacity)),
+            )
+            .any((content) => content.opacity < 1),
+        isTrue,
+      );
+      await settle();
+      await settle();
+      expect(tester.getRect(window), whole);
     }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
   });
 }

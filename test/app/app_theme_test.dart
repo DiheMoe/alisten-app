@@ -259,6 +259,82 @@ void main() {
     expect(cache.loads, [_coverA]);
   });
 
+  group('the colours shown in the room', () {
+    late Color shown;
+
+    Future<void> show(WidgetTester tester, ProviderContainer container) {
+      return tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: RoomTheme(
+              child: Builder(
+                builder: (context) {
+                  shown = Theme.of(context).colorScheme.primary;
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    Future<ProviderContainer> entering(WidgetTester tester) async {
+      covers.held[_coverA] = Completer();
+      final container = await open(playing: _playingCover(_coverA));
+      await show(tester, container);
+      expect(shown, brand(Brightness.light).primary);
+      covers.held[_coverA]!.complete();
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      return container;
+    }
+
+    testWidgets(
+      'in a desktop window the first cover replaces the brand colours at '
+      'once, and the next song dissolves in from a picture of the old look',
+      (tester) async {
+        await entering(tester);
+        expect(shown, roomCover(_coverA, Brightness.light));
+
+        // 换歌时新的颜色一次换上，旧的样子盖在上面淡出：不逐帧重建整个窗口。
+        var builds = 0;
+        final previous = debugOnRebuildDirtyWidget;
+        debugOnRebuildDirtyWidget = (element, builtOnce) {
+          if (element.widget is Builder) builds++;
+        };
+        addTearDown(() => debugOnRebuildDirtyWidget = previous);
+        play(_playingCover(_coverB));
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(shown, roomCover(_coverB, Brightness.light));
+        expect(find.byType(RawImage), findsOneWidget);
+        final settled = builds;
+        await tester.pump(const Duration(milliseconds: 100));
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(builds, settled);
+        await tester.pump(const Duration(milliseconds: 700));
+        expect(find.byType(RawImage), findsNothing);
+        expect(shown, roomCover(_coverB, Brightness.light));
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+
+    testWidgets('on a phone the first cover fades in from the brand colours', (
+      tester,
+    ) async {
+      await entering(tester);
+      expect(shown, isNot(brand(Brightness.light).primary));
+      expect(shown, isNot(roomCover(_coverA, Brightness.light)));
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(shown, roomCover(_coverA, Brightness.light));
+    });
+  });
+
   testWidgets('colours change at once when the system removes animations', (
     tester,
   ) async {

@@ -108,6 +108,12 @@ abstract final class AlistenMotion {
 
   /// 向右拖动页面时，拖满一屏宽缩小这么多。
   static const double dragShrink = 0.3;
+
+  /// 桌面窗口里原地换上的页面，从下方这么远处升到位。
+  static const double fadeThroughRise = 12;
+
+  /// 桌面窗口里原地出现的整页，从这个大小长到原大。
+  static const double windowRise = 0.94;
 }
 
 /// 从元素长出的外框底色有多实：起初透明，进度到 0.3 时不透明。

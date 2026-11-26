@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:alisten/app/desktop/desktop_room.dart';
+import 'package:alisten/app/desktop/desktop_room_shell.dart';
 import 'package:alisten/app/desktop/desktop_shell.dart';
 import 'package:alisten/app/app_theme.dart';
 import 'package:alisten/app/app_version.dart';
@@ -63,7 +64,6 @@ const playlistSegment = 'playlists/:source/:id';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final rootNavigator = GlobalKey<NavigatorState>(debugLabel: 'root');
-  // 手机上房间盖住整个屏幕；桌面上它是窗口骨架里的一页，侧栏和播放条不动。
   final roomNavigator = isDesktopPlatform ? null : rootNavigator;
   final toasts = ref.read(toastControllerProvider);
   void reportPick(MutationResult<Object?> result, String success) {
@@ -128,6 +128,65 @@ final routerProvider = Provider<GoRouter>((ref) {
     ),
   );
 
+  final roomRoutes = [
+    for (final mode in RoomMode.values)
+      GoRoute(
+        path: _roomPath(mode),
+        parentNavigatorKey: roomNavigator,
+        pageBuilder: (context, state) =>
+            _roomPage(state.pathParameters['ref']!, mode),
+        routes: [
+          if (mode == RoomMode.player) ...[
+            GoRoute(
+              path: songSearchSegment,
+              parentNavigatorKey: roomNavigator,
+              pageBuilder: _page(
+                task: true,
+                (context, state) => songs(context, state, fromPlaylists: false),
+              ),
+            ),
+            GoRoute(
+              path: pickFromPlaylistsSegment,
+              parentNavigatorKey: roomNavigator,
+              pageBuilder: _page(
+                task: true,
+                (context, state) => songs(context, state, fromPlaylists: true),
+              ),
+            ),
+            GoRoute(
+              path: playlistSegment,
+              parentNavigatorKey: roomNavigator,
+              pageBuilder: _page((context, state) {
+                // 重定向已经按 roomRoute 只放行网易云和 QQ 音乐。
+                final source = TrackSource.values.byName(
+                  state.pathParameters['source']!,
+                );
+                final id = state.pathParameters['id']!;
+                return RoomTheme(
+                  child: RoomRouteGate(
+                    roomRef: state.pathParameters['ref']!,
+                    child: PlaylistScreen(
+                      source: source,
+                      id: id,
+                      onResult: reportPick,
+                      onNotice: notice,
+                      saveAsMine: (name) => SavePlatformPlaylistButton(
+                        source: source,
+                        playlistId: id,
+                        name: name,
+                        onOpenAccount: openAccount,
+                        onNotice: toasts.show,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ],
+      ),
+  ];
+
   router = GoRouter(
     navigatorKey: rootNavigator,
     redirect: (context, state) {
@@ -149,6 +208,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         pageBuilder: (context, state, child) => AlistenPage<void>(
           key: state.pageKey,
+          fade: isDesktopPlatform,
           child: isDesktopPlatform
               ? DesktopShell(location: state.uri, child: child)
               : MiniPlayerHost(location: state.uri, child: child),
@@ -380,65 +440,25 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                 ],
               ),
-              for (final mode in RoomMode.values)
-                GoRoute(
-                  path: _roomPath(mode),
-                  parentNavigatorKey: roomNavigator,
-                  pageBuilder: (context, state) =>
-                      _roomPage(state.pathParameters['ref']!, mode),
-                  routes: [
-                    if (mode == RoomMode.player) ...[
-                      GoRoute(
-                        path: songSearchSegment,
-                        parentNavigatorKey: roomNavigator,
-                        pageBuilder: _page(
-                          task: true,
-                          (context, state) =>
-                              songs(context, state, fromPlaylists: false),
-                        ),
+              // 桌面上房间是盖在其他页面之上的一整个窗口，房间的页面都在它里面；
+              // 手机上每一页各自盖住屏幕。
+              if (isDesktopPlatform)
+                ShellRoute(
+                  parentNavigatorKey: rootNavigator,
+                  pageBuilder: (context, state, child) => AlistenPage<void>(
+                    key: _roomPageKey,
+                    returnTo: roomZoomTag,
+                    child: RoomTheme(
+                      child: DesktopRoomShell(
+                        location: state.uri,
+                        child: child,
                       ),
-                      GoRoute(
-                        path: pickFromPlaylistsSegment,
-                        parentNavigatorKey: roomNavigator,
-                        pageBuilder: _page(
-                          task: true,
-                          (context, state) =>
-                              songs(context, state, fromPlaylists: true),
-                        ),
-                      ),
-                      GoRoute(
-                        path: playlistSegment,
-                        parentNavigatorKey: roomNavigator,
-                        pageBuilder: _page((context, state) {
-                          // 重定向已经按 roomRoute 只放行网易云和 QQ 音乐。
-                          final source = TrackSource.values.byName(
-                            state.pathParameters['source']!,
-                          );
-                          final id = state.pathParameters['id']!;
-                          return RoomTheme(
-                            child: RoomRouteGate(
-                              roomRef: state.pathParameters['ref']!,
-                              child: PlaylistScreen(
-                                source: source,
-                                id: id,
-                                onResult: reportPick,
-                                onNotice: notice,
-                                saveAsMine: (name) =>
-                                    SavePlatformPlaylistButton(
-                                      source: source,
-                                      playlistId: id,
-                                      name: name,
-                                      onOpenAccount: openAccount,
-                                      onNotice: toasts.show,
-                                    ),
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ],
-                  ],
-                ),
+                    ),
+                  ),
+                  routes: roomRoutes,
+                )
+              else
+                ...roomRoutes,
             ],
           ),
         ],
@@ -489,17 +509,26 @@ final _roomPaths = {for (final mode in RoomMode.values) _roomPath(mode)};
 
 // 所有房间路由共用一个 key，切换模式或 ref 时原地更新页面，而不是替换。
 const _roomPageKey = ValueKey('room');
+const _roomStageKey = ValueKey('room-stage');
 
 Page<void> _roomPage(String roomRef, RoomMode mode) {
+  if (isDesktopPlatform) {
+    return AlistenPage(
+      key: _roomStageKey,
+      fade: true,
+      child: RoomRouteGate(
+        roomRef: roomRef,
+        child: DesktopRoomStage(roomRef: roomRef),
+      ),
+    );
+  }
   return AlistenPage(
     key: _roomPageKey,
     returnTo: roomZoomTag,
     child: RoomTheme(
       child: RoomRouteGate(
         roomRef: roomRef,
-        child: isDesktopPlatform
-            ? DesktopRoomStage(roomRef: roomRef)
-            : RoomScreen(roomRef: roomRef, mode: mode),
+        child: RoomScreen(roomRef: roomRef, mode: mode),
       ),
     ),
   );
@@ -516,8 +545,10 @@ GoRouterPageBuilder _page(
     key: state.pageKey,
     name: state.name ?? state.path,
     restorationId: state.pageKey.value,
-    task: task,
-    push: push,
+    // 桌面窗口里的页面并排着侧栏或面板，原地换上。
+    task: task && !isDesktopPlatform,
+    push: push && !isDesktopPlatform,
+    fade: isDesktopPlatform,
     child: Builder(builder: (context) => builder(context, state)),
   );
 }

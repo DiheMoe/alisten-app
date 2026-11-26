@@ -6,6 +6,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
+/// 页面叠在别处已经画好的背景上（桌面窗口里房间的流动封面）：页面自己不再铺
+/// 底色，背景才不会被盖住。
+class OverBackdrop extends InheritedWidget {
+  const OverBackdrop({required this.active, required super.child, super.key});
+
+  final bool active;
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<OverBackdrop>()?.active ??
+      false;
+
+  @override
+  bool updateShouldNotify(OverBackdrop oldWidget) => active != oldWidget.active;
+}
+
 /// 页面延伸到系统栏之下。[topBar] 和 [bottomBar] 自行处理所在边缘的安全区，
 /// 因此 [body] 在有栏的一侧不再获得安全区内边距。
 ///
@@ -52,7 +67,10 @@ class AlistenScaffold extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            background ?? ColoredBox(color: theme.colorScheme.surface),
+            background ??
+                (OverBackdrop.of(context)
+                    ? const SizedBox.shrink()
+                    : ColoredBox(color: theme.colorScheme.surface)),
             LayoutBuilder(
               builder: (context, constraints) {
                 final width = math.min(constraints.maxWidth, contentMaxWidth);

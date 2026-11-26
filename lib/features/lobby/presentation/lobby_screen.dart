@@ -689,6 +689,8 @@ class _RoomRow extends StatelessWidget {
     final colors = AlistenColors.of(context);
     final name = room.name.trim();
     final online = room.onlineCount > 0;
+    // 桌面窗口里卡片成排，色块都是灰的分不出谁是谁：各房间按名字取一种颜色。
+    final tile = isDesktopPlatform ? AlistenColors.identity(name) : null;
     // 房间页从这张卡片长出来。
     return ZoomSource(
       child: Pressable(
@@ -706,7 +708,7 @@ class _RoomRow extends StatelessWidget {
                   width: AlistenSizes.rowCover,
                   height: AlistenSizes.rowCover,
                   decoration: BoxDecoration(
-                    color: colors.onGlass.withValues(alpha: 0.08),
+                    color: tile?.fill ?? colors.onGlass.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(AlistenRadii.sm),
                   ),
                   alignment: Alignment.center,
@@ -717,7 +719,7 @@ class _RoomRow extends StatelessWidget {
                     style: AlistenTypography.weighted(
                       AlistenTypography.title,
                       FontWeight.w800,
-                    ).copyWith(color: colors.onGlass),
+                    ).copyWith(color: tile?.ink ?? colors.onGlass),
                   ),
                 ),
               ),

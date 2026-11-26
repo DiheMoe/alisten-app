@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:alisten/app/desktop/desktop_room_shell.dart';
+import 'package:alisten/app/desktop/desktop_room_transport.dart';
 import 'package:alisten/app/feedback.dart';
 import 'package:alisten/app/room/connection_pill.dart';
 import 'package:alisten/app/room/room_actions.dart';
+import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/chat/index.dart';
 import 'package:alisten/features/lyrics/index.dart';
 import 'package:alisten/features/playlists/index.dart';
@@ -12,33 +15,102 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
+import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
-import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-/// 桌面窗口里房间页的中间部分：顶上是点歌和房间操作，下面是歌词。队列、
-/// 聊天和播放条由窗口骨架常驻显示。
-class DesktopRoomStage extends ConsumerWidget {
+/// 桌面窗口的房间页：左边是封面和这首歌的信息，旁边是歌词，底部是播放控制。队列
+/// 和聊天由窗口骨架显示在右侧。
+class DesktopRoomStage extends StatelessWidget {
   const DesktopRoomStage({required this.roomRef, super.key});
 
   final String roomRef;
 
-  static const _barHeight = 64.0;
+  @override
+  Widget build(BuildContext context) => _HeldWhileOpening(
+    window: DesktopRoomScope.of(context).window,
+    child: _Stage(roomRef: roomRef),
+  );
+}
 
-  Future<void> _leave(BuildContext context, WidgetRef ref) async {
-    final router = GoRouter.of(context);
-    final room = ref.read(roomControllerProvider.notifier);
-    if (!await confirmLeavingRoom(context)) return;
-    router.go('/');
-    unawaited(room.leaveRoom());
+// 窗口打开的途中才连上房间时，等它停稳再排出里面的内容并淡入。打开途中画的是
+// 窗口的快照，这时排出来的内容既看不见，又让打开的动画掉帧。窗口打开的第一帧
+// 就在的内容照常排出：从迷你播放条回来时，封面要有地方落。
+class _HeldWhileOpening extends StatefulWidget {
+  const _HeldWhileOpening({required this.window, required this.child});
+
+  final ModalRoute<Object?>? window;
+  final Widget child;
+
+  @override
+  State<_HeldWhileOpening> createState() => _HeldWhileOpeningState();
+}
+
+class _HeldWhileOpeningState extends State<_HeldWhileOpening> {
+  late bool _held;
+  late final bool _wasHeld;
+  Animation<double>? _entrance;
+
+  @override
+  void initState() {
+    super.initState();
+    final entrance = widget.window?.animation;
+    _held =
+        entrance != null &&
+        entrance.status == AnimationStatus.forward &&
+        entrance.value > 0;
+    _wasHeld = _held;
+    if (_held) _entrance = entrance!..addStatusListener(_release);
+  }
+
+  void _release(AnimationStatus status) {
+    if (status == AnimationStatus.forward) return;
+    _entrance?.removeStatusListener(_release);
+    setState(() => _held = false);
   }
 
   @override
+  void dispose() {
+    if (_held) _entrance?.removeStatusListener(_release);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_held) return const SizedBox.expand();
+    if (!_wasHeld) return widget.child;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: AlistenDurations.of(context, AlistenDurations.short),
+      curve: AlistenCurves.standard,
+      builder: (context, shown, child) => Opacity(opacity: shown, child: child),
+      child: widget.child,
+    );
+  }
+}
+
+class _Stage extends ConsumerWidget {
+  const _Stage({required this.roomRef});
+
+  final String roomRef;
+
+  static const _barHeight = 64.0;
+  static const _minCover = 180.0;
+  static const _maxCover = 420.0;
+
+  // 封面超过这么大时，歌词的字也跟着放大。
+  static const _plainCover = 300.0;
+  static const _minLyricsWidth = 280.0;
+
+  @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = AlistenColors.of(context);
+    final router = GoRouter.of(context);
     final room = ref.watch(
       roomControllerProvider.select((room) {
         final snapshot = room.snapshot;
@@ -47,6 +119,10 @@ class DesktopRoomStage extends ConsumerWidget {
         return (
           id: id,
           slug: room.roomSlug,
+          name: snapshot.room.name,
+          online: snapshot.onlineCount,
+          capacity: snapshot.room.capacity,
+          nowPlaying: snapshot.nowPlaying,
           status: room.status,
           nextRetryAt: room.nextRetryAt,
           mayReconnectNow: room.mayReconnectNow,
@@ -54,6 +130,7 @@ class DesktopRoomStage extends ConsumerWidget {
       }),
     );
     if (room == null) return const SizedBox.shrink();
+    final settled = SettledStageWidth.maybeOf(context);
     return Material(
       type: MaterialType.transparency,
       child: Column(
@@ -62,33 +139,61 @@ class DesktopRoomStage extends ConsumerWidget {
             height: _barHeight,
             child: Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: AlistenSpacing.lg,
+                horizontal: AlistenSpacing.sm,
               ),
               child: Row(
                 children: [
+                  _Action(
+                    icon: AlistenIcons.caretDown,
+                    label: '收起房间',
+                    style: IconCircleButtonStyle.plain,
+                    onPressed: () => context.go('/'),
+                  ),
+                  const SizedBox(width: AlistenSpacing.xxs),
+                  // 这一组占满剩下的宽度，按钮才靠到右边；窗口窄时房间名先省略。
                   Expanded(
-                    child: Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: _SearchEntry(
-                        onPressed: () =>
-                            unawaited(context.push<void>('/r/$roomRef/search')),
-                      ),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            room.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AlistenTypography.bodyStrong.copyWith(
+                              color: colors.onGlass,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AlistenSpacing.sm),
+                        Text(
+                          '${room.online} / ${room.capacity}',
+                          style: AlistenTypography.caption.copyWith(
+                            color: colors.success,
+                          ),
+                        ),
+                        const SizedBox(width: AlistenSpacing.sm),
+                        ConnectionPill(
+                          status: room.status,
+                          nextRetryAt: room.nextRetryAt,
+                          onRetryNow: room.mayReconnectNow
+                              ? () => unawaited(
+                                  ref
+                                      .read(roomControllerProvider.notifier)
+                                      .checkConnection(),
+                                )
+                              : null,
+                        ),
+                      ],
                     ),
                   ),
-                  if (room.status != RoomConnectionStatus.open) ...[
-                    const SizedBox(width: AlistenSpacing.sm),
-                    ConnectionPill(
-                      status: room.status,
-                      nextRetryAt: room.nextRetryAt,
-                      onRetryNow: room.mayReconnectNow
-                          ? () => unawaited(
-                              ref
-                                  .read(roomControllerProvider.notifier)
-                                  .checkConnection(),
-                            )
-                          : null,
-                    ),
-                  ],
+                  const SizedBox(width: AlistenSpacing.md),
+                  // 点歌的两个入口一组，房间的两个操作一组。
+                  _Action(
+                    icon: AlistenIcons.magnifyingGlass,
+                    label: '搜歌',
+                    onPressed: () =>
+                        unawaited(context.push<void>('/r/$roomRef/search')),
+                  ),
                   const SizedBox(width: AlistenSpacing.sm),
                   _Action(
                     icon: AlistenIcons.playlist,
@@ -97,113 +202,200 @@ class DesktopRoomStage extends ConsumerWidget {
                       context.push<void>('/r/$roomRef/from-playlists'),
                     ),
                   ),
-                  const SizedBox(width: AlistenSpacing.md),
+                  const SizedBox(width: AlistenSpacing.xl),
                   _Action(
                     icon: AlistenIcons.userPlus,
                     label: '复制邀请链接',
                     onPressed: () =>
                         copyInviteLink(ref, id: room.id, slug: room.slug),
                   ),
-                  const SizedBox(width: AlistenSpacing.xs),
+                  const SizedBox(width: AlistenSpacing.sm),
                   _Action(
                     icon: AlistenIcons.signOut,
                     label: '退出房间',
-                    onPressed: () => unawaited(_leave(context, ref)),
+                    onPressed: DesktopRoomScope.of(context).leave,
                   ),
                 ],
               ),
             ),
           ),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: AlistenSpacing.md),
-              child: LyricsView(
-                columnWidth: SettledStageWidth.maybeOf(context),
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // 封面只随高度变，要不要显示按停稳后的宽度定：右侧面板滑动的途中
+                // 两者都不变，歌词不会来回挪。
+                final width = math.min(
+                  constraints.maxWidth,
+                  settled ?? constraints.maxWidth,
+                );
+                final cover = (constraints.maxHeight * 0.5).clamp(
+                  _minCover,
+                  _maxCover,
+                );
+                const edge = AlistenSpacing.xxl;
+                const gap = AlistenSpacing.xxl;
+                final showCover = width >= edge + cover + gap + _minLyricsWidth;
+                return Padding(
+                  padding: const EdgeInsetsDirectional.only(start: edge),
+                  child: Row(
+                    children: [
+                      if (showCover) ...[
+                        SizedBox(
+                          width: cover,
+                          child: _NowPlaying(
+                            nowPlaying: room.nowPlaying,
+                            coverSize: cover,
+                            save: switch (room.nowPlaying?.entry) {
+                              final entry? => SaveToPlaylistButton(
+                                track: entry.track,
+                                title: entry.meta.title,
+                                onOpenAccount: () =>
+                                    router.go('/settings/account'),
+                                onNotice: ref
+                                    .read(toastControllerProvider)
+                                    .show,
+                              ),
+                              null => null,
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: gap),
+                      ],
+                      Expanded(
+                        child: MediaQuery(
+                          data: MediaQuery.of(context).copyWith(
+                            textScaler: TextScaler.linear(
+                              MediaQuery.textScalerOf(context)
+                                  .scale(math.max(1, cover / _plainCover)),
+                            ),
+                          ),
+                          child: LyricsView(
+                            columnWidth:
+                                width - edge - (showCover ? cover + gap : 0),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
+          const DesktopRoomTransport(),
         ],
       ),
     );
   }
 }
 
-// 看起来是输入框，点下去打开点歌页并聚焦到它的输入框。
-class _SearchEntry extends StatelessWidget {
-  const _SearchEntry({required this.onPressed});
+class _NowPlaying extends StatelessWidget {
+  const _NowPlaying({
+    required this.nowPlaying,
+    required this.coverSize,
+    required this.save,
+  });
 
-  final VoidCallback onPressed;
-
-  static const _maxWidth = 360.0;
+  final NowPlaying? nowPlaying;
+  final double coverSize;
+  final Widget? save;
 
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: _maxWidth),
-      child: Pressable(
-        onPressed: onPressed,
-        semanticLabel: '搜歌',
-        focusRadius: BorderRadius.circular(AlistenRadii.pill),
-        child: Container(
-          height: AlistenSizes.iconButton,
-          padding: const EdgeInsets.symmetric(horizontal: AlistenSpacing.md),
-          decoration: BoxDecoration(
-            color: colors.raised,
-            borderRadius: BorderRadius.circular(AlistenRadii.pill),
-            border: Border.all(
-              color: colors.glassStroke,
-              width: AlistenSizes.hairline,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                AlistenIcons.magnifyingGlass,
-                size: AlistenSizes.iconSm,
-                color: colors.onGlassMuted,
-              ),
-              const SizedBox(width: AlistenSpacing.xs),
-              Expanded(
-                child: Text(
-                  '搜歌名、歌手，或粘贴链接',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AlistenTypography.secondary.copyWith(
-                    color: colors.onGlassMuted,
-                  ),
+    final entry = nowPlaying?.entry;
+    final requester = entry == null
+        ? null
+        : entry.auto
+        ? '自动推荐'
+        : switch (entry.requestedBy) {
+            final member? => '${member.name} 点歌',
+            null => null,
+          };
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CoverArt(
+          url: entry?.meta.coverUrl,
+          size: coverSize,
+          radius: AlistenRadii.lg,
+          shadow: true,
+          // 和迷你播放条的封面是同一个：进出房间时它在两处之间飞过去。
+          heroTag: entry == null ? null : 'cover-${entry.id}',
+        ),
+        const SizedBox(height: AlistenSpacing.lg),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: AlistenDurations.of(context, AlistenDurations.medium),
+                layoutBuilder: (current, previous) => Stack(
+                  alignment: AlignmentDirectional.topStart,
+                  children: [...previous, ?current],
+                ),
+                child: Column(
+                  key: ValueKey(entry?.id),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry?.meta.title ?? '房间暂时没有播放',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AlistenTypography.title.copyWith(
+                        color: colors.onGlass,
+                      ),
+                    ),
+                    if (entry != null) ...[
+                      const SizedBox(height: AlistenSpacing.xxs),
+                      Text(
+                        [
+                          entry.meta.artist,
+                          ?requester,
+                        ].where((part) => part.isNotEmpty).join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AlistenTypography.secondary.copyWith(
+                          color: colors.onGlassMuted,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
+            ),
+            if (save case final save?) ...[
+              const SizedBox(width: AlistenSpacing.xs),
+              save,
             ],
-          ),
+          ],
         ),
-      ),
+      ],
     );
   }
 }
 
-// 只有图标的按钮：名称在悬停提示里，读屏照常读出。
+// 只有图标的按钮，名称由读屏读出。
 class _Action extends StatelessWidget {
   const _Action({
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.style = IconCircleButtonStyle.glass,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
+  final IconCircleButtonStyle style;
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: label,
-      excludeFromSemantics: true,
-      child: IconCircleButton(
-        icon: icon,
-        semanticLabel: label,
-        onPressed: onPressed,
-      ),
+    return IconCircleButton(
+      icon: icon,
+      semanticLabel: label,
+      style: style,
+      onPressed: onPressed,
     );
   }
 }
@@ -229,7 +421,7 @@ class SettledStageWidth extends InheritedWidget {
 
 /// 所在房间的队列和聊天，同时显示且可拖动分隔条调整各自高度。离开房间页面时
 /// 面板会被移除，所以队列所占的比例 [queueFraction] 由上层保存。
-class DesktopRoomPanel extends ConsumerStatefulWidget {
+class DesktopRoomPanel extends StatelessWidget {
   const DesktopRoomPanel({
     required this.queueFraction,
     required this.onQueueFractionChanged,
@@ -244,10 +436,29 @@ class DesktopRoomPanel extends ConsumerStatefulWidget {
   static const minPaneHeight = 156.0;
 
   @override
-  ConsumerState<DesktopRoomPanel> createState() => _DesktopRoomPanelState();
+  Widget build(BuildContext context) => _HeldWhileOpening(
+    window: DesktopRoomScope.of(context).window,
+    child: _Panel(
+      queueFraction: queueFraction,
+      onQueueFractionChanged: onQueueFractionChanged,
+    ),
+  );
 }
 
-class _DesktopRoomPanelState extends ConsumerState<DesktopRoomPanel> {
+class _Panel extends ConsumerStatefulWidget {
+  const _Panel({
+    required this.queueFraction,
+    required this.onQueueFractionChanged,
+  });
+
+  final double queueFraction;
+  final ValueChanged<double> onQueueFractionChanged;
+
+  @override
+  ConsumerState<_Panel> createState() => _PanelState();
+}
+
+class _PanelState extends ConsumerState<_Panel> {
   double? _dragStartY;
   double? _dragStartQueueHeight;
 
@@ -337,6 +548,13 @@ class _DesktopRoomPanelState extends ConsumerState<DesktopRoomPanel> {
                         DesktopRoomPanel.defaultQueueFraction,
                       );
                     },
+                    onNudge: (delta) {
+                      if (available <= 0) return;
+                      widget.onQueueFractionChanged(
+                        (queueHeight + delta).clamp(minPane, maxQueue) /
+                            available,
+                      );
+                    },
                   ),
                   SizedBox(height: chatHeight, child: const ChatView()),
                 ],
@@ -355,12 +573,18 @@ class _PanelSplitter extends StatefulWidget {
     required this.onDragMove,
     required this.onDragEnd,
     required this.onReset,
+    required this.onNudge,
   });
 
   final ValueChanged<double> onDragStart;
   final ValueChanged<double> onDragMove;
   final VoidCallback onDragEnd;
   final VoidCallback onReset;
+
+  /// 用键盘上下方向键挪动，参数是挪多少。
+  final ValueChanged<double> onNudge;
+
+  static const _step = 24.0;
 
   @override
   State<_PanelSplitter> createState() => _PanelSplitterState();
@@ -369,6 +593,19 @@ class _PanelSplitter extends StatefulWidget {
 class _PanelSplitterState extends State<_PanelSplitter> {
   bool _hovered = false;
   bool _dragging = false;
+  bool _focused = false;
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    final direction = switch (event.logicalKey) {
+      LogicalKeyboardKey.arrowUp => -1,
+      LogicalKeyboardKey.arrowDown => 1,
+      _ => 0,
+    };
+    if (direction == 0) return KeyEventResult.ignored;
+    widget.onNudge(direction * _PanelSplitter._step);
+    return KeyEventResult.handled;
+  }
 
   void _endDrag() {
     widget.onDragEnd();
@@ -378,58 +615,64 @@ class _PanelSplitterState extends State<_PanelSplitter> {
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
-    final active = _hovered || _dragging;
-    final pillAlpha = _dragging
+    final active = _hovered || _dragging || _focused;
+    final pillAlpha = _dragging || _focused
         ? 0.55
         : _hovered
         ? 0.35
         : 0.16;
     return Semantics(
       label: '调整队列与聊天高度',
-      hint: '上下拖动调整高度，双击恢复默认比例',
-      child: MouseRegion(
-        cursor: SystemMouseCursors.resizeRow,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          key: const ValueKey('desktop-room-panel-splitter'),
-          behavior: HitTestBehavior.opaque,
-          // 从按下的位置起算，高度按指针的绝对位置定，与指针 1:1 对应。
-          dragStartBehavior: DragStartBehavior.down,
-          onVerticalDragStart: (details) {
-            widget.onDragStart(details.globalPosition.dy);
-            setState(() => _dragging = true);
-          },
-          onVerticalDragUpdate: (details) =>
-              widget.onDragMove(details.globalPosition.dy),
-          onVerticalDragEnd: (_) => _endDrag(),
-          onVerticalDragCancel: _endDrag,
-          onDoubleTap: widget.onReset,
-          child: SizedBox(
-            height: DesktopRoomPanel.splitterHeight,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  height: AlistenSizes.hairline,
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: AlistenSpacing.md,
+      hint: '上下拖动或按上下方向键调整高度，双击恢复默认比例',
+      child: Focus(
+        onFocusChange: (focused) => setState(() => _focused = focused),
+        onKeyEvent: _onKey,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.resizeRow,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: GestureDetector(
+            key: const ValueKey('desktop-room-panel-splitter'),
+            behavior: HitTestBehavior.opaque,
+            // 从按下的位置起算，高度按指针的绝对位置定，与指针 1:1 对应。
+            dragStartBehavior: DragStartBehavior.down,
+            onVerticalDragStart: (details) {
+              widget.onDragStart(details.globalPosition.dy);
+              setState(() => _dragging = true);
+            },
+            onVerticalDragUpdate: (details) =>
+                widget.onDragMove(details.globalPosition.dy),
+            onVerticalDragEnd: (_) => _endDrag(),
+            onVerticalDragCancel: _endDrag,
+            onDoubleTap: widget.onReset,
+            child: SizedBox(
+              height: DesktopRoomPanel.splitterHeight,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    height: AlistenSizes.hairline,
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: AlistenSpacing.md,
+                    ),
+                    color: colors.onGlass.withValues(
+                      alpha: active ? 0.16 : 0.08,
+                    ),
                   ),
-                  color: colors.onGlass.withValues(alpha: active ? 0.16 : 0.08),
-                ),
-                AnimatedContainer(
-                  duration: AlistenDurations.of(
-                    context,
-                    AlistenDurations.short,
+                  AnimatedContainer(
+                    duration: AlistenDurations.of(
+                      context,
+                      AlistenDurations.short,
+                    ),
+                    width: active ? 44 : 32,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colors.onGlass.withValues(alpha: pillAlpha),
+                      borderRadius: BorderRadius.circular(AlistenRadii.pill),
+                    ),
                   ),
-                  width: active ? 44 : 32,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colors.onGlass.withValues(alpha: pillAlpha),
-                    borderRadius: BorderRadius.circular(AlistenRadii.pill),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

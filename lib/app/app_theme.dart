@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:alisten/core/cache/cached_cover_image.dart';
 import 'package:alisten/core/cache/cover_cache.dart';
@@ -9,7 +10,9 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/cover_palette.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final coverImageSourceProvider = Provider<ImageProvider Function(String url)>((
@@ -47,11 +50,15 @@ final class AppThemes {
     required this.mode,
     required this.light,
     required this.dark,
+    this.tinted = const {},
   });
 
   final ThemeMode mode;
   final ThemeData light;
   final ThemeData dark;
+
+  /// 已经换上封面颜色的深浅，其余的还是品牌色。
+  final Set<Brightness> tinted;
 }
 
 // 每个容器各建一份，不用顶层缓存：ThemeData 构建时读取当时的平台，
@@ -115,6 +122,7 @@ final class RoomThemeController extends Notifier<AppThemes> {
       mode: mode,
       light: previous?.light ?? brand[Brightness.light]!,
       dark: previous?.dark ?? brand[Brightness.dark]!,
+      tinted: previous?.tinted ?? const {},
     );
   }
 
@@ -126,6 +134,7 @@ final class RoomThemeController extends Notifier<AppThemes> {
   ) async {
     final brightness = brand.brightness;
     ThemeData theme;
+    var read = true;
     try {
       theme = buildAlistenTheme(
         await loader.load(cover, brightness),
@@ -134,18 +143,27 @@ final class RoomThemeController extends Notifier<AppThemes> {
     } on Object {
       AppLog.debug('theme', 'cover colours not read');
       theme = brand;
+      read = false;
     }
     if (!scope.mounted) return;
+    final tinted = {...state.tinted};
+    if (read) {
+      tinted.add(brightness);
+    } else {
+      tinted.remove(brightness);
+    }
     state = switch (brightness) {
       Brightness.light => AppThemes(
         mode: state.mode,
         light: theme,
         dark: state.dark,
+        tinted: tinted,
       ),
       Brightness.dark => AppThemes(
         mode: state.mode,
         light: state.light,
         dark: theme,
+        tinted: tinted,
       ),
     };
   }
@@ -153,13 +171,20 @@ final class RoomThemeController extends Notifier<AppThemes> {
 
 /// 给房间内的内容套上 [roomThemeProvider] 中当前深浅的主题，换歌时颜色渐变
 /// 过去。
-class RoomTheme extends ConsumerWidget {
+class RoomTheme extends ConsumerStatefulWidget {
   const RoomTheme({required this.child, super.key});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RoomTheme> createState() => _RoomThemeState();
+}
+
+class _RoomThemeState extends ConsumerState<RoomTheme> {
+  bool? _tinted;
+
+  @override
+  Widget build(BuildContext context) {
     final themes = ref.watch(roomThemeProvider);
     final dark = switch (themes.mode) {
       ThemeMode.dark => true,
@@ -167,10 +192,123 @@ class RoomTheme extends ConsumerWidget {
       ThemeMode.system =>
         MediaQuery.platformBrightnessOf(context) == Brightness.dark,
     };
-    return AnimatedTheme(
-      data: dark ? themes.dark : themes.light,
-      duration: AlistenDurations.of(context, AlistenDurations.theme),
-      child: child,
+    final tinted = themes.tinted.contains(
+      dark ? Brightness.dark : Brightness.light,
+    );
+    final data = dark ? themes.dark : themes.light;
+    final duration = AlistenDurations.of(context, AlistenDurations.theme);
+    if (!isDesktopPlatform) {
+      return AnimatedTheme(data: data, duration: duration, child: widget.child);
+    }
+    // 品牌色第一次换成封面的颜色时直接换上：这多半是刚进房间，页面正在打开。
+    final first = _tinted == false && tinted;
+    _tinted = tinted;
+    return _ThemeDissolve(
+      data: data,
+      duration: first ? Duration.zero : duration,
+      child: widget.child,
+    );
+  }
+}
+
+// 桌面窗口大，逐帧渐变主题要把整个窗口每帧重建一遍，跟不上。这里先拍下旧颜色
+// 的样子盖在上面，一次换上新主题，再让旧的样子淡出。
+class _ThemeDissolve extends StatefulWidget {
+  const _ThemeDissolve({
+    required this.data,
+    required this.duration,
+    required this.child,
+  });
+
+  final ThemeData data;
+  final Duration duration;
+  final Widget child;
+
+  @override
+  State<_ThemeDissolve> createState() => _ThemeDissolveState();
+}
+
+class _ThemeDissolveState extends State<_ThemeDissolve>
+    with SingleTickerProviderStateMixin {
+  final _look = GlobalKey();
+  late final _old = AnimationController(vsync: this)
+    ..addStatusListener((status) {
+      if (status.isDismissed && _picture != null) setState(_drop);
+    });
+  late ThemeData _applied = widget.data;
+  ui.Image? _picture;
+  bool _waiting = false;
+
+  void _drop() {
+    _picture?.dispose();
+    _picture = null;
+  }
+
+  @override
+  void didUpdateWidget(_ThemeDissolve oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.data == _applied || _waiting) return;
+    if (widget.duration == Duration.zero) {
+      _applied = widget.data;
+      return;
+    }
+    // 等这一帧画完再拍：画面完整，颜色还是旧的。
+    _waiting = true;
+    WidgetsBinding.instance.addPostFrameCallback(_swap);
+  }
+
+  void _swap(Duration _) {
+    _waiting = false;
+    if (!mounted) return;
+    final look = _look.currentContext?.findRenderObject();
+    var paintable = look is RenderRepaintBoundary && !look.size.isEmpty;
+    // 只在调试模式下有效：这时拍会触发断言，改为直接换上。
+    assert(() {
+      paintable = paintable && !look!.debugNeedsPaint;
+      return true;
+    }());
+    setState(() {
+      if (paintable) {
+        _drop();
+        _picture = (look! as RenderRepaintBoundary).toImageSync(
+          pixelRatio: MediaQuery.devicePixelRatioOf(context),
+        );
+        _old
+          ..value = 1
+          ..animateBack(0, duration: widget.duration, curve: Curves.easeOut);
+      }
+      _applied = widget.data;
+    });
+  }
+
+  @override
+  void dispose() {
+    _old.dispose();
+    _drop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final picture = _picture;
+    // 旧的样子也在拍照的范围里：渐变途中又换主题时，接着当时的画面淡出。
+    return RepaintBoundary(
+      key: _look,
+      child: Stack(
+        fit: StackFit.passthrough,
+        children: [
+          Theme(data: _applied, child: widget.child),
+          if (picture != null)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: FadeTransition(
+                  opacity: _old,
+                  child: RawImage(image: picture, fit: BoxFit.fill),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
