@@ -10,9 +10,89 @@
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
+  // The size of the window while it is not maximised, and whether it is
+  // maximised, kept for the next launch. The position is not kept: Wayland
+  // does not let a window place itself.
+  gint window_width;
+  gint window_height;
+  gboolean window_maximized;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
+
+static const gint kDefaultWidth = 1280;
+static const gint kDefaultHeight = 840;
+static const gint kMinWidth = 960;
+static const gint kMinHeight = 600;
+static const gint kMaxSide = 16384;
+static const gchar kWindowGroup[] = "window";
+
+static gchar* window_state_path() {
+  return g_build_filename(g_get_user_config_dir(), APPLICATION_ID,
+                          "window.ini", nullptr);
+}
+
+static void load_window_state(MyApplication* self) {
+  self->window_width = kDefaultWidth;
+  self->window_height = kDefaultHeight;
+  self->window_maximized = FALSE;
+
+  g_autofree gchar* path = window_state_path();
+  g_autoptr(GKeyFile) file = g_key_file_new();
+  if (!g_key_file_load_from_file(file, path, G_KEY_FILE_NONE, nullptr)) {
+    return;
+  }
+  const gint width = g_key_file_get_integer(file, kWindowGroup, "width", nullptr);
+  const gint height =
+      g_key_file_get_integer(file, kWindowGroup, "height", nullptr);
+  if (width >= kMinWidth && width <= kMaxSide && height >= kMinHeight &&
+      height <= kMaxSide) {
+    self->window_width = width;
+    self->window_height = height;
+  }
+  self->window_maximized =
+      g_key_file_get_boolean(file, kWindowGroup, "maximized", nullptr);
+}
+
+static void save_window_state(MyApplication* self) {
+  g_autofree gchar* path = window_state_path();
+  g_autofree gchar* directory = g_path_get_dirname(path);
+  if (g_mkdir_with_parents(directory, 0700) != 0) {
+    return;
+  }
+  g_autoptr(GKeyFile) file = g_key_file_new();
+  g_key_file_set_integer(file, kWindowGroup, "width", self->window_width);
+  g_key_file_set_integer(file, kWindowGroup, "height", self->window_height);
+  g_key_file_set_boolean(file, kWindowGroup, "maximized",
+                         self->window_maximized);
+  g_key_file_save_to_file(file, path, nullptr);
+}
+
+static gboolean window_configure_cb(GtkWidget* widget,
+                                    GdkEventConfigure* event,
+                                    gpointer user_data) {
+  MyApplication* self = MY_APPLICATION(user_data);
+  GtkWindow* window = GTK_WINDOW(widget);
+  if (!gtk_window_is_maximized(window)) {
+    gtk_window_get_size(window, &self->window_width, &self->window_height);
+  }
+  return FALSE;
+}
+
+static gboolean window_state_cb(GtkWidget* widget,
+                                GdkEventWindowState* event,
+                                gpointer user_data) {
+  MY_APPLICATION(user_data)->window_maximized =
+      (event->new_window_state & GDK_WINDOW_STATE_MAXIMIZED) != 0;
+  return FALSE;
+}
+
+static gboolean window_delete_cb(GtkWidget* widget,
+                                 GdkEvent* event,
+                                 gpointer user_data) {
+  save_window_state(MY_APPLICATION(user_data));
+  return FALSE;
+}
 
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
@@ -61,8 +141,17 @@ static void my_application_activate(GApplication* application) {
     gtk_window_set_title(window, "Alisten");
   }
 
-  gtk_window_set_default_size(window, 1280, 840);
-  gtk_widget_set_size_request(GTK_WIDGET(window), 960, 600);
+  load_window_state(self);
+  gtk_window_set_default_size(window, self->window_width, self->window_height);
+  gtk_widget_set_size_request(GTK_WIDGET(window), kMinWidth, kMinHeight);
+  if (self->window_maximized) {
+    gtk_window_maximize(window);
+  }
+  g_signal_connect(window, "configure-event", G_CALLBACK(window_configure_cb),
+                   self);
+  g_signal_connect(window, "window-state-event", G_CALLBACK(window_state_cb),
+                   self);
+  g_signal_connect(window, "delete-event", G_CALLBACK(window_delete_cb), self);
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(
