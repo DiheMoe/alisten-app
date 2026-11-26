@@ -1,0 +1,42 @@
+name: windows
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: .fvmrc
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build windows --release
+      - name: Package zip
+        run: |
+          $folder = Join-Path $env:RUNNER_TEMP "Alisten-v${env:VERSION}"
+          Copy-Item build\windows\x64\runner\Release $folder -Recurse
+          if (-not (Test-Path (Join-Path $folder 'alisten.exe'))) {
+            throw 'alisten.exe is missing from the build output'
+          }
+          foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+            Copy-Item (Join-Path $env:SystemRoot "System32\$dll") $folder
+          }
+          New-Item dist -ItemType Directory | Out-Null
+          7z a -tzip "dist\Alisten-${env:VERSION}-windows-x64.zip" $folder
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-windows
+          path: dist/
+          if-no-files-found: error
+          retention-days: 3

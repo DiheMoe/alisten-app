@@ -59,6 +59,12 @@ jobs:
     with:
       version: ${{ needs.version.outputs.version }}
 
+  windows:
+    needs: version
+    uses: ./.github/workflows/windows.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
   testflight:
     needs: [version, checks]
     uses: ./.github/workflows/testflight.yml
@@ -72,7 +78,7 @@ jobs:
       ASC_TEAM: ${{ secrets.ASC_TEAM }}
 
   publish:
-    needs: [version, checks, android, ios, linux]
+    needs: [version, checks, android, ios, linux, windows]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -98,6 +104,7 @@ jobs:
           - \`Alisten-$VERSION-armeabi-v7a.apk\`：Android 32 位 ARM 安装包，适用于部分安卓电视，正式签名，证书 SHA-256 \`$cert\`。
           - \`Alisten-$VERSION-ios-unsigned.ipa\`：iOS 安装包，未签名，需要用 AltStore、SideStore 或 Sideloadly 以自己的 Apple ID 重签后安装。
           - \`Alisten-$VERSION-x86_64.AppImage\`：Linux 64 位应用，加上可执行权限后直接运行。需要系统已安装 mpv、GTK 3、libsecret 和 WebKitGTK 4.1。
+          - \`Alisten-$VERSION-windows-x64.zip\`：Windows 64 位应用，解压后运行 \`Alisten-v$VERSION\` 文件夹里的 \`alisten.exe\`，不需要安装。
           - \`Alisten-$VERSION-symbols.zip\`：本次构建的调试符号和 Android R8 映射，用于还原崩溃堆栈，普通用户不需要下载。
           EOF
           notes="$RUNNER_TEMP/assets.md"

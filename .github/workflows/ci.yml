@@ -33,3 +33,9 @@ jobs:
     uses: ./.github/workflows/linux.yml
     with:
       version: ${{ github.sha }}
+
+  windows:
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/windows.yml
+    with:
+      version: ${{ github.sha }}
