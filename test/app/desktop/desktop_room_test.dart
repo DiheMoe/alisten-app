@@ -27,6 +27,7 @@ import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
+import 'package:alisten/shared/ui/settings_list.dart';
 import 'package:alisten/shared/ui/track_row.dart';
 import 'package:alisten/shared/ui/zoom_frame.dart';
 import 'package:flutter/foundation.dart';
@@ -494,11 +495,11 @@ void main() {
         await settle();
 
         await press(tester, kBackMouseButton);
-        expect(path(), '/settings');
+        expect(path(), '/settings/account');
         await press(tester, kBackMouseButton);
         expect(path(), '/r/listen');
         await press(tester, kForwardMouseButton);
-        expect(path(), '/settings');
+        expect(path(), '/settings/account');
 
         // 走回去之后再去别处，前面那段就没有了。
         router.go('/playlists');
@@ -506,7 +507,7 @@ void main() {
         await press(tester, kForwardMouseButton);
         expect(path(), '/playlists');
         await press(tester, kBackMouseButton);
-        expect(path(), '/settings');
+        expect(path(), '/settings/account');
       },
       variant: TargetPlatformVariant.only(TargetPlatform.linux),
     );
@@ -1054,6 +1055,47 @@ void main() {
       variant: TargetPlatformVariant.only(TargetPlatform.linux),
     );
   });
+
+  testWidgets('settings show the categories beside the one that is open', (
+    tester,
+  ) async {
+    final (:settle, :router, rooms: _) = await enterRoom(
+      tester,
+      size: _wideDesktop,
+    );
+    router.go('/settings');
+    await settle();
+    await settle();
+
+    // 左边是分类，右边先打开账号。
+    final appearance = find.widgetWithText(CategoryRow, '外观');
+    expect(appearance, findsOneWidget);
+    expect(router.state.uri.path, '/settings/account');
+    expect(find.bySemanticsLabel('返回'), findsNothing);
+
+    await tester.tap(appearance);
+    await settle();
+    expect(router.state.uri.path, '/settings/appearance');
+    expect(appearance, findsOneWidget);
+    final theme = find.text('主题');
+    expect(theme, findsOneWidget);
+    expect(
+      tester.getRect(theme).left,
+      greaterThan(tester.getRect(appearance).right),
+    );
+    expect(tester.getSemantics(appearance), isSemantics(isSelected: true));
+    expect(
+      tester.getSemantics(find.widgetWithText(CategoryRow, '通知')),
+      isSemantics(isSelected: false),
+    );
+    expect(find.bySemanticsLabel('返回'), findsNothing);
+
+    // 更深一层的页面仍能返回到这一类。
+    router.go('/settings/about/licenses');
+    await settle();
+    expect(appearance, findsOneWidget);
+    expect(find.bySemanticsLabel('返回'), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 
   group('the sidebar', () {
     testWidgets(

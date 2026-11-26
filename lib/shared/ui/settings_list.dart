@@ -258,6 +258,7 @@ class CategoryRow extends StatelessWidget {
     required this.summary,
     required this.onPressed,
     this.alert = false,
+    this.selected,
     super.key,
   });
 
@@ -265,6 +266,9 @@ class CategoryRow extends StatelessWidget {
   final String title;
   final String summary;
   final VoidCallback onPressed;
+
+  /// 两栏布局里这一类是否正打开着；不是两栏时为 null。
+  final bool? selected;
 
   /// 为 true 时摘要前显示红点，比如有音源没登录。
   final bool alert;
@@ -274,61 +278,67 @@ class CategoryRow extends StatelessWidget {
     final colors = AlistenColors.of(context);
     return Pressable(
       onPressed: onPressed,
+      selected: selected,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
           minHeight: AlistenSizes.largeTouchTarget,
         ),
-        child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(
-            AlistenSpacing.md,
-            AlistenSpacing.sm,
-            AlistenSpacing.sm,
-            AlistenSpacing.sm,
-          ),
-          child: Row(
-            children: [
-              Icon(icon, size: AlistenSizes.icon, color: colors.onGlass),
-              const SizedBox(width: AlistenSpacing.md),
-              SettingsRowTitle(title),
-              const SizedBox(width: AlistenSpacing.sm),
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    if (alert) ...[
-                      ExcludeSemantics(
-                        child: DecoratedBox(
-                          key: const ValueKey('category-alert'),
-                          decoration: BoxDecoration(
-                            color: colors.danger,
-                            shape: BoxShape.circle,
+        child: ColoredBox(
+          color: selected ?? false
+              ? colors.selectedFill
+              : colors.selectedFill.withValues(alpha: 0),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              AlistenSpacing.md,
+              AlistenSpacing.sm,
+              AlistenSpacing.sm,
+              AlistenSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: AlistenSizes.icon, color: colors.onGlass),
+                const SizedBox(width: AlistenSpacing.md),
+                SettingsRowTitle(title),
+                const SizedBox(width: AlistenSpacing.sm),
+                Expanded(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (alert) ...[
+                        ExcludeSemantics(
+                          child: DecoratedBox(
+                            key: const ValueKey('category-alert'),
+                            decoration: BoxDecoration(
+                              color: colors.danger,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const SizedBox.square(dimension: 8),
                           ),
-                          child: const SizedBox.square(dimension: 8),
+                        ),
+                        const SizedBox(width: AlistenSpacing.xs),
+                      ],
+                      Flexible(
+                        child: Text(
+                          summary,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                          style: AlistenTypography.secondary.copyWith(
+                            color: colors.onGlassMuted,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: AlistenSpacing.xs),
                     ],
-                    Flexible(
-                      child: Text(
-                        summary,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.end,
-                        style: AlistenTypography.secondary.copyWith(
-                          color: colors.onGlassMuted,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: AlistenSpacing.xxs),
-              Icon(
-                AlistenIcons.caretRight,
-                size: AlistenSizes.icon,
-                color: colors.onGlassMuted,
-              ),
-            ],
+                const SizedBox(width: AlistenSpacing.xxs),
+                Icon(
+                  AlistenIcons.caretRight,
+                  size: AlistenSizes.icon,
+                  color: colors.onGlassMuted,
+                ),
+              ],
+            ),
           ),
         ),
       ),

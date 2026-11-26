@@ -32,11 +32,15 @@ class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({
     required this.appVersion,
     required this.onOpen,
+    this.selected,
     super.key,
   });
 
   final String appVersion;
   final ValueChanged<SettingsSection> onOpen;
+
+  /// 桌面窗口的两栏里，旁边打开着的那一类。
+  final SettingsSection? selected;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -71,6 +75,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       (false, false) => '都不记录',
     };
     void open(SettingsSection section) => widget.onOpen(section);
+    bool? selected(SettingsSection section) =>
+        widget.selected == null ? null : widget.selected == section;
     return AlistenScaffold(
       topBar: AlistenTopBar(
         leading: IconCircleButton(
@@ -94,6 +100,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Pressable(
               onPressed: () => open(SettingsSection.account),
               semanticLabel: SettingsSection.account.title,
+              selected: widget.selected == null
+                  ? null
+                  : widget.selected == SettingsSection.account,
               child: Row(
                 children: [
                   Expanded(
@@ -123,30 +132,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 title: SettingsSection.appearance.title,
                 summary: themeLabel(settings.theme),
                 onPressed: () => open(SettingsSection.appearance),
+                selected: selected(SettingsSection.appearance),
               ),
               CategoryRow(
                 icon: AlistenIcons.bell,
                 title: SettingsSection.notifications.title,
                 summary: settings.reminders ? '开播提醒已开' : '已关闭',
                 onPressed: () => open(SettingsSection.notifications),
+                selected: selected(SettingsSection.notifications),
               ),
               CategoryRow(
                 icon: AlistenIcons.shieldCheck,
                 title: SettingsSection.privacy.title,
                 summary: privacy,
                 onPressed: () => open(SettingsSection.privacy),
+                selected: selected(SettingsSection.privacy),
               ),
               CategoryRow(
                 icon: AlistenIcons.hardDrives,
                 title: SettingsSection.storage.title,
                 summary: imageCacheText(cache),
                 onPressed: () => open(SettingsSection.storage),
+                selected: selected(SettingsSection.storage),
               ),
               CategoryRow(
                 icon: AlistenIcons.info,
                 title: SettingsSection.about.title,
                 summary: widget.appVersion,
                 onPressed: () => open(SettingsSection.about),
+                selected: selected(SettingsSection.about),
               ),
             ],
           ),

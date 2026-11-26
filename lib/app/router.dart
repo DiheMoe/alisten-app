@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:alisten/app/desktop/desktop_room.dart';
 import 'package:alisten/app/desktop/desktop_room_shell.dart';
+import 'package:alisten/app/desktop/desktop_settings.dart';
 import 'package:alisten/app/desktop/desktop_shell.dart';
 import 'package:alisten/app/app_theme.dart';
 import 'package:alisten/app/app_version.dart';
@@ -127,6 +128,169 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ),
   );
+
+  Widget settingsHome(BuildContext context, GoRouterState state) {
+    final segments = state.uri.pathSegments;
+    return SettingsScreen(
+      appVersion: appVersion,
+      // 两栏时标出右边打开的是哪一类。
+      selected: isDesktopPlatform && segments.length >= 2
+          ? SettingsSection.values
+                .where((section) => section.path == segments[1])
+                .firstOrNull
+          : null,
+      onOpen: (section) => context.go('/settings/${section.path}'),
+    );
+  }
+
+  final settingsRoutes = <RouteBase>[
+    GoRoute(
+      path: SettingsSection.account.path,
+      pageBuilder: _pushPage(
+        (context, state) => AccountSettingsScreen(
+          onProfileResult: (result) =>
+              reportMutation(toasts, result, success: (_) => '资料已保存'),
+          accountActions: AccountActions(
+            onOpenLogin: () => context.go('/settings/account/login'),
+            onOpenRegister: () => context.go('/settings/account/register'),
+            onNotice: toasts.show,
+          ),
+        ),
+      ),
+      routes: [
+        GoRoute(
+          path: 'login',
+          pageBuilder: _pushPage(
+            (context, state) => LoginScreen(
+              onDone: () => context.go('/settings/account'),
+              onOpenRegister: () => context.go('/settings/account/register'),
+              onOpenPairing: () => context.go('/settings/account/pair'),
+              onNotice: toasts.show,
+            ),
+          ),
+        ),
+        GoRoute(
+          path: 'register',
+          pageBuilder: _pushPage(
+            (context, state) => RegisterScreen(
+              onDone: () {
+                toasts.show(ToastKind.success, '已注册');
+                context.go('/settings/account');
+              },
+            ),
+          ),
+        ),
+        GoRoute(
+          path: 'pair',
+          pageBuilder: _pushPage((context, state) {
+            final extra = state.extra;
+            return PairScreen(
+              prefill: extra is PairPrefill ? extra : null,
+              onDone: () {
+                toasts.show(ToastKind.success, '已登录');
+                context.go('/settings/account');
+              },
+            );
+          }),
+        ),
+      ],
+    ),
+    GoRoute(
+      path: SettingsSection.appearance.path,
+      pageBuilder: _pushPage(
+        (context, state) => const AppearanceSettingsScreen(),
+      ),
+    ),
+    GoRoute(
+      path: SettingsSection.notifications.path,
+      pageBuilder: _pushPage(
+        (context, state) => NotificationSettingsScreen(onNotice: toasts.show),
+      ),
+    ),
+    GoRoute(
+      path: SettingsSection.privacy.path,
+      pageBuilder: _pushPage(
+        (context, state) => PrivacySettingsScreen(
+          onNotice: toasts.show,
+          // 从这里看的播放历史返回这里，不回大厅。
+          onOpenHistory: () => context.go('/settings/privacy/history'),
+        ),
+      ),
+      routes: [GoRoute(path: 'history', pageBuilder: _pushPage(history))],
+    ),
+    GoRoute(
+      path: SettingsSection.storage.path,
+      pageBuilder: _pushPage(
+        (context, state) => StorageSettingsScreen(onNotice: toasts.show),
+      ),
+    ),
+    GoRoute(
+      path: SettingsSection.about.path,
+      pageBuilder: _pushPage(
+        (context, state) => AboutSettingsScreen(
+          appVersion: appVersion,
+          protocolVersion: protocolVersion,
+          onNotice: toasts.show,
+          onOpenLicenses: () => context.go('/settings/about/licenses'),
+          onOpenServers: () => context.go('/settings/servers'),
+          onOpenAdmin: () => context.go('/settings/admin'),
+        ),
+      ),
+      routes: [
+        GoRoute(
+          path: 'licenses',
+          pageBuilder: _pushPage((context, state) => const LicensesScreen()),
+        ),
+      ],
+    ),
+    GoRoute(
+      path: 'servers',
+      pageBuilder: _pushPage(
+        (context, state) => ServerScreen(
+          onSwitched: () => context.go('/'),
+          onNotice: toasts.show,
+        ),
+      ),
+    ),
+    GoRoute(
+      path: 'admin',
+      parentNavigatorKey: rootNavigator,
+      // 管理 token 只在后台页面存续期间有效。后台里可能开关了注册或
+      // GitHub 登录，回到设置页时重新读取站点能力。
+      onExit: (context, state) {
+        ref.read(adminSessionProvider.notifier).end();
+        ref.invalidate(siteCapabilitiesProvider);
+        return true;
+      },
+      pageBuilder: _pushPage(
+        (context, state) => AdminScreen(
+          onExit: () => context.go('/settings'),
+          onOpenSection: (section) =>
+              context.go('/settings/admin/${section.path}'),
+        ),
+      ),
+      routes: [
+        for (final section in AdminSection.values)
+          GoRoute(
+            path: section.path,
+            parentNavigatorKey: rootNavigator,
+            pageBuilder: _pushPage(
+              (context, state) => adminSectionScreen(
+                section,
+                onNotice: toasts.show,
+                onOpenRoom: (roomRef) => context.go('/r/$roomRef'),
+                // 离开后台时会话随之结束，正在退出的子页面不能把位置拉回后台。
+                onEnded: () {
+                  if (router.state.uri.path.startsWith('/settings/admin')) {
+                    router.go('/settings/admin');
+                  }
+                },
+              ),
+            ),
+          ),
+      ],
+    ),
+  ];
 
   final roomRoutes = [
     for (final mode in RoomMode.values)
@@ -264,182 +428,40 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                 ),
               ),
-              GoRoute(
-                path: 'settings',
-                pageBuilder: _pushPage(
-                  (context, state) => SettingsScreen(
-                    appVersion: appVersion,
-                    onOpen: (section) =>
-                        context.go('/settings/${section.path}'),
+              // 桌面窗口里设置是两栏：左边一直是分类，右边是打开的那一类。
+              if (isDesktopPlatform)
+                ShellRoute(
+                  pageBuilder: (context, state, child) => AlistenPage<void>(
+                    key: const ValueKey('settings'),
+                    fade: true,
+                    child: DesktopSettings(
+                      location: state.uri,
+                      categories: settingsHome(context, state),
+                      child: child,
+                    ),
                   ),
+                  routes: [
+                    GoRoute(
+                      path: 'settings',
+                      // 只有跳转的路由会让它的子路由算作这个外壳的直接子路由，
+                      // 后台那几页就不能再盖在整个窗口上；所以给它一个空页。
+                      pageBuilder: _pushPage(
+                        (context, state) => const SizedBox.shrink(),
+                      ),
+                      redirect: (context, state) =>
+                          state.uri.path == '/settings'
+                          ? '/settings/${SettingsSection.account.path}'
+                          : null,
+                      routes: settingsRoutes,
+                    ),
+                  ],
+                )
+              else
+                GoRoute(
+                  path: 'settings',
+                  pageBuilder: _pushPage(settingsHome),
+                  routes: settingsRoutes,
                 ),
-                routes: [
-                  GoRoute(
-                    path: SettingsSection.account.path,
-                    pageBuilder: _pushPage(
-                      (context, state) => AccountSettingsScreen(
-                        onProfileResult: (result) => reportMutation(
-                          toasts,
-                          result,
-                          success: (_) => '资料已保存',
-                        ),
-                        accountActions: AccountActions(
-                          onOpenLogin: () =>
-                              context.go('/settings/account/login'),
-                          onOpenRegister: () =>
-                              context.go('/settings/account/register'),
-                          onNotice: toasts.show,
-                        ),
-                      ),
-                    ),
-                    routes: [
-                      GoRoute(
-                        path: 'login',
-                        pageBuilder: _pushPage(
-                          (context, state) => LoginScreen(
-                            onDone: () => context.go('/settings/account'),
-                            onOpenRegister: () =>
-                                context.go('/settings/account/register'),
-                            onOpenPairing: () =>
-                                context.go('/settings/account/pair'),
-                            onNotice: toasts.show,
-                          ),
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'register',
-                        pageBuilder: _pushPage(
-                          (context, state) => RegisterScreen(
-                            onDone: () {
-                              toasts.show(ToastKind.success, '已注册');
-                              context.go('/settings/account');
-                            },
-                          ),
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'pair',
-                        pageBuilder: _pushPage((context, state) {
-                          final extra = state.extra;
-                          return PairScreen(
-                            prefill: extra is PairPrefill ? extra : null,
-                            onDone: () {
-                              toasts.show(ToastKind.success, '已登录');
-                              context.go('/settings/account');
-                            },
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                  GoRoute(
-                    path: SettingsSection.appearance.path,
-                    pageBuilder: _pushPage(
-                      (context, state) => const AppearanceSettingsScreen(),
-                    ),
-                  ),
-                  GoRoute(
-                    path: SettingsSection.notifications.path,
-                    pageBuilder: _pushPage(
-                      (context, state) =>
-                          NotificationSettingsScreen(onNotice: toasts.show),
-                    ),
-                  ),
-                  GoRoute(
-                    path: SettingsSection.privacy.path,
-                    pageBuilder: _pushPage(
-                      (context, state) => PrivacySettingsScreen(
-                        onNotice: toasts.show,
-                        // 从这里看的播放历史返回这里，不回大厅。
-                        onOpenHistory: () =>
-                            context.go('/settings/privacy/history'),
-                      ),
-                    ),
-                    routes: [
-                      GoRoute(path: 'history', pageBuilder: _pushPage(history)),
-                    ],
-                  ),
-                  GoRoute(
-                    path: SettingsSection.storage.path,
-                    pageBuilder: _pushPage(
-                      (context, state) =>
-                          StorageSettingsScreen(onNotice: toasts.show),
-                    ),
-                  ),
-                  GoRoute(
-                    path: SettingsSection.about.path,
-                    pageBuilder: _pushPage(
-                      (context, state) => AboutSettingsScreen(
-                        appVersion: appVersion,
-                        protocolVersion: protocolVersion,
-                        onNotice: toasts.show,
-                        onOpenLicenses: () =>
-                            context.go('/settings/about/licenses'),
-                        onOpenServers: () => context.go('/settings/servers'),
-                        onOpenAdmin: () => context.go('/settings/admin'),
-                      ),
-                    ),
-                    routes: [
-                      GoRoute(
-                        path: 'licenses',
-                        pageBuilder: _pushPage(
-                          (context, state) => const LicensesScreen(),
-                        ),
-                      ),
-                    ],
-                  ),
-                  GoRoute(
-                    path: 'servers',
-                    pageBuilder: _pushPage(
-                      (context, state) => ServerScreen(
-                        onSwitched: () => context.go('/'),
-                        onNotice: toasts.show,
-                      ),
-                    ),
-                  ),
-                  GoRoute(
-                    path: 'admin',
-                    parentNavigatorKey: rootNavigator,
-                    // 管理 token 只在后台页面存续期间有效。后台里可能开关了注册或
-                    // GitHub 登录，回到设置页时重新读取站点能力。
-                    onExit: (context, state) {
-                      ref.read(adminSessionProvider.notifier).end();
-                      ref.invalidate(siteCapabilitiesProvider);
-                      return true;
-                    },
-                    pageBuilder: _pushPage(
-                      (context, state) => AdminScreen(
-                        onExit: () => context.go('/settings'),
-                        onOpenSection: (section) =>
-                            context.go('/settings/admin/${section.path}'),
-                      ),
-                    ),
-                    routes: [
-                      for (final section in AdminSection.values)
-                        GoRoute(
-                          path: section.path,
-                          parentNavigatorKey: rootNavigator,
-                          pageBuilder: _pushPage(
-                            (context, state) => adminSectionScreen(
-                              section,
-                              onNotice: toasts.show,
-                              onOpenRoom: (roomRef) =>
-                                  context.go('/r/$roomRef'),
-                              // 离开后台时会话随之结束，正在退出的子页面不能把位置拉回后台。
-                              onEnded: () {
-                                if (router.state.uri.path.startsWith(
-                                  '/settings/admin',
-                                )) {
-                                  router.go('/settings/admin');
-                                }
-                              },
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
               // 桌面上房间是盖在其他页面之上的一整个窗口，房间的页面都在它里面；
               // 手机上每一页各自盖住屏幕。
               if (isDesktopPlatform)
