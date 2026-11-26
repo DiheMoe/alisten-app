@@ -695,6 +695,7 @@ class _RoomRow extends StatelessWidget {
         onPressed: onPressed,
         // 进房期间各行不可点但不变淡，由正在进入的那一行显示转圈。
         dimWhenDisabled: false,
+        hover: PressableHover.glow,
         focusRadius: BorderRadius.circular(AlistenRadii.md),
         child: Padding(
           padding: const EdgeInsets.all(AlistenSpacing.sm),

@@ -10,6 +10,7 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_slider.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
+import 'package:alisten/shared/ui/hover_glow.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/nudge.dart';
 import 'package:alisten/shared/ui/popover.dart';
@@ -24,10 +25,15 @@ class PlayerControls extends ConsumerStatefulWidget {
     this.vote,
     this.voting = false,
     this.interactive = true,
+    this.compactGap = 0,
     super.key,
   });
 
   final bool compact;
+
+  /// 紧凑排列时两个按钮之间的间距。迷你播放条里两者紧挨着；用鼠标的界面里要
+  /// 留开，免得点错。
+  final double compactGap;
   final VoidCallback? onVoteSkip;
   final VoteSkipResult? vote;
   final bool voting;
@@ -71,6 +77,7 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _PlayButton(status: status, large: false, onPressed: toggle),
+          SizedBox(width: widget.compactGap),
           _CompactVote(
             onPressed: onVoteSkip,
             voting: widget.voting,
@@ -163,14 +170,16 @@ class _PlayButton extends StatelessWidget {
           child: Center(
             child: pending
                 ? BusyIndicator(size: iconSize * 0.75, color: ink)
-                : Icon(
-                    status == LocalPlaybackStatus.unavailable
-                        ? localPlaybackNote(status)!.icon
-                        : offerPlay
-                        ? AlistenIcons.playFill
-                        : AlistenIcons.pauseFill,
-                    size: iconSize,
-                    color: ink,
+                : HoverPop(
+                    child: Icon(
+                      status == LocalPlaybackStatus.unavailable
+                          ? localPlaybackNote(status)!.icon
+                          : offerPlay
+                          ? AlistenIcons.playFill
+                          : AlistenIcons.pauseFill,
+                      size: iconSize,
+                      color: ink,
+                    ),
                   ),
           ),
         ),
@@ -425,10 +434,12 @@ class _CompactVote extends StatelessWidget {
                       ? const BusyIndicator(size: AlistenSizes.iconSm)
                       : Nudge(
                           trigger: vote,
-                          child: Icon(
-                            AlistenIcons.skipForwardFill,
-                            size: AlistenSizes.icon,
-                            color: colors.onGlass,
+                          child: HoverPop(
+                            child: Icon(
+                              AlistenIcons.skipForwardFill,
+                              size: AlistenSizes.icon,
+                              color: colors.onGlass,
+                            ),
                           ),
                         ),
                 ),

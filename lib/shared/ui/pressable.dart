@@ -1,12 +1,22 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/motion.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/desktop_platform.dart';
+import 'package:alisten/shared/ui/hover_glow.dart';
 import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:flutter/widgets.dart';
+
+/// 桌面窗口里鼠标指着时的样子。
+enum PressableHover {
+  /// 整块淡淡亮起：按钮、标签、列表里的一行。
+  tint,
+
+  /// 光跟着指针走，靠近指针的边缘也亮起来。只给卡片这样的大块用，用多了
+  /// 满屏都在闪。
+  glow,
+}
 
 /// 按下时在控件上叠一层墨迹，形状同 [focusRadius]，不缩放也不变淡。墨迹在确认
 /// 不是滚动之后才出现：列表外立即出现，列表内在手指抬起时出现；至少保持
@@ -29,6 +39,8 @@ class Pressable extends StatefulWidget {
     this.focusRadius = const BorderRadius.all(Radius.circular(AlistenRadii.sm)),
     this.focusNode,
     this.ink = true,
+    this.hover = PressableHover.tint,
+    this.hoverColor,
     super.key,
   });
 
@@ -51,6 +63,12 @@ class Pressable extends StatefulWidget {
   /// 为 false 时按下不叠墨迹，比如点开菜单的按钮：菜单从它长出来就是反馈。
   final bool ink;
 
+  final PressableHover hover;
+
+  /// 鼠标指着时亮起的颜色，默认是玻璃上的文字色。填了深色的按钮要给浅色，
+  /// 否则看不出亮了。
+  final Color? hoverColor;
+
   @override
   State<Pressable> createState() => _PressableState();
 }
@@ -60,7 +78,6 @@ class _PressableState extends State<Pressable>
   late final _ink = AnimationController(vsync: this);
   bool _down = false;
   bool _focused = false;
-  bool _hovered = false;
   Timer? _hold;
   bool _lifted = false;
 
@@ -155,9 +172,6 @@ class _PressableState extends State<Pressable>
             ? SystemMouseCursors.click
             : SystemMouseCursors.basic,
         onShowFocusHighlight: (focused) => setState(() => _focused = focused),
-        onShowHoverHighlight: isDesktopPlatform && widget.ink
-            ? (hovered) => setState(() => _hovered = hovered)
-            : null,
         actions: {
           ActivateIntent: CallbackAction<ActivateIntent>(
             onInvoke: (_) => _press(),
@@ -179,35 +193,35 @@ class _PressableState extends State<Pressable>
             duration: AlistenDurations.of(context, AlistenDurations.short),
             curve: AlistenCurves.standard,
             // 墨迹和焦点框两层一直都在，按下或聚焦时树结构不变，子组件不丢状态。
-            child: AnimatedBuilder(
-              animation: _ink,
-              builder: (context, child) => DecoratedBox(
-                position: DecorationPosition.foreground,
-                decoration: BoxDecoration(
-                  color: _ink.value == 0 && !_hovered
-                      ? null
-                      : colors.onGlass.withValues(
-                          alpha: math.max(
-                            AlistenMotion.pressInkAlpha * _ink.value,
-                            _hovered ? _hoverAlpha : 0,
+            child: _lit(
+              colors,
+              AnimatedBuilder(
+                animation: _ink,
+                builder: (context, child) => DecoratedBox(
+                  position: DecorationPosition.foreground,
+                  decoration: BoxDecoration(
+                    color: _ink.value == 0
+                        ? null
+                        : colors.onGlass.withValues(
+                            alpha: AlistenMotion.pressInkAlpha * _ink.value,
                           ),
-                        ),
-                  borderRadius: widget.focusRadius,
+                    borderRadius: widget.focusRadius,
+                  ),
+                  child: child,
                 ),
-                child: child,
-              ),
-              child: DecoratedBox(
-                position: DecorationPosition.foreground,
-                decoration: _focused
-                    ? BoxDecoration(
-                        borderRadius: widget.focusRadius,
-                        border: Border.all(
-                          color: colors.onGlass,
-                          width: AlistenSizes.ring,
-                        ),
-                      )
-                    : const BoxDecoration(),
-                child: widget.child,
+                child: DecoratedBox(
+                  position: DecorationPosition.foreground,
+                  decoration: _focused
+                      ? BoxDecoration(
+                          borderRadius: widget.focusRadius,
+                          border: Border.all(
+                            color: colors.onGlass,
+                            width: AlistenSizes.ring,
+                          ),
+                        )
+                      : const BoxDecoration(),
+                  child: widget.child,
+                ),
               ),
             ),
           ),
@@ -215,7 +229,16 @@ class _PressableState extends State<Pressable>
       ),
     );
   }
-}
 
-// 比按下的墨迹淡一半：只表示鼠标指着它。
-const _hoverAlpha = AlistenMotion.pressInkAlpha / 2;
+  // 桌面窗口里鼠标指着时亮起来。
+  Widget _lit(AlistenColors colors, Widget child) {
+    if (!isDesktopPlatform || !widget.ink) return child;
+    return HoverGlow(
+      radius: widget.focusRadius,
+      color: widget.hoverColor ?? colors.onGlass,
+      enabled: _enabled,
+      follow: widget.hover == PressableHover.glow,
+      child: child,
+    );
+  }
+}

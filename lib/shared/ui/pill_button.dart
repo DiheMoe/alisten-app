@@ -94,6 +94,7 @@ class PillButton extends StatelessWidget {
       onPressed: busy ? null : onPressed,
       // 忙碌不等于不可用，不变淡。
       dimWhenDisabled: !busy,
+      hoverColor: primary ? colors.onBrand : null,
       expanded: expanded,
       focusRadius: BorderRadius.circular(AlistenRadii.control),
       child: ConstrainedBox(

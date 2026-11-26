@@ -1,5 +1,6 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/hover_glow.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/material.dart';
 
@@ -58,12 +59,17 @@ class IconCircleButton extends StatelessWidget {
     final target = diameter < AlistenSizes.minTouchTarget
         ? AlistenSizes.minTouchTarget
         : diameter;
-    final glyph = Icon(icon, size: iconSize, color: ink);
+    final glyph = HoverPop(
+      child: Icon(icon, size: iconSize, color: ink),
+    );
     final image = this.image;
     return Pressable(
       onPressed: onPressed,
       semanticLabel: semanticLabel,
       expanded: expanded,
+      hoverColor: fill == null || style == IconCircleButtonStyle.glass
+          ? null
+          : ink,
       focusRadius: BorderRadius.circular(target / 2),
       child: SizedBox.square(
         dimension: target,
