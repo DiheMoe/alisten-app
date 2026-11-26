@@ -11,6 +11,9 @@ ThemeData buildAlistenTheme(ColorScheme scheme, {bool immersive = false}) {
     fontFamily: AlistenTypography.family,
     fontFamilyFallback: AlistenTypography.fallback,
     textTheme: _textTheme(),
+    // 框架在桌面系统上默认用紧凑密度，会把输入框上下的内边距各减 4。组件的
+    // 尺寸都是自己定的，不随平台变。
+    visualDensity: VisualDensity.standard,
     scaffoldBackgroundColor: scheme.surface,
     canvasColor: scheme.surface,
     splashFactory: NoSplash.splashFactory,
