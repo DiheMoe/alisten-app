@@ -1,6 +1,7 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/popover.dart';
 import 'package:alisten/shared/ui/pressable.dart';
@@ -76,7 +77,6 @@ class _ActionMenuButtonState extends State<ActionMenuButton> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = AlistenColors.of(context);
     final trigger = widget.trigger;
     return Popover(
       open: _open,
@@ -85,26 +85,7 @@ class _ActionMenuButtonState extends State<ActionMenuButton> {
       childAnchor: Alignment(_rightward ? -1 : 1, _upward ? 1 : -1),
       contentAnchor: Alignment(_rightward ? -1 : 1, _upward ? 1 : -1),
       pours: true,
-      // 菜单与最长的一项同宽，各项整行可点。
-      content: IntrinsicWidth(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final entry in widget.entries)
-              _MenuItem(
-                entry: entry,
-                ink: entry.danger ? colors.danger : colors.onGlass,
-                onPressed: entry.enabled
-                    ? () {
-                        _close();
-                        entry.onSelected();
-                      }
-                    : null,
-              ),
-          ],
-        ),
-      ),
+      content: _MenuList(entries: widget.entries, onClose: _close),
       child: trigger != null
           ? trigger(_open, _toggle)
           : IconCircleButton(
@@ -115,6 +96,106 @@ class _ActionMenuButtonState extends State<ActionMenuButton> {
               expanded: _open,
               onPressed: _toggle,
             ),
+    );
+  }
+}
+
+/// 桌面窗口里在 [child] 上按鼠标右键，在指针处打开菜单。[entries] 为空或不在
+/// 桌面上时就是 [child] 本身。
+class ContextMenuRegion extends StatefulWidget {
+  const ContextMenuRegion({
+    required this.entries,
+    required this.child,
+    super.key,
+  });
+
+  final List<ActionMenuEntry> entries;
+  final Widget child;
+
+  @override
+  State<ContextMenuRegion> createState() => _ContextMenuRegionState();
+}
+
+class _ContextMenuRegionState extends State<ContextMenuRegion> {
+  Offset? _at;
+  bool _open = false;
+  bool _upward = false;
+  bool _leftward = false;
+
+  void _show(TapUpDetails details) {
+    final screen = MediaQuery.sizeOf(context);
+    setState(() {
+      _at = details.localPosition;
+      _upward = details.globalPosition.dy > screen.height / 2;
+      _leftward = details.globalPosition.dx > screen.width / 2;
+      _open = true;
+    });
+  }
+
+  void _close() {
+    if (_open) setState(() => _open = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isDesktopPlatform || widget.entries.isEmpty) return widget.child;
+    final at = _at;
+    // 菜单的一个角落在指针上，朝窗口里空的那一边展开。
+    final corner = Alignment(_leftward ? 1 : -1, _upward ? 1 : -1);
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onSecondaryTapUp: _show,
+      child: Stack(
+        fit: StackFit.passthrough,
+        children: [
+          widget.child,
+          if (at != null)
+            Positioned(
+              left: at.dx,
+              top: at.dy,
+              child: Popover(
+                open: _open,
+                onClose: _close,
+                childAnchor: Alignment.topLeft,
+                contentAnchor: corner,
+                content: _MenuList(entries: widget.entries, onClose: _close),
+                child: const SizedBox.shrink(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// 菜单与最长的一项同宽，各项整行可点。
+class _MenuList extends StatelessWidget {
+  const _MenuList({required this.entries, required this.onClose});
+
+  final List<ActionMenuEntry> entries;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AlistenColors.of(context);
+    return IntrinsicWidth(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final entry in entries)
+            _MenuItem(
+              entry: entry,
+              ink: entry.danger ? colors.danger : colors.onGlass,
+              onPressed: entry.enabled
+                  ? () {
+                      onClose();
+                      entry.onSelected();
+                    }
+                  : null,
+            ),
+        ],
+      ),
     );
   }
 }

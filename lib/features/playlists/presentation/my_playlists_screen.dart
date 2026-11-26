@@ -14,6 +14,7 @@ import 'package:alisten/features/playlists/presentation/playlist_name_form.dart'
 import 'package:alisten/features/playlists/presentation/playlist_states.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/keyed_sliver_list.dart';
 import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
@@ -166,6 +167,9 @@ class _MyPlaylistsScreenState extends ConsumerState<MyPlaylistsScreen> {
       body = _list(sortPlaylists(playlists, view.sort), view, list.loadedAtMs);
     }
     return AlistenScaffold(
+      contentMaxWidth: isDesktopPlatform
+          ? AlistenSizes.wideContentMaxWidth
+          : AlistenSizes.contentMaxWidth,
       topBar: AlistenTopBar(
         leading: IconCircleButton(
           icon: AlistenIcons.arrowLeft,

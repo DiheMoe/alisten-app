@@ -7,6 +7,7 @@ import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/search/application/pick_controller.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/animated_resize.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
@@ -100,12 +101,46 @@ class SongRow extends ConsumerWidget {
       pickControllerProvider.select((picks) => picks.of(song.track) != null),
     );
     final duration = picked ? 0 : meta.durationMs;
+    final connected = ref.watch(
+      roomControllerProvider.select(
+        (room) => room.status == RoomConnectionStatus.open,
+      ),
+    );
+    final openable = meta.pageUrl.isNotEmpty;
+    return ContextMenuRegion(
+      entries: [
+        ActionMenuEntry(
+          icon: AlistenIcons.plusBold,
+          label: '点歌',
+          enabled: connected && !picked,
+          onSelected: () => onPick(song.track, meta.title),
+        ),
+        if (openable)
+          ActionMenuEntry(
+            icon: AlistenIcons.arrowSquareOut,
+            label: openOriginalHint,
+            onSelected: () => onOpen(meta.pageUrl),
+          ),
+      ],
+      child: _row(context, duration: duration, openable: openable),
+    );
+  }
+
+  Widget _row(
+    BuildContext context, {
+    required int duration,
+    required bool openable,
+  }) {
+    final meta = song.meta;
     return TrackRow(
       title: meta.title,
       subtitle: songSubtitle(meta),
       coverUrl: meta.coverUrl,
       coverMark: trackKey(song.track),
-      onLongPress: meta.pageUrl.isEmpty ? null : () => onOpen(meta.pageUrl),
+      // 桌面窗口里右键出菜单，这一项在菜单里。
+      onLongPress: openable && !isDesktopPlatform
+          ? () => onOpen(meta.pageUrl)
+          : null,
       longPressHint: openOriginalHint,
       padding: const EdgeInsets.fromLTRB(
         AlistenSpacing.page,

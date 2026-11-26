@@ -17,6 +17,7 @@ class AlistenTextField extends StatefulWidget {
     this.icon,
     this.pill = false,
     this.onClear,
+    this.trailing,
     this.focusNode,
     this.autofocus = false,
     this.obscureText = false,
@@ -43,6 +44,9 @@ class AlistenTextField extends StatefulWidget {
 
   /// 调用时输入框已清空，随后重新获得焦点。
   final VoidCallback? onClear;
+
+  /// 框内末尾的控件，比如搜索范围；点它不算点在框外。
+  final Widget? trailing;
   final FocusNode? focusNode;
   final bool autofocus;
   final bool obscureText;
@@ -255,6 +259,10 @@ class _AlistenTextFieldState extends State<AlistenTextField> {
                           onPressed: _clear,
                         ),
                 ),
+              if (widget.trailing case final trailing?) ...[
+                trailing,
+                const SizedBox(width: AlistenSpacing.xs),
+              ],
             ],
           ),
         ),

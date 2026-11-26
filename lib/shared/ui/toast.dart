@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -76,7 +77,7 @@ class _ToastHostState extends State<ToastHost>
     reverseCurve: AlistenCurves.exit,
   );
   late final Animation<Offset> _slide = Tween(
-    begin: const Offset(0, -0.25),
+    begin: Offset(0, isDesktopPlatform ? 0.25 : -0.25),
     end: Offset.zero,
   ).animate(_rise);
 
@@ -170,7 +171,9 @@ class _ToastHostState extends State<ToastHost>
           widget.child,
           if (shown != null)
             Positioned(
-              top: top,
+              // 桌面窗口里放在下方、播放条之上：顶部正中会盖住搜索结果的头几行。
+              top: isDesktopPlatform ? null : top,
+              bottom: isDesktopPlatform ? _desktopBottom : null,
               left: AlistenSpacing.page,
               right: AlistenSpacing.page,
               // 提示不挡住下方页面，到时自行消失。
@@ -196,6 +199,9 @@ class _ToastHostState extends State<ToastHost>
     );
   }
 }
+
+// 高过迷你播放条和房间页的播放控制。
+const _desktopBottom = 112.0;
 
 class _ToastCapsule extends StatelessWidget {
   const _ToastCapsule({required this.message});

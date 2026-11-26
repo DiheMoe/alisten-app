@@ -21,9 +21,12 @@ import 'package:alisten/features/search/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_text_field.dart';
+import 'package:alisten/shared/ui/chip_pill.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
+import 'package:alisten/shared/ui/segmented_pills.dart';
 import 'package:alisten/shared/ui/track_row.dart';
 import 'package:alisten/shared/ui/zoom_frame.dart';
 import 'package:flutter/foundation.dart';
@@ -702,6 +705,66 @@ void main() {
       await settle();
       expect(flying, findsNothing);
       expect(tester.getRect(coverIn(SearchScreen)), from);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.linux),
+  );
+
+  testWidgets(
+    'on the search page the source is picked from a menu at the end of the '
+    'search field',
+    (tester) async {
+      final (:settle, :router, :rooms) = await enterRoom(
+        tester,
+        size: _wideDesktop,
+      );
+      rooms.last.responses.addAll(defaultSearchAnswers());
+      router.go('/r/listen/search');
+      await settle();
+      final field = find.descendant(
+        of: find.byType(SearchScreen),
+        matching: find.byType(AlistenTextField),
+      );
+      Finder inField(Finder what) => find.descendant(of: field, matching: what);
+      await tester.enterText(inField(find.byType(EditableText)), '夜曲');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await settle();
+
+      expect(
+        find.descendant(
+          of: find.byType(SearchScreen),
+          matching: find.byType(SegmentedPills<TrackSource?>),
+        ),
+        findsNothing,
+      );
+      // 框里只显示当前的来源，其余的在菜单里。
+      final source = inField(find.bySemanticsLabel('音乐来源'));
+      expect(source, findsOneWidget);
+      expect(inField(find.text('QQ 音乐')), findsOneWidget);
+      expect(find.text('网易云'), findsNothing);
+      expect(
+        tester.getRect(source).left,
+        greaterThan(tester.getRect(inField(find.byType(EditableText))).right),
+      );
+      // 筛选仍在输入框下面。
+      expect(
+        tester
+            .getRect(
+              find.descendant(
+                of: find.byType(SearchScreen),
+                matching: find.widgetWithText(ChipPill, '歌曲'),
+              ),
+            )
+            .top,
+        greaterThan(tester.getRect(field).bottom),
+      );
+
+      await tester.tap(source);
+      await settle();
+      await tester.tap(find.text('网易云'));
+      await settle();
+      expect(inField(find.text('网易云')), findsOneWidget);
+      expect(inField(find.text('QQ 音乐')), findsNothing);
+      expect(inField(find.text('夜曲')), findsOneWidget);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.linux),
   );

@@ -36,6 +36,7 @@ import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/section_header.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
+import 'package:alisten/shared/ui/select_menu.dart';
 import 'package:alisten/shared/ui/shared_text.dart';
 import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:alisten/shared/ui/toast.dart';
@@ -63,6 +64,11 @@ final class SearchLibrary {
 const _platforms = [
   PillSegment<TrackSource?>(value: TrackSource.qq, label: 'QQ 音乐'),
   PillSegment<TrackSource?>(value: TrackSource.netease, label: '网易云'),
+];
+
+List<PillSegment<TrackSource?>> _sourcesWith(String? libraryLabel) => [
+  ..._platforms,
+  if (libraryLabel != null) PillSegment(value: null, label: libraryLabel),
 ];
 
 // 三项时“我的歌单”四个字要放得下。
@@ -346,13 +352,25 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       hint: library?.hint ?? '搜歌名、歌手，或粘贴链接',
       icon: AlistenIcons.magnifyingGlass,
       pill: true,
+      // 用键盘的窗口里打开就能打字；手机上自动聚焦会顶起键盘。
+      autofocus: isDesktopPlatform,
       textInputAction: TextInputAction.search,
       onChanged: _onChanged,
       onSubmitted: (_) => _submit(),
       onClear: _clear,
+      trailing: isDesktopPlatform && !widget.libraryOnly
+          ? _SourceSwitch(
+              sources: _sourcesWith(widget.library?.label),
+              selected: library == null ? search.source : null,
+              onChanged: _chooseSource,
+            )
+          : null,
     );
     final picked = _PickedCount(onPressed: widget.onShowQueue);
     return AlistenScaffold(
+      contentMaxWidth: isDesktopPlatform
+          ? AlistenSizes.wideContentMaxWidth
+          : AlistenSizes.contentMaxWidth,
       // 提示显示在输入框和筛选项下方，以免搜下一首歌时挡住它们。
       topBar: ToastClearance(
         child: Column(
@@ -860,6 +878,30 @@ class _Filters extends StatelessWidget {
   Widget build(BuildContext context) {
     final view = this.view;
     final libraryLabel = this.libraryLabel;
+    final views = view == null
+        ? null
+        : Wrap(
+            spacing: AlistenSpacing.xs,
+            children: [
+              for (final (choice, label) in _views)
+                ChipPill(
+                  label: label,
+                  selected: view == choice,
+                  onPressed: () {
+                    if (view != choice) onView(choice);
+                  },
+                ),
+            ],
+          );
+    // 桌面窗口里来源在输入框里选。
+    if (isDesktopPlatform) {
+      return views == null
+          ? const SizedBox.shrink()
+          : Padding(
+              padding: const EdgeInsets.only(top: AlistenSpacing.sm),
+              child: views,
+            );
+    }
     final width = MediaQuery.textScalerOf(context).scale(
       libraryLabel == null ? AlistenSizes.twoChoiceWidth : _threeSourcesWidth,
     );
@@ -877,31 +919,51 @@ class _Filters extends StatelessWidget {
               container: true,
               label: '音乐来源',
               child: SegmentedPills<TrackSource?>(
-                segments: [
-                  ..._platforms,
-                  if (libraryLabel != null)
-                    PillSegment(value: null, label: libraryLabel),
-                ],
+                segments: _sourcesWith(libraryLabel),
                 selected: source,
                 onChanged: onSource,
               ),
             ),
           ),
         ),
-        if (view != null)
-          Wrap(
-            spacing: AlistenSpacing.xs,
-            children: [
-              for (final (choice, label) in _views)
-                ChipPill(
-                  label: label,
-                  selected: view == choice,
-                  onPressed: () {
-                    if (view != choice) onView(choice);
-                  },
-                ),
-            ],
-          ),
+        ?views,
+      ],
+    );
+  }
+}
+
+// 桌面窗口里的音乐来源，放在搜索框的末尾：框里只显示当前这一家，点开是菜单。
+class _SourceSwitch extends StatelessWidget {
+  const _SourceSwitch({
+    required this.sources,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final List<PillSegment<TrackSource?>> sources;
+  final TrackSource? selected;
+  final ValueChanged<TrackSource?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: AlistenSizes.hairline,
+          height: AlistenSizes.iconSm,
+          margin: const EdgeInsets.symmetric(horizontal: AlistenSpacing.xxs),
+          color: AlistenColors.of(context).glassStroke,
+        ),
+        SelectMenuButton<TrackSource?>(
+          label: '音乐来源',
+          options: [
+            for (final source in sources)
+              SelectOption(value: source.value, label: source.label),
+          ],
+          selected: selected,
+          onChanged: onChanged,
+        ),
       ],
     );
   }
@@ -937,6 +999,23 @@ class _Recommendations extends StatelessWidget {
           child: Center(child: BusyIndicator(size: AlistenSizes.iconLg)),
         ),
       };
+    }
+    // 鼠标滚轮横着滚不动，桌面窗口里排成换行的格子。
+    if (isDesktopPlatform) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AlistenSpacing.md),
+        child: SizedBox(
+          width: double.infinity,
+          child: Wrap(
+            spacing: AlistenSpacing.sm,
+            runSpacing: AlistenSpacing.md,
+            children: [
+              for (final song in songs)
+                _RecommendationCard(song: song, onPick: onPick, onOpen: onOpen),
+            ],
+          ),
+        ),
+      );
     }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1184,6 +1263,7 @@ class _PlaylistTile extends StatelessWidget {
     return ZoomSource(
       child: Pressable(
         onPressed: () => onOpen(playlist),
+        hover: PressableHover.glow,
         focusRadius: BorderRadius.circular(AlistenRadii.md),
         child: LayoutBuilder(
           builder: (context, constraints) {

@@ -13,6 +13,7 @@ import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/arrival_fade.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/shared_text.dart';
 import 'package:alisten/shared/ui/cover_backdrop.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
@@ -114,6 +115,9 @@ class PlaylistScreen extends ConsumerWidget {
       );
     }
     return AlistenScaffold(
+      contentMaxWidth: isDesktopPlatform
+          ? AlistenSizes.wideContentMaxWidth
+          : AlistenSizes.contentMaxWidth,
       body: Stack(
         children: [
           CustomScrollView(

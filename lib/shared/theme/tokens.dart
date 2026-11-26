@@ -81,6 +81,9 @@ abstract final class AlistenSizes {
   static const double sheetMaxWidth = 560;
   static const double toastMaxWidth = 480;
   static const double contentMaxWidth = 640;
+
+  /// 桌面窗口里列表页的内容宽度：手机那样的一列在宽窗口里两边空得太多。
+  static const double wideContentMaxWidth = 880;
 }
 
 abstract final class AlistenPress {

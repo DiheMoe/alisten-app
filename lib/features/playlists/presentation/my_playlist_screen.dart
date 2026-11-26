@@ -25,6 +25,7 @@ import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/confirm_sheet.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/fade_leaving_inert.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
@@ -387,6 +388,9 @@ class _MyPlaylistScreenState extends ConsumerState<MyPlaylistScreen>
         if (!didPop && selecting) _detail.stopSelecting();
       },
       child: AlistenScaffold(
+        contentMaxWidth: isDesktopPlatform
+            ? AlistenSizes.wideContentMaxWidth
+            : AlistenSizes.contentMaxWidth,
         body: Stack(
           children: [
             CustomScrollView(slivers: slivers),
