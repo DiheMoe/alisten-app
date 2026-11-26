@@ -15,6 +15,7 @@ import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,6 +46,10 @@ class _DesktopShellState extends ConsumerState<DesktopShell>
     with SingleTickerProviderStateMixin {
   bool _panelExpanded = true;
   double _queueFraction = DesktopRoomPanel.defaultQueueFraction;
+
+  // 到过的位置，鼠标侧键像浏览器那样在其中后退和前进。
+  final _visited = <Uri>[];
+  int _visitedAt = -1;
   late final AnimationController _panelController = AnimationController(
     vsync: this,
     value: 1,
@@ -61,7 +66,69 @@ class _DesktopShellState extends ConsumerState<DesktopShell>
   );
 
   @override
+  void initState() {
+    super.initState();
+    _visit(widget.location);
+    GestureBinding.instance.pointerRouter.addGlobalRoute(_onPointer);
+  }
+
+  @override
+  void didUpdateWidget(DesktopShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _visit(widget.location);
+  }
+
+  // 后退或前进到的位置就是 [_visitedAt] 指着的那个，不算新到的地方。
+  void _visit(Uri location) {
+    if (_visitedAt >= 0 && _visited[_visitedAt] == location) return;
+    _visited
+      ..removeRange(_visitedAt + 1, _visited.length)
+      ..add(location);
+    if (_visited.length > _visitedLimit) _visited.removeAt(0);
+    _visitedAt = _visited.length - 1;
+  }
+
+  void _travel(int step) {
+    final rooms = ref.read(roomControllerProvider.notifier);
+    for (
+      var at = _visitedAt + step;
+      at >= 0 && at < _visited.length;
+      at += step
+    ) {
+      final segments = _visited[at].pathSegments;
+      // 后退和前进不进房间也不换房间：已经离开的房间的页面跳过。
+      if (segments.length >= 2 &&
+          segments.first == 'r' &&
+          !rooms.names(segments[1])) {
+        continue;
+      }
+      _visitedAt = at;
+      GoRouter.of(context).go('${_visited[at]}');
+      return;
+    }
+  }
+
+  // 侧键在窗口的任何地方都管用，所以不经过命中测试。
+  void _onPointer(PointerEvent event) {
+    if (event is! PointerDownEvent || event.kind != PointerDeviceKind.mouse) {
+      return;
+    }
+    final back = event.buttons & kBackMouseButton != 0;
+    final forward = event.buttons & kForwardMouseButton != 0;
+    if (back == forward) return;
+    // 对话框或盖住整个窗口的页面开着时，后退先关掉它。
+    if (!(ModalRoute.isCurrentOf(context) ?? true)) {
+      if (back) {
+        unawaited(Navigator.of(context, rootNavigator: true).maybePop());
+      }
+      return;
+    }
+    _travel(back ? -1 : 1);
+  }
+
+  @override
   void dispose() {
+    GestureBinding.instance.pointerRouter.removeGlobalRoute(_onPointer);
     _panelOpacity.dispose();
     _panelMotion.dispose();
     _panelController.dispose();
@@ -374,6 +441,7 @@ class _PanelEdgeToggleState extends State<_PanelEdgeToggle> {
 }
 
 const _sidebarPages = {'/playlists', '/history', '/settings'};
+const _visitedLimit = 50;
 const _roomSubPages = {'search', 'from-playlists', 'playlists'};
 
 class _Sidebar extends ConsumerWidget {

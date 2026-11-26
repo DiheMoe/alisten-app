@@ -9,6 +9,7 @@ import 'package:alisten/features/lyrics/presentation/render_lyric_line.dart';
 import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/features/queue/index.dart';
+import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/theme/tokens.dart';
@@ -449,4 +450,93 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.windows),
   );
+
+  group('the side buttons of the mouse', () {
+    Future<void> press(
+      WidgetTester tester,
+      int button, {
+      Offset at = const Offset(600, 300),
+    }) async {
+      final pointer = TestPointer(7, PointerDeviceKind.mouse);
+      tester.binding.handlePointerEvent(pointer.hover(at));
+      tester.binding.handlePointerEvent(pointer.down(at, buttons: button));
+      tester.binding.handlePointerEvent(pointer.up());
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    testWidgets(
+      'walk back and forward through the pages visited, in the order they '
+      'were visited',
+      (tester) async {
+        final (:settle, :router, rooms: _) = await enterRoom(
+          tester,
+          size: _wideDesktop,
+        );
+        String path() => router.state.uri.path;
+        router.go('/settings');
+        await settle();
+        router.go('/history');
+        await settle();
+
+        await press(tester, kBackMouseButton);
+        expect(path(), '/settings');
+        await press(tester, kBackMouseButton);
+        expect(path(), '/r/listen');
+        await press(tester, kForwardMouseButton);
+        expect(path(), '/settings');
+
+        // 走回去之后再去别处，前面那段就没有了。
+        router.go('/playlists');
+        await settle();
+        await press(tester, kForwardMouseButton);
+        expect(path(), '/playlists');
+        await press(tester, kBackMouseButton);
+        expect(path(), '/settings');
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+
+    testWidgets('never lead back into a room that has been left', (
+      tester,
+    ) async {
+      final (:settle, :router, rooms: _) = await enterRoom(
+        tester,
+        size: _wideDesktop,
+      );
+      router.go('/settings');
+      await settle();
+      unawaited(
+        appContainer(tester).read(roomControllerProvider.notifier).leaveRoom(),
+      );
+      await settle();
+
+      await press(tester, kBackMouseButton);
+
+      expect(router.state.uri.path, '/');
+    }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
+    testWidgets('close a dialog before leaving the page under it', (
+      tester,
+    ) async {
+      final (:settle, :router, rooms: _) = await enterRoom(
+        tester,
+        size: _wideDesktop,
+      );
+      await tester.tap(find.bySemanticsLabel('退出房间'));
+      await settle();
+      expect(find.text('退出这个房间？'), findsOneWidget);
+
+      // 指针停在对话框上：点遮罩本来就会关掉它。
+      await press(
+        tester,
+        kBackMouseButton,
+        at: tester.getCenter(find.text('退出这个房间？')),
+      );
+
+      expect(find.text('退出这个房间？'), findsNothing);
+      expect(router.state.uri.path, '/r/listen');
+    }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+  });
 }
