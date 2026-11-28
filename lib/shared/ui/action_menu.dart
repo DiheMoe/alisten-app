@@ -37,6 +37,7 @@ class ActionMenuButton extends StatefulWidget {
     this.icon = AlistenIcons.dotsThreeBold,
     this.iconSize = AlistenSizes.icon,
     this.trigger,
+    this.below = false,
     super.key,
   });
 
@@ -48,6 +49,9 @@ class ActionMenuButton extends StatefulWidget {
   /// 自定义触发控件，参数是菜单是否展开和开关菜单的回调；为 null 时是图标按钮。
   /// 有它时不用 [semanticLabel]：名称和展开状态由它自己提供。
   final Widget Function(bool open, VoidCallback toggle)? trigger;
+
+  /// 为 true 时菜单在按钮下方（放不下时上方）展开，不盖住按钮。
+  final bool below;
 
   @override
   State<ActionMenuButton> createState() => _ActionMenuButtonState();
@@ -78,14 +82,29 @@ class _ActionMenuButtonState extends State<ActionMenuButton> {
   @override
   Widget build(BuildContext context) {
     final trigger = widget.trigger;
+    final alignX = _rightward ? -1.0 : 1.0;
+    final childY = widget.below
+        ? (_upward ? -1.0 : 1.0)
+        : (_upward ? 1.0 : -1.0);
+    final contentY = _upward ? 1.0 : -1.0;
     return Popover(
       open: _open,
       onClose: _close,
-      // 菜单的角对着按钮的同一个角，盖住按钮展开：按钮自己变成菜单。
-      childAnchor: Alignment(_rightward ? -1 : 1, _upward ? 1 : -1),
-      contentAnchor: Alignment(_rightward ? -1 : 1, _upward ? 1 : -1),
-      pours: true,
-      content: _MenuList(entries: widget.entries, onClose: _close),
+      // 菜单的角对着按钮的同一个角，盖住按钮展开；[below] 时留一条缝，从按钮的
+      // 边长出来。
+      childAnchor: Alignment(alignX, childY),
+      contentAnchor: Alignment(alignX, contentY),
+      offset: widget.below
+          ? Offset(0, _upward ? -AlistenSpacing.xxs : AlistenSpacing.xxs)
+          : Offset.zero,
+      padding: _menuPadding,
+      pours: !widget.below,
+      fromPoint: widget.below,
+      content: _MenuList(
+        entries: widget.entries,
+        onClose: _close,
+        minWidth: widget.below && isDesktopPlatform ? _dropdownMinWidth : 0,
+      ),
       child: trigger != null
           ? trigger(_open, _toggle)
           : IconCircleButton(
@@ -158,6 +177,7 @@ class _ContextMenuRegionState extends State<ContextMenuRegion> {
                 onClose: _close,
                 childAnchor: Alignment.topLeft,
                 contentAnchor: corner,
+                padding: _menuPadding,
                 content: _MenuList(entries: widget.entries, onClose: _close),
                 child: const SizedBox.shrink(),
               ),
@@ -168,33 +188,59 @@ class _ContextMenuRegionState extends State<ContextMenuRegion> {
   }
 }
 
+EdgeInsets get _menuPadding =>
+    EdgeInsets.all(isDesktopPlatform ? AlistenSpacing.xxs : AlistenSpacing.xs);
+
+const _dropdownMinWidth = 160.0;
+
 // 菜单与最长的一项同宽，各项整行可点。
 class _MenuList extends StatelessWidget {
-  const _MenuList({required this.entries, required this.onClose});
+  const _MenuList({
+    required this.entries,
+    required this.onClose,
+    this.minWidth = 0,
+  });
 
   final List<ActionMenuEntry> entries;
   final VoidCallback onClose;
+  final double minWidth;
 
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
     return IntrinsicWidth(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final entry in entries)
-            _MenuItem(
-              entry: entry,
-              ink: entry.danger ? colors.danger : colors.onGlass,
-              onPressed: entry.enabled
-                  ? () {
-                      onClose();
-                      entry.onSelected();
-                    }
-                  : null,
-            ),
-        ],
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minWidth: minWidth),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (index, entry) in entries.indexed) ...[
+              if (isDesktopPlatform &&
+                  index > 0 &&
+                  entry.danger &&
+                  !entries[index - 1].danger)
+                Container(
+                  height: AlistenSizes.hairline,
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: AlistenSpacing.sm,
+                    vertical: AlistenSpacing.xxs,
+                  ),
+                  color: colors.glassStroke,
+                ),
+              _MenuItem(
+                entry: entry,
+                ink: entry.danger ? colors.danger : colors.onGlass,
+                onPressed: entry.enabled
+                    ? () {
+                        onClose();
+                        entry.onSelected();
+                      }
+                    : null,
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -213,31 +259,49 @@ class _MenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = isDesktopPlatform;
+    final colors = AlistenColors.of(context);
     return Pressable(
       onPressed: onPressed,
       selected: entry.checked,
       inMutuallyExclusiveGroup: entry.checked != null,
+      hoverColor: entry.danger ? colors.danger : null,
+      // 桌面窗口里鼠标指着的一项亮起来，圆角套在面板的圆角里面。
+      focusRadius: BorderRadius.circular(
+        compact ? AlistenRadii.md - AlistenSpacing.xxs : AlistenRadii.sm,
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minHeight: AlistenSizes.minTouchTarget,
+        constraints: BoxConstraints(
+          minHeight: compact
+              ? AlistenSizes.rowAction
+              : AlistenSizes.minTouchTarget,
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(
+          padding: EdgeInsets.symmetric(
             horizontal: AlistenSpacing.sm,
-            vertical: AlistenSpacing.xs,
+            vertical: compact ? AlistenSpacing.xxs : AlistenSpacing.xs,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (entry.icon case final icon?) ...[
                 Icon(icon, size: AlistenSizes.iconSm, color: ink),
-                const SizedBox(width: AlistenSpacing.sm),
+                SizedBox(
+                  width: compact ? AlistenSpacing.xs : AlistenSpacing.sm,
+                ),
               ],
               // 菜单与最长的一项同宽，勾在每一行的末端对齐。
               Expanded(
                 child: Text(
                   entry.label,
-                  style: AlistenTypography.bodyStrong.copyWith(color: ink),
+                  style:
+                      (compact
+                              ? AlistenTypography.weighted(
+                                  AlistenTypography.secondary,
+                                  FontWeight.w600,
+                                )
+                              : AlistenTypography.bodyStrong)
+                          .copyWith(color: ink),
                 ),
               ),
               if (entry.checked ?? false) ...[

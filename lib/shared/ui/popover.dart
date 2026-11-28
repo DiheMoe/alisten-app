@@ -29,6 +29,7 @@ class Popover extends StatefulWidget {
     this.offset = Offset.zero,
     this.padding = const EdgeInsets.all(AlistenSpacing.xs),
     this.pours = false,
+    this.fromPoint = false,
     super.key,
   });
 
@@ -46,6 +47,9 @@ class Popover extends StatefulWidget {
   /// 浮层盖在按钮上展开时设为 true：菜单像一滴液体从按钮倒出来，收起时
   /// 流回按钮，见 [Pour]。
   final bool pours;
+
+  /// 为 true 时浮层从锚点长出，而不是从 [child] 的外形变过去。
+  final bool fromPoint;
 
   @override
   State<Popover> createState() => _PopoverState();
@@ -307,7 +311,7 @@ class _PopoverState extends State<Popover> with TickerProviderStateMixin {
                   child: MorphPanel(
                     growth: grown,
                     corners: _corners.value,
-                    trigger: _trigger,
+                    trigger: widget.fromPoint ? Size.zero : _trigger,
                     triggerAnchor: widget.childAnchor,
                     panelAnchor: widget.contentAnchor,
                     offset: widget.offset,
