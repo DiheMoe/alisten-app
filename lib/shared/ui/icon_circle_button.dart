@@ -70,58 +70,54 @@ class IconCircleButton extends StatelessWidget {
       hoverColor: fill == null || style == IconCircleButtonStyle.glass
           ? null
           : ink,
-      focusRadius: BorderRadius.circular(target / 2),
-      child: SizedBox.square(
-        dimension: target,
-        child: Center(
-          child: Container(
-            width: diameter,
-            height: diameter,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: fill,
-              border: border,
-            ),
-            child: image == null
-                ? glyph
-                : Center(
-                    child: Image(
-                      image: image,
-                      width: AlistenSizes.avatar,
-                      height: AlistenSizes.avatar,
-                      fit: BoxFit.cover,
-                      excludeFromSemantics: true,
-                      gaplessPlayback: true,
-                      frameBuilder: (context, child, frame, synchronous) {
-                        final loaded = synchronous || frame != null;
-                        return AnimatedSwitcher(
-                          duration: AlistenDurations.of(
-                            context,
-                            AlistenDurations.short,
-                          ),
-                          // 前后两个子组件的键必须不同，否则图标立即消失，不会淡出。
-                          child: KeyedSubtree(
-                            key: ValueKey(loaded),
-                            child: loaded
-                                ? Container(
-                                    // 细边让照片和旁边的线条图标在分量上接近。
-                                    foregroundDecoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: colors.glassStroke,
-                                      ),
-                                    ),
-                                    child: ClipOval(child: child),
-                                  )
-                                : glyph,
-                          ),
-                        );
-                      },
-                      errorBuilder: (_, _, _) => glyph,
-                    ),
-                  ),
-          ),
+      focusRadius: BorderRadius.circular(diameter / 2),
+      touchTarget: target > diameter
+          ? BoxConstraints.tightFor(width: target, height: target)
+          : null,
+      child: Container(
+        width: diameter,
+        height: diameter,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: fill,
+          border: border,
         ),
+        child: image == null
+            ? glyph
+            : Center(
+                child: Image(
+                  image: image,
+                  width: AlistenSizes.avatar,
+                  height: AlistenSizes.avatar,
+                  fit: BoxFit.cover,
+                  excludeFromSemantics: true,
+                  gaplessPlayback: true,
+                  frameBuilder: (context, child, frame, synchronous) {
+                    final loaded = synchronous || frame != null;
+                    return AnimatedSwitcher(
+                      duration: AlistenDurations.of(
+                        context,
+                        AlistenDurations.short,
+                      ),
+                      // 前后两个子组件的键必须不同，否则图标立即消失，不会淡出。
+                      child: KeyedSubtree(
+                        key: ValueKey(loaded),
+                        child: loaded
+                            ? Container(
+                                // 细边让照片和旁边的线条图标在分量上接近。
+                                foregroundDecoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: colors.glassStroke),
+                                ),
+                                child: ClipOval(child: child),
+                              )
+                            : glyph,
+                      ),
+                    );
+                  },
+                  errorBuilder: (_, _, _) => glyph,
+                ),
+              ),
       ),
     );
   }

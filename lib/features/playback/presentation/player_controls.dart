@@ -156,33 +156,28 @@ class _PlayButton extends StatelessWidget {
     final iconSize = large ? AlistenSizes.playIcon : AlistenSizes.icon;
     final ink = large ? colors.onControl : colors.onGlass;
     final target = _PlayButton.target(large: large);
-    final disc = SizedBox.square(
-      dimension: target,
+    final disc = Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: large ? colors.control : colors.glassFill,
+        border: large ? null : Border.all(color: colors.glassStroke),
+      ),
       child: Center(
-        child: Container(
-          width: diameter,
-          height: diameter,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: large ? colors.control : colors.glassFill,
-            border: large ? null : Border.all(color: colors.glassStroke),
-          ),
-          child: Center(
-            child: pending
-                ? BusyIndicator(size: iconSize * 0.75, color: ink)
-                : HoverPop(
-                    child: Icon(
-                      status == LocalPlaybackStatus.unavailable
-                          ? localPlaybackNote(status)!.icon
-                          : offerPlay
-                          ? AlistenIcons.playFill
-                          : AlistenIcons.pauseFill,
-                      size: iconSize,
-                      color: ink,
-                    ),
-                  ),
-          ),
-        ),
+        child: pending
+            ? BusyIndicator(size: iconSize * 0.75, color: ink)
+            : HoverPop(
+                child: Icon(
+                  status == LocalPlaybackStatus.unavailable
+                      ? localPlaybackNote(status)!.icon
+                      : offerPlay
+                      ? AlistenIcons.playFill
+                      : AlistenIcons.pauseFill,
+                  size: iconSize,
+                  color: ink,
+                ),
+              ),
       ),
     );
     // 两首之间或本机无法播放时不作为禁用按钮，而由读屏读出原因。
@@ -190,13 +185,20 @@ class _PlayButton extends StatelessWidget {
       return Semantics(
         container: true,
         label: localPlaybackNote(status)!.text,
-        child: disc,
+        child: SizedBox.square(
+          dimension: target,
+          child: Center(child: disc),
+        ),
       );
     }
     return Pressable(
       onPressed: onPressed,
       semanticLabel: offerPlay ? '恢复本机播放' : '暂停本机播放',
-      focusRadius: BorderRadius.circular(target / 2),
+      hoverColor: large ? colors.onControl : null,
+      focusRadius: BorderRadius.circular(diameter / 2),
+      touchTarget: target > diameter
+          ? BoxConstraints.tightFor(width: target, height: target)
+          : null,
       child: Semantics(
         value: pending
             ? localPlaybackNote(status)?.text
@@ -412,46 +414,47 @@ class _CompactVote extends StatelessWidget {
       onPressed: onPressed,
       semanticLabel: '投票切歌',
       dimWhenDisabled: !voting && vote == null,
-      focusRadius: BorderRadius.circular(AlistenSizes.minTouchTarget / 2),
+      focusRadius: BorderRadius.circular(disc / 2),
+      touchTarget: const BoxConstraints.tightFor(
+        width: AlistenSizes.minTouchTarget,
+        height: AlistenSizes.minTouchTarget,
+      ),
       child: Semantics(
         value: voting ? busySemanticValue : value,
-        child: SizedBox.square(
-          dimension: AlistenSizes.minTouchTarget,
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: disc,
-                height: disc,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: colors.glassFill,
-                  border: Border.all(color: colors.glassStroke),
-                ),
-                child: Center(
-                  child: voting
-                      ? const BusyIndicator(size: AlistenSizes.iconSm)
-                      : Nudge(
-                          trigger: vote,
-                          child: HoverPop(
-                            child: Icon(
-                              AlistenIcons.skipForwardFill,
-                              size: AlistenSizes.icon,
-                              color: colors.onGlass,
-                            ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: disc,
+              height: disc,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colors.glassFill,
+                border: Border.all(color: colors.glassStroke),
+              ),
+              child: Center(
+                child: voting
+                    ? const BusyIndicator(size: AlistenSizes.iconSm)
+                    : Nudge(
+                        trigger: vote,
+                        child: HoverPop(
+                          child: Icon(
+                            AlistenIcons.skipForwardFill,
+                            size: AlistenSizes.icon,
+                            color: colors.onGlass,
                           ),
                         ),
-                ),
+                      ),
               ),
-              if (vote != null)
-                PositionedDirectional(
-                  top: 0,
-                  end: 0,
-                  child: _VoteBadge(vote: vote),
-                ),
-            ],
-          ),
+            ),
+            if (vote != null)
+              PositionedDirectional(
+                top: -AlistenSpacing.xxs / 2,
+                end: -AlistenSpacing.xxs / 2,
+                child: _VoteBadge(vote: vote),
+              ),
+          ],
         ),
       ),
     );

@@ -1409,6 +1409,7 @@ class _SendButton extends StatelessWidget {
       onPressed: onPressed,
       semanticLabel: '发送',
       dimWhenDisabled: false,
+      hoverColor: idle ? null : colors.onBrand,
       focusRadius: BorderRadius.circular(size / 2),
       child: AnimatedContainer(
         duration: AlistenDurations.of(context, AlistenDurations.short),

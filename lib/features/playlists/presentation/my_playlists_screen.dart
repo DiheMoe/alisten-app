@@ -21,6 +21,7 @@ import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
+import 'package:alisten/shared/ui/hover_glow.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/shared_text.dart';
@@ -412,52 +413,62 @@ class _SortTrigger extends StatelessWidget {
     final muted = AlistenTypography.secondary.copyWith(
       color: colors.onGlassMuted,
     );
+    final label = Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: '$count 个歌单 · '),
+          TextSpan(
+            text: sortKeyLabel(sort.key),
+            style: AlistenTypography.weighted(
+              AlistenTypography.secondary,
+              FontWeight.w600,
+            ).copyWith(color: colors.onGlass),
+          ),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Padding(
+              padding: const EdgeInsetsDirectional.only(
+                start: AlistenSpacing.xxs / 2,
+              ),
+              child: Icon(
+                sort.order == SortOrder.ascending
+                    ? AlistenIcons.arrowUpBold
+                    : AlistenIcons.arrowDown,
+                size: MediaQuery.textScalerOf(context)
+                    .scale(AlistenSizes.inlineIcon),
+                color: colors.onGlass,
+              ),
+            ),
+          ),
+        ],
+      ),
+      style: muted,
+    );
+    const target = BoxConstraints(minHeight: AlistenSizes.minTouchTarget);
     return Pressable(
       onPressed: onPressed,
       semanticLabel: semanticLabel,
       expanded: open,
       focusRadius: BorderRadius.circular(AlistenRadii.sm),
+      // 桌面窗口里只有这几个字在鼠标下亮起；手机上整条都是按下的范围。
+      touchTarget: isDesktopPlatform ? target : null,
       child: ExcludeSemantics(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            minHeight: AlistenSizes.minTouchTarget,
-          ),
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            widthFactor: 1,
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(text: '$count 个歌单 · '),
-                  TextSpan(
-                    text: sortKeyLabel(sort.key),
-                    style: AlistenTypography.weighted(
-                      AlistenTypography.secondary,
-                      FontWeight.w600,
-                    ).copyWith(color: colors.onGlass),
-                  ),
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.only(
-                        start: AlistenSpacing.xxs / 2,
-                      ),
-                      child: Icon(
-                        sort.order == SortOrder.ascending
-                            ? AlistenIcons.arrowUpBold
-                            : AlistenIcons.arrowDown,
-                        size: MediaQuery.textScalerOf(context)
-                            .scale(AlistenSizes.inlineIcon),
-                        color: colors.onGlass,
-                      ),
-                    ),
-                  ),
-                ],
+        child: isDesktopPlatform
+            ? Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AlistenSpacing.xs,
+                  vertical: AlistenSpacing.xxs,
+                ),
+                child: label,
+              )
+            : ConstrainedBox(
+                constraints: target,
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  widthFactor: 1,
+                  child: label,
+                ),
               ),
-              style: muted,
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -510,17 +521,22 @@ class _Card extends StatelessWidget {
           child: Pressable(
             onPressed: onOpen,
             semanticLabel: '${playlist.name}，$subtitle',
+            ink: !isDesktopPlatform,
+            hover: PressableHover.none,
             focusRadius: BorderRadius.circular(AlistenRadii.md),
             child: ExcludeSemantics(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  PlaylistCover(
-                    url: playlist.coverUrl,
-                    favorites: playlist.favorites,
-                    size: size,
+                  HoverCover(
                     radius: AlistenRadii.md,
-                    heroTag: myPlaylistHeroTags(playlist.id).cover,
+                    child: PlaylistCover(
+                      url: playlist.coverUrl,
+                      favorites: playlist.favorites,
+                      size: size,
+                      radius: AlistenRadii.md,
+                      heroTag: myPlaylistHeroTags(playlist.id).cover,
+                    ),
                   ),
                   const SizedBox(height: AlistenSpacing.xs),
                   Padding(

@@ -30,6 +30,7 @@ import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/cover_backdrop.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
+import 'package:alisten/shared/ui/hover_glow.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/page_turn.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -810,45 +811,41 @@ class _PickedCount extends ConsumerWidget {
               key: ValueKey(added),
               onPressed: onPressed,
               semanticLabel: '已点 $added 首，查看队列',
+              hoverColor: colors.onBrand,
               focusRadius: BorderRadius.circular(AlistenRadii.pill),
+              touchTarget: const BoxConstraints(
+                minHeight: AlistenSizes.minTouchTarget,
+              ),
               child: ExcludeSemantics(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    minHeight: AlistenSizes.minTouchTarget,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.brand,
+                    borderRadius: BorderRadius.circular(AlistenRadii.pill),
                   ),
-                  child: Center(
-                    widthFactor: 1,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: colors.brand,
-                        borderRadius: BorderRadius.circular(AlistenRadii.pill),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AlistenSpacing.sm,
-                          AlistenSpacing.xs,
-                          AlistenSpacing.md,
-                          AlistenSpacing.xs,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AlistenSpacing.sm,
+                      AlistenSpacing.xs,
+                      AlistenSpacing.md,
+                      AlistenSpacing.xs,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          AlistenIcons.queue,
+                          size: AlistenSizes.iconSm,
+                          color: colors.onBrand,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              AlistenIcons.queue,
-                              size: AlistenSizes.iconSm,
-                              color: colors.onBrand,
-                            ),
-                            const SizedBox(width: AlistenSpacing.xxs),
-                            Text(
-                              '已点 $added 首',
-                              style: AlistenTypography.weighted(
-                                AlistenTypography.secondary,
-                                FontWeight.w700,
-                              ).copyWith(color: colors.onBrand),
-                            ),
-                          ],
+                        const SizedBox(width: AlistenSpacing.xxs),
+                        Text(
+                          '已点 $added 首',
+                          style: AlistenTypography.weighted(
+                            AlistenTypography.secondary,
+                            FontWeight.w700,
+                          ).copyWith(color: colors.onBrand),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
@@ -1263,7 +1260,8 @@ class _PlaylistTile extends StatelessWidget {
     return ZoomSource(
       child: Pressable(
         onPressed: () => onOpen(playlist),
-        hover: PressableHover.glow,
+        ink: !isDesktopPlatform,
+        hover: PressableHover.none,
         focusRadius: BorderRadius.circular(AlistenRadii.md),
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -1271,11 +1269,14 @@ class _PlaylistTile extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CoverArt(
-                  url: playlist.coverUrl,
-                  size: constraints.maxWidth,
+                HoverCover(
                   radius: AlistenRadii.md,
-                  heroTag: tags.cover,
+                  child: CoverArt(
+                    url: playlist.coverUrl,
+                    size: constraints.maxWidth,
+                    radius: AlistenRadii.md,
+                    heroTag: tags.cover,
+                  ),
                 ),
                 const SizedBox(height: AlistenSpacing.xs),
                 SharedText(

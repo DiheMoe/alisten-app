@@ -208,6 +208,7 @@ class LinkRow extends StatelessWidget {
       onPressed: busy ? null : onPressed,
       // 进行中不等于不可用，不变淡。
       dimWhenDisabled: !busy,
+      focusRadius: Pressable.panelRow,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
           minHeight: AlistenSizes.largeTouchTarget,
@@ -279,6 +280,7 @@ class CategoryRow extends StatelessWidget {
     return Pressable(
       onPressed: onPressed,
       selected: selected,
+      focusRadius: Pressable.panelRow,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
           minHeight: AlistenSizes.largeTouchTarget,

@@ -196,6 +196,7 @@ class _ActionRow extends StatelessWidget {
     return Pressable(
       onPressed: busy ? null : onPressed,
       dimWhenDisabled: !busy,
+      focusRadius: Pressable.panelRow,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
           minHeight: AlistenSizes.largeTouchTarget,

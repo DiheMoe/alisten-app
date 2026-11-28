@@ -2,7 +2,10 @@ import 'package:alisten/domain/track/track.dart';
 import 'package:alisten/features/search/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
+import 'package:alisten/shared/ui/hover_glow.dart';
+import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -111,4 +114,72 @@ void main() {
     expect(ink('featured'), colors.onBrand);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets(
+    'pick button hover matches the button face instead of the 48px target',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: await alistenAppOverrides(),
+          child: MaterialApp(
+            theme: buildAlistenTheme(
+              AlistenColors.brandScheme(Brightness.dark),
+            ),
+            home: Scaffold(
+              body: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  PickControl(
+                    key: const ValueKey('compact'),
+                    track: const Track(source: TrackSource.netease, id: '1'),
+                    title: '晴天',
+                    onPick: (_, _) {},
+                  ),
+                  SizedBox(
+                    width: 240,
+                    child: PickControl(
+                      key: const ValueKey('wide'),
+                      track: const Track(source: TrackSource.netease, id: '2'),
+                      title: '七里香',
+                      wide: true,
+                      expand: true,
+                      tone: PickTone.filled,
+                      onPick: (_, _) {},
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final compact = find.byKey(const ValueKey('compact'));
+      final compactTouch = tester.getRect(
+        find.descendant(of: compact, matching: find.byType(Pressable)),
+      );
+      final compactFace = tester.getRect(
+        find.descendant(of: compact, matching: find.byType(AnimatedContainer)),
+      );
+      final compactGlow = tester.getRect(
+        find.descendant(of: compact, matching: find.byType(HoverGlow)),
+      );
+      expect(compactTouch.size, const Size.square(AlistenSizes.minTouchTarget));
+      expect(compactGlow, compactFace);
+      expect(compactFace.width, lessThan(compactTouch.width));
+
+      final wide = find.byKey(const ValueKey('wide'));
+      final wideFace = tester.getRect(
+        find.descendant(of: wide, matching: find.byType(AnimatedContainer)),
+      );
+      final wideGlow = tester.getRect(
+        find.descendant(of: wide, matching: find.byType(HoverGlow)),
+      );
+      expect(wideFace.width, 240);
+      expect(wideGlow, wideFace);
+      await tester.pumpWidget(const SizedBox());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.linux),
+  );
 }

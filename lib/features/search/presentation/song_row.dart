@@ -513,18 +513,14 @@ class _PickButtonState extends State<PickButton>
           // 点歌中和已点不算不可用，不调暗。
           dimWhenDisabled:
               status != PickStatus.sending && status != PickStatus.added,
+          hoverColor: tone == PickTone.filled ? colors.onBrand : null,
           focusRadius: pill,
+          touchTarget: const BoxConstraints(
+            minWidth: AlistenSizes.minTouchTarget,
+            minHeight: AlistenSizes.minTouchTarget,
+          ),
           child: ExcludeSemantics(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: AlistenSizes.minTouchTarget,
-                minHeight: AlistenSizes.minTouchTarget,
-              ),
-              child: Center(
-                widthFactor: widget.expand ? null : 1,
-                child: ScaleTransition(scale: _scale, child: face),
-              ),
-            ),
+            child: ScaleTransition(scale: _scale, child: face),
           ),
         ),
       ),

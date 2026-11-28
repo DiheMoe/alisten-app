@@ -16,6 +16,9 @@ enum PressableHover {
   /// 光跟着指针走，靠近指针的边缘也亮起来。只给卡片这样的大块用，用多了
   /// 满屏都在闪。
   glow,
+
+  /// 外框本身不画悬停底色，只把悬停进度传给子组件（如 [HoverCover]）。
+  none,
 }
 
 /// 按下时在控件上叠一层墨迹，形状同 [focusRadius]，不缩放也不变淡。墨迹在确认
@@ -36,13 +39,21 @@ class Pressable extends StatefulWidget {
     this.inMutuallyExclusiveGroup = false,
     this.expanded,
     this.dimWhenDisabled = true,
-    this.focusRadius = const BorderRadius.all(Radius.circular(AlistenRadii.sm)),
+    this.focusRadius = _rounded,
     this.focusNode,
     this.ink = true,
     this.hover = PressableHover.tint,
     this.hoverColor,
+    this.touchTarget,
     super.key,
   });
+
+  static const _rounded = BorderRadius.all(Radius.circular(AlistenRadii.sm));
+
+  /// 面板里通栏的一行用的 [focusRadius]：桌面窗口里鼠标指着时一直亮到面板的边，
+  /// 手机上按下的墨迹留着圆角。
+  static BorderRadius get panelRow =>
+      isDesktopPlatform ? BorderRadius.zero : _rounded;
 
   final Widget child;
   final VoidCallback? onPressed;
@@ -69,6 +80,10 @@ class Pressable extends StatefulWidget {
   /// 否则看不出亮了。
   final Color? hoverColor;
 
+  /// 触控与读屏区域至少占这么多空间，而悬停光晕、按压墨迹和焦点框只贴在
+  /// [child] 自身上。用于视觉尺寸小于 48×48 的开关、小按钮和标签。
+  final BoxConstraints? touchTarget;
+
   @override
   State<Pressable> createState() => _PressableState();
 }
@@ -81,7 +96,8 @@ class _PressableState extends State<Pressable>
   Timer? _hold;
   bool _lifted = false;
 
-  bool get _enabled => widget.onPressed != null || widget.onLongPress != null;
+  bool get _clickable => widget.onPressed != null;
+  bool get _enabled => _clickable || widget.onLongPress != null;
 
   // 先记下自己的位置：接下来打开的页面或面板从这里长出。
   void _press() {
@@ -155,6 +171,45 @@ class _PressableState extends State<Pressable>
     final opacity = !_enabled && widget.dimWhenDisabled
         ? AlistenPress.disabledOpacity
         : 1.0;
+    // 墨迹和焦点框两层一直都在，按下或聚焦时树结构不变，子组件不丢状态。
+    final visual = _lit(
+      colors,
+      AnimatedBuilder(
+        animation: _ink,
+        builder: (context, child) => DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(
+            color: _ink.value == 0
+                ? null
+                : colors.onGlass.withValues(
+                    alpha: AlistenMotion.pressInkAlpha * _ink.value,
+                  ),
+            borderRadius: widget.focusRadius,
+          ),
+          child: child,
+        ),
+        child: DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: _focused
+              ? BoxDecoration(
+                  borderRadius: widget.focusRadius,
+                  border: Border.all(
+                    color: colors.onGlass,
+                    width: AlistenSizes.ring,
+                  ),
+                )
+              : const BoxDecoration(),
+          child: widget.child,
+        ),
+      ),
+    );
+    final touchTarget = widget.touchTarget;
+    final body = touchTarget == null
+        ? visual
+        : ConstrainedBox(
+            constraints: touchTarget,
+            child: Center(widthFactor: 1, heightFactor: 1, child: visual),
+          );
     return Semantics(
       container: true,
       button: widget.button,
@@ -168,7 +223,7 @@ class _PressableState extends State<Pressable>
       child: FocusableActionDetector(
         focusNode: widget.focusNode,
         enabled: _enabled,
-        mouseCursor: _enabled
+        mouseCursor: _clickable
             ? SystemMouseCursors.click
             : SystemMouseCursors.basic,
         onShowFocusHighlight: (focused) => setState(() => _focused = focused),
@@ -192,52 +247,23 @@ class _PressableState extends State<Pressable>
             opacity: opacity,
             duration: AlistenDurations.of(context, AlistenDurations.short),
             curve: AlistenCurves.standard,
-            // 墨迹和焦点框两层一直都在，按下或聚焦时树结构不变，子组件不丢状态。
-            child: _lit(
-              colors,
-              AnimatedBuilder(
-                animation: _ink,
-                builder: (context, child) => DecoratedBox(
-                  position: DecorationPosition.foreground,
-                  decoration: BoxDecoration(
-                    color: _ink.value == 0
-                        ? null
-                        : colors.onGlass.withValues(
-                            alpha: AlistenMotion.pressInkAlpha * _ink.value,
-                          ),
-                    borderRadius: widget.focusRadius,
-                  ),
-                  child: child,
-                ),
-                child: DecoratedBox(
-                  position: DecorationPosition.foreground,
-                  decoration: _focused
-                      ? BoxDecoration(
-                          borderRadius: widget.focusRadius,
-                          border: Border.all(
-                            color: colors.onGlass,
-                            width: AlistenSizes.ring,
-                          ),
-                        )
-                      : const BoxDecoration(),
-                  child: widget.child,
-                ),
-              ),
-            ),
+            child: body,
           ),
         ),
       ),
     );
   }
 
-  // 桌面窗口里鼠标指着时亮起来。
+  // 桌面窗口里鼠标指着时亮起来。只有左键能点的控件才亮，仅有长按/右键的不亮。
   Widget _lit(AlistenColors colors, Widget child) {
-    if (!isDesktopPlatform || !widget.ink) return child;
+    if (!isDesktopPlatform) return child;
+    if (!widget.ink && widget.hover != PressableHover.none) return child;
     return HoverGlow(
       radius: widget.focusRadius,
       color: widget.hoverColor ?? colors.onGlass,
-      enabled: _enabled,
+      enabled: _clickable,
       follow: widget.hover == PressableHover.glow,
+      paint: widget.hover != PressableHover.none,
       child: child,
     );
   }

@@ -10,6 +10,7 @@ import 'package:alisten/features/playlists/index.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/inline_message.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
+import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
 import 'package:alisten/shared/ui/toast.dart';
@@ -146,6 +147,42 @@ void main() {
       );
     }
     semantics.dispose();
+  });
+
+  testWidgets('on a phone the count with the sort starts at the left edge of '
+      'the cards', (tester) async {
+    await open(tester);
+    expect(
+      tester.getTopLeft(find.textContaining('3 个歌单')).dx,
+      tester.getTopLeft(find.byType(PlaylistCover).first).dx,
+    );
+  });
+
+  testWidgets('on a phone a tapped card shows as pressed', (tester) async {
+    await open(tester);
+    final card = find
+        .ancestor(of: find.text('夜跑'), matching: find.byType(Pressable))
+        .first;
+    double ink() =>
+        (tester
+                    .widgetList<DecoratedBox>(
+                      find.descendant(
+                        of: card,
+                        matching: find.byType(DecoratedBox),
+                      ),
+                    )
+                    .first
+                    .decoration
+                as BoxDecoration)
+            .color
+            ?.a ??
+        0;
+
+    await tester.tap(find.text('夜跑'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(ink(), greaterThan(0));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('a card or a row is read as one button with the name and its '

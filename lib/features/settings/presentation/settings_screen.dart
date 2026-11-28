@@ -100,6 +100,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Pressable(
               onPressed: () => open(SettingsSection.account),
               semanticLabel: SettingsSection.account.title,
+              focusRadius: BorderRadius.circular(AlistenRadii.md),
               selected: widget.selected == null
                   ? null
                   : widget.selected == SettingsSection.account,

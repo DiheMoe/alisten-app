@@ -622,8 +622,13 @@ class _Song extends StatelessWidget {
               Pressable(
                 onPressed: onToggle,
                 button: false,
+                focusRadius: BorderRadius.circular(AlistenSizes.rowAction / 2),
+                touchTarget: const BoxConstraints.tightFor(
+                  width: AlistenSizes.minTouchTarget,
+                  height: AlistenSizes.minTouchTarget,
+                ),
                 child: SizedBox.square(
-                  dimension: AlistenSizes.minTouchTarget,
+                  dimension: AlistenSizes.rowAction,
                   child: Icon(
                     selected
                         ? AlistenIcons.checkCircleFill

@@ -3,6 +3,7 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/chip_pill.dart';
+import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/segmented_pills.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -120,6 +121,37 @@ void main() {
     await page.settle();
     expect(find.text('歌单'), findsWidgets);
     expect(playlistSources(), ['qq', 'netease']);
+  });
+
+  testWidgets('on a phone a tapped playlist shows as pressed', (tester) async {
+    final page = await SearchPage.open(tester);
+    await page.search('晴天');
+    await tester.tap(find.text('歌单').first);
+    await page.settle();
+    final name = find.text('playlist-0');
+    final tile = find
+        .ancestor(of: name, matching: find.byType(Pressable))
+        .first;
+    double ink() =>
+        (tester
+                    .widgetList<DecoratedBox>(
+                      find.descendant(
+                        of: tile,
+                        matching: find.byType(DecoratedBox),
+                      ),
+                    )
+                    .first
+                    .decoration
+                as BoxDecoration)
+            .color
+            ?.a ??
+        0;
+
+    await tester.tap(name);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(ink(), greaterThan(0));
+    await page.settle();
   });
 
   testWidgets('a temporary room offers to pick a Bilibili link and no other', (

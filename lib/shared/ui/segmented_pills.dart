@@ -145,6 +145,7 @@ class _Segment<T> extends StatelessWidget {
       selected: selected,
       inMutuallyExclusiveGroup: true,
       semanticLabel: showLabel ? null : segment.label,
+      hoverColor: selected ? ink : null,
       focusRadius: BorderRadius.circular(AlistenRadii.control),
       child: ConstrainedBox(
         constraints: BoxConstraints(

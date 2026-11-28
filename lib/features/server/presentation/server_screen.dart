@@ -263,6 +263,7 @@ class _ServerRow extends StatelessWidget {
               : Pressable(
                   onPressed: onSwitch,
                   dimWhenDisabled: workingLabel == null,
+                  focusRadius: Pressable.panelRow,
                   child: details,
                 ),
         ),

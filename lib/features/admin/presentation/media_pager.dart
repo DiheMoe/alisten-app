@@ -6,6 +6,7 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
@@ -15,6 +16,8 @@ import 'package:flutter/services.dart';
 /// 两个按钮占去 360 dp 宽屏幕的大半，字号再大中间的范围就没地方了；范围放
 /// 不下时缩小，读屏名称里仍是完整的范围。
 const _maxTextScale = 1.3;
+
+const _target = BoxConstraints(minHeight: AlistenSizes.minTouchTarget);
 
 /// “‹ 上一页”“第 21–40 首”“下一页 ›”；点中间的范围输入页码跳转。
 class MediaPager extends StatelessWidget {
@@ -42,6 +45,11 @@ class MediaPager extends StatelessWidget {
     final first = (page - 1) * mediaPageSize + 1;
     final last = math.min(page * mediaPageSize, total);
     final range = '第 $first–$last 首';
+    final label = Text(
+      range,
+      maxLines: 1,
+      style: AlistenTypography.timecode.copyWith(color: colors.onGlass),
+    );
     return MediaQuery.withClampedTextScaling(
       maxScaleFactor: _maxTextScale,
       child: Padding(
@@ -61,27 +69,26 @@ class MediaPager extends StatelessWidget {
                   child: Pressable(
                     semanticLabel: '$range，共 $pageCount 页，跳到指定页',
                     onPressed: () => unawaited(_jump(context)),
+                    // 桌面窗口里只有页码在鼠标下亮起；手机上整块都是按下的范围。
+                    touchTarget: isDesktopPlatform ? _target : null,
                     child: ExcludeSemantics(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          minHeight: AlistenSizes.minTouchTarget,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AlistenSpacing.xs,
-                          ),
-                          child: Center(
-                            widthFactor: 1,
-                            child: Text(
-                              range,
-                              maxLines: 1,
-                              style: AlistenTypography.timecode.copyWith(
-                                color: colors.onGlass,
+                      child: isDesktopPlatform
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AlistenSpacing.sm,
+                                vertical: AlistenSpacing.xs,
+                              ),
+                              child: label,
+                            )
+                          : ConstrainedBox(
+                              constraints: _target,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AlistenSpacing.xs,
+                                ),
+                                child: Center(widthFactor: 1, child: label),
                               ),
                             ),
-                          ),
-                        ),
-                      ),
                     ),
                   ),
                 ),

@@ -1,6 +1,8 @@
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
+import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/settings_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +44,23 @@ void main() {
       findsOneWidget,
     );
     semantics.dispose();
+  });
+
+  group('a pressed row', () {
+    BorderRadius shape(WidgetTester tester) =>
+        tester.widget<Pressable>(find.byType(Pressable)).focusRadius;
+
+    testWidgets('on a phone is tinted with rounded corners', (tester) async {
+      await pump(tester, alert: false);
+      expect(shape(tester), BorderRadius.circular(AlistenRadii.sm));
+    });
+
+    testWidgets('in a desktop window lights up to the edges of its panel', (
+      tester,
+    ) async {
+      await pump(tester, alert: false);
+      expect(shape(tester), BorderRadius.zero);
+    }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
   });
 
   testWidgets('a row without anything to attend to has no dot', (tester) async {

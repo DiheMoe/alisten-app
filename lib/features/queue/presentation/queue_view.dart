@@ -883,13 +883,17 @@ class _LikeButtonState extends State<_LikeButton>
     return Pressable(
       onPressed: onPressed == null ? null : () => unawaited(_press()),
       semanticLabel: widget.label,
+      focusRadius: BorderRadius.circular(AlistenRadii.control),
+      touchTarget: const BoxConstraints(
+        minWidth: AlistenSizes.minTouchTarget,
+        minHeight: AlistenSizes.minTouchTarget,
+      ),
       child: Semantics(
         value: widget.busy ? busySemanticValue : null,
         child: ExcludeSemantics(
           child: ConstrainedBox(
             constraints: const BoxConstraints(
-              minWidth: AlistenSizes.minTouchTarget,
-              minHeight: AlistenSizes.minTouchTarget,
+              minHeight: AlistenSizes.rowAction,
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(

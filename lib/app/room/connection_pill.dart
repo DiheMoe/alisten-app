@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:alisten/features/room/index.dart';
+import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/status_pill.dart';
@@ -125,6 +126,7 @@ class _ConnectionPillState extends ConsumerState<ConnectionPill> {
         child: Pressable(
           onPressed: onRetryNow,
           dimWhenDisabled: false,
+          focusRadius: BorderRadius.circular(AlistenRadii.pill),
           child: StatusPill(label: label, icon: icon, tone: tone, busy: busy),
         ),
       ),

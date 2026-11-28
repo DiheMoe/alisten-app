@@ -258,6 +258,7 @@ class _RoomRow extends StatelessWidget {
     return Pressable(
       onPressed: onPressed,
       dimWhenDisabled: !deleting,
+      focusRadius: Pressable.panelRow,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
           minHeight: AlistenSizes.largeTouchTarget,

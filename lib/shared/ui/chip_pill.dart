@@ -28,53 +28,45 @@ class ChipPill extends StatelessWidget {
     return Pressable(
       onPressed: onPressed,
       selected: selected,
+      hoverColor: selected ? surface : null,
       focusRadius: pill,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minHeight: AlistenSizes.minTouchTarget,
+      touchTarget: const BoxConstraints(minHeight: AlistenSizes.minTouchTarget),
+      child: AnimatedContainer(
+        duration: AlistenDurations.of(context, AlistenDurations.short),
+        curve: AlistenCurves.standard,
+        constraints: const BoxConstraints(minHeight: AlistenSizes.chipHeight),
+        padding: EdgeInsets.fromLTRB(
+          icon == null ? AlistenSpacing.md : AlistenSpacing.sm,
+          AlistenSpacing.xxs,
+          AlistenSpacing.md,
+          AlistenSpacing.xxs,
         ),
-        child: Center(
-          widthFactor: 1,
-          child: AnimatedContainer(
-            duration: AlistenDurations.of(context, AlistenDurations.short),
-            curve: AlistenCurves.standard,
-            constraints: const BoxConstraints(
-              minHeight: AlistenSizes.chipHeight,
-            ),
-            padding: EdgeInsets.fromLTRB(
-              icon == null ? AlistenSpacing.md : AlistenSpacing.sm,
-              AlistenSpacing.xxs,
-              AlistenSpacing.md,
-              AlistenSpacing.xxs,
-            ),
-            decoration: BoxDecoration(
-              color: selected ? colors.onGlass : colors.glassFill,
-              borderRadius: pill,
-              border: Border.all(
-                color: selected ? colors.onGlass : colors.glassStroke,
+        decoration: BoxDecoration(
+          color: selected ? colors.onGlass : colors.glassFill,
+          borderRadius: pill,
+          border: Border.all(
+            color: selected ? colors.onGlass : colors.glassStroke,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: AlistenSizes.iconSm, color: ink),
+              const SizedBox(width: AlistenSpacing.xxs),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AlistenTypography.weighted(
+                  AlistenTypography.secondary,
+                  FontWeight.w600,
+                ).copyWith(color: ink),
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: AlistenSizes.iconSm, color: ink),
-                  const SizedBox(width: AlistenSpacing.xxs),
-                ],
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AlistenTypography.weighted(
-                      AlistenTypography.secondary,
-                      FontWeight.w600,
-                    ).copyWith(color: ink),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          ],
         ),
       ),
     );

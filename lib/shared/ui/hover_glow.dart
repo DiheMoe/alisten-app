@@ -21,6 +21,8 @@ const _minReach = 64.0;
 const _maxReach = 240.0;
 
 const _popScale = 1.1;
+const _coverZoom = 1.03;
+const _coverSheenAlpha = 0.08;
 
 /// 鼠标指着控件时亮起：淡入，离开后淡出，形状同 [radius]。
 class HoverGlow extends StatefulWidget {
@@ -30,6 +32,7 @@ class HoverGlow extends StatefulWidget {
     required this.enabled,
     required this.follow,
     required this.child,
+    this.paint = true,
     super.key,
   });
 
@@ -38,6 +41,9 @@ class HoverGlow extends StatefulWidget {
 
   /// 为 true 时光跟着指针走，指针处最亮；否则整块一样亮。
   final bool follow;
+
+  /// 为 false 时不在外框上画光，只把悬停进度传给子组件（如 [HoverCover]）。
+  final bool paint;
 
   /// 不能按的控件不亮。
   final bool enabled;
@@ -93,23 +99,23 @@ class _HoverGlowState extends State<HoverGlow>
 
   @override
   Widget build(BuildContext context) {
+    final content = widget.paint
+        ? CustomPaint(
+            foregroundPainter: _GlowPainter(
+              shown: _shown,
+              pointer: widget.follow ? _pointer : null,
+              radius: widget.radius,
+              color: widget.color,
+            ),
+            child: widget.child,
+          )
+        : widget.child;
     return MouseRegion(
       opaque: false,
       onEnter: widget.enabled ? _light : null,
-      onHover: widget.enabled && widget.follow ? _light : null,
+      onHover: widget.enabled && widget.paint && widget.follow ? _light : null,
       onExit: (_) => _dim(),
-      child: _HoverScope(
-        shown: _shown,
-        child: CustomPaint(
-          foregroundPainter: _GlowPainter(
-            shown: _shown,
-            pointer: widget.follow ? _pointer : null,
-            radius: widget.radius,
-            color: widget.color,
-          ),
-          child: widget.child,
-        ),
-      ),
+      child: _HoverScope(shown: _shown, child: content),
     );
   }
 }
@@ -197,6 +203,46 @@ class HoverPop extends StatelessWidget {
           .drive(CurveTween(curve: Curves.easeOutBack))
           .drive(Tween(begin: 1, end: _popScale)),
       child: child,
+    );
+  }
+}
+
+/// 封面卡片的悬停反馈：只提亮并略微放大封面。要放在 [HoverGlow] 里面。
+class HoverCover extends StatelessWidget {
+  const HoverCover({required this.radius, required this.child, super.key});
+
+  final double radius;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isDesktopPlatform) return child;
+    final shown = HoverGlow.maybeOf(context);
+    if (shown == null) return child;
+    final zoomed = reducedMotion(context)
+        ? child
+        : ScaleTransition(
+            scale: shown
+                .drive(CurveTween(curve: Curves.easeOutCubic))
+                .drive(Tween(begin: 1, end: _coverZoom)),
+            child: child,
+          );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: AnimatedBuilder(
+        animation: shown,
+        builder: (context, child) => DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(
+            color: shown.value == 0
+                ? null
+                : const Color(0xFFFFFFFF)
+                      .withValues(alpha: _coverSheenAlpha * shown.value),
+          ),
+          child: child,
+        ),
+        child: zoomed,
+      ),
     );
   }
 }

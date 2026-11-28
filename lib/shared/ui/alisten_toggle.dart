@@ -27,44 +27,40 @@ class AlistenToggle extends StatelessWidget {
       semanticLabel: semanticLabel,
       button: false,
       toggled: value,
+      hoverColor: value ? colors.onBrand : null,
       focusRadius: pill,
-      child: SizedBox(
-        height: AlistenSizes.minTouchTarget,
-        child: Center(
-          widthFactor: 1,
-          child: AnimatedContainer(
-            duration: duration,
-            curve: AlistenCurves.standard,
-            width: AlistenSizes.toggleTrack.width,
-            height: AlistenSizes.toggleTrack.height,
-            padding: const EdgeInsets.all(AlistenSizes.toggleInset),
+      touchTarget: const BoxConstraints(minHeight: AlistenSizes.minTouchTarget),
+      child: AnimatedContainer(
+        duration: duration,
+        curve: AlistenCurves.standard,
+        width: AlistenSizes.toggleTrack.width,
+        height: AlistenSizes.toggleTrack.height,
+        padding: const EdgeInsets.all(AlistenSizes.toggleInset),
+        decoration: BoxDecoration(
+          borderRadius: pill,
+          color: value ? colors.brand : colors.outline,
+        ),
+        child: AnimatedAlign(
+          duration: duration,
+          curve: AlistenMotion.toggleCurve,
+          alignment: value
+              ? AlignmentDirectional.centerEnd
+              : AlignmentDirectional.centerStart,
+          child: Container(
+            width: _knob,
+            height: _knob,
             decoration: BoxDecoration(
-              borderRadius: pill,
-              color: value ? colors.brand : colors.outline,
-            ),
-            child: AnimatedAlign(
-              duration: duration,
-              curve: AlistenMotion.toggleCurve,
-              alignment: value
-                  ? AlignmentDirectional.centerEnd
-                  : AlignmentDirectional.centerStart,
-              child: Container(
-                width: _knob,
-                height: _knob,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  // 打开时轨道是强调色，圆钮用它上面的文字色才分得清。
-                  color: value ? colors.onBrand : colors.knob,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(context).colorScheme.shadow
-                          .withValues(alpha: 0.2),
-                      blurRadius: AlistenSpacing.xs,
-                      offset: const Offset(0, AlistenSpacing.xxs / 2),
-                    ),
-                  ],
+              shape: BoxShape.circle,
+              // 打开时轨道是强调色，圆钮用它上面的文字色才分得清。
+              color: value ? colors.onBrand : colors.knob,
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).colorScheme.shadow
+                      .withValues(alpha: 0.2),
+                  blurRadius: AlistenSpacing.xs,
+                  offset: const Offset(0, AlistenSpacing.xxs / 2),
                 ),
-              ),
+              ],
             ),
           ),
         ),
