@@ -43,19 +43,29 @@ const _shortestLineChangeMs = 350;
 
 const _rowHeightEm = 1.3;
 
-// 超宽屏（如收起侧栏的平板横屏）限制歌词行宽，避免单行拉过整屏。
-const _maxLyricWidth = 560.0;
-
 /// 歌词跟随本机播放位置，只在播放中前进；拖动后在停下的位置保留
 /// [_holdAfterDrag]，再回到当前行。
 ///
 /// 逐帧的变化都走绘制阶段：列表不重建，只有当前行和过渡中的行重绘。
 class LyricsView extends ConsumerStatefulWidget {
-  const LyricsView({this.columnWidth, super.key});
+  const LyricsView({
+    this.columnWidth,
+    this.maxWidth = baseMaxWidth,
+    this.alignment = Alignment.topCenter,
+    super.key,
+  });
+
+  /// 超宽屏（如收起侧栏的平板横屏）限制歌词行宽，避免单行拉过整屏。
+  static const baseMaxWidth = 560.0;
 
   /// 歌词列最宽到这里。所在区域的宽度在动画里逐帧变化时，由上层给出停稳后的
   /// 宽度，歌词不必跟着逐帧重排。
   final double? columnWidth;
+
+  /// 字号跟着放大的地方由上层把行宽一起放宽。
+  final double maxWidth;
+
+  final AlignmentGeometry alignment;
 
   @override
   ConsumerState<LyricsView> createState() => _LyricsViewState();
@@ -472,26 +482,33 @@ class _LyricsViewState extends ConsumerState<LyricsView>
       );
     }
     return RepaintBoundary(
-      child: EdgeFade(
-        top: AlistenSpacing.xxxl,
-        bottom: AlistenSpacing.xxxl,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: _onScroll,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final column = math.min(
-                math.min(
-                  constraints.maxWidth,
-                  widget.columnWidth ?? double.infinity,
-                ),
-                _maxLyricWidth,
-              );
-              _resetWidth(column);
-              _sizeSnapshots(constraints.maxHeight);
-              _contentInset = constraints.hasBoundedHeight
-                  ? constraints.maxHeight / 2
-                  : AlistenSpacing.xl;
-              return Listener(
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _onScroll,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final column = math.min(
+              math.min(
+                constraints.maxWidth,
+                widget.columnWidth ?? double.infinity,
+              ),
+              widget.maxWidth,
+            );
+            _resetWidth(column);
+            _sizeSnapshots(constraints.maxHeight);
+            _contentInset = constraints.hasBoundedHeight
+                ? constraints.maxHeight / 2
+                : AlistenSpacing.xl;
+            // 桌面窗口高得多，固定的渐隐在里面只剩窄窄一条。
+            final fade = isDesktopPlatform && constraints.hasBoundedHeight
+                ? (constraints.maxHeight * 0.09).clamp(
+                    AlistenSpacing.xxxl,
+                    2 * AlistenSpacing.xxxl,
+                  )
+                : AlistenSpacing.xxxl;
+            return EdgeFade(
+              top: fade,
+              bottom: fade,
+              child: Listener(
                 onPointerSignal: _onPointerSignal,
                 child: ScrollConfiguration(
                   behavior: ScrollConfiguration.of(context)
@@ -505,7 +522,7 @@ class _LyricsViewState extends ConsumerState<LyricsView>
                     // 上下各留半个视口，首行和末行也能滚到中央（仅限高度有界时）。
                     padding: EdgeInsets.symmetric(vertical: _contentInset),
                     child: Align(
-                      alignment: Alignment.topCenter,
+                      alignment: widget.alignment,
                       child: ConstrainedBox(
                         constraints: BoxConstraints(maxWidth: column),
                         child: Column(
@@ -519,9 +536,9 @@ class _LyricsViewState extends ConsumerState<LyricsView>
                     ),
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ),
     );

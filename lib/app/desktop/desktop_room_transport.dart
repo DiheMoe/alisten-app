@@ -12,11 +12,16 @@ import 'package:alisten/shared/ui/playback_progress_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// 房间页底部的播放控制：本机暂停、投票切歌和进度居中，左边收藏，右边音量。
+/// 房间页底部的播放控制：本机暂停、投票切歌和进度居中，右边音量。
 class DesktopRoomTransport extends ConsumerWidget {
-  const DesktopRoomTransport({super.key});
+  const DesktopRoomTransport({required this.maxWidth, super.key});
 
-  static const _controlsWidth = 480.0;
+  /// 舞台上的内容最宽到这里，播放控制收在同样的宽度里。
+  final double maxWidth;
+
+  static const _controlsWidth = 540.0;
+  static const _compactVolumeThreshold = 520.0;
+  static const _balanceThreshold = 680.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,39 +30,61 @@ class DesktopRoomTransport extends ConsumerWidget {
         (room) => room.snapshot?.nowPlaying != null,
       ),
     );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AlistenSpacing.xxl,
-        0,
-        AlistenSpacing.md,
-        AlistenSpacing.md,
-      ),
-      child: Row(
-        children: [
-          // 两边一样宽，中间的控制才在正中。
-          const SizedBox(width: _Volume.width),
-          Expanded(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: DesktopRoomTransport._controlsWidth,
-                ),
-                child: playing
-                    ? const Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          DesktopPlaybackControls(gap: AlistenSpacing.md),
-                          SizedBox(height: AlistenSpacing.xs),
-                          _Progress(),
-                        ],
-                      )
-                    : null,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compactVolume = constraints.maxWidth < _compactVolumeThreshold;
+        final sliderWidth = compactVolume
+            ? _Volume.compactSliderWidth
+            : _Volume.defaultSliderWidth;
+        final volumeWidth = AlistenSizes.iconButton + sliderWidth;
+        // 两边一样宽，中间的控制才在正中；窗口窄时把左边的占位让给进度条。
+        final balanceFactor =
+            ((constraints.maxWidth - _compactVolumeThreshold) /
+                    (_balanceThreshold - _compactVolumeThreshold))
+                .clamp(0.0, 1.0);
+        final leftBalance = (volumeWidth + AlistenSpacing.md) * balanceFactor;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AlistenSpacing.xl,
+            0,
+            AlistenSpacing.xl,
+            AlistenSpacing.lg,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: Row(
+                children: [
+                  if (leftBalance > 0) SizedBox(width: leftBalance),
+                  Expanded(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: _controlsWidth,
+                        ),
+                        child: playing
+                            ? const Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  DesktopPlaybackControls(
+                                    gap: AlistenSpacing.md,
+                                  ),
+                                  SizedBox(height: AlistenSpacing.xs),
+                                  _Progress(),
+                                ],
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AlistenSpacing.md),
+                  _Volume(sliderWidth: sliderWidth),
+                ],
               ),
             ),
           ),
-          const _Volume(),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -89,10 +116,12 @@ class _Progress extends ConsumerWidget {
 }
 
 class _Volume extends ConsumerWidget {
-  const _Volume();
+  const _Volume({required this.sliderWidth});
 
-  static const _sliderWidth = 132.0;
-  static const width = AlistenSizes.iconButton + _sliderWidth;
+  static const defaultSliderWidth = 132.0;
+  static const compactSliderWidth = 96.0;
+
+  final double sliderWidth;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -113,7 +142,7 @@ class _Volume extends ConsumerWidget {
           onPressed: () => unawaited(playback.toggleMute()),
         ),
         SizedBox(
-          width: _sliderWidth,
+          width: sliderWidth,
           child: AlistenSlider(
             value: volume / 100,
             semanticLabel: '本机音量',

@@ -343,6 +343,22 @@ void main() {
     expect(_fieldText(tester), '还没写完');
   });
 
+  testWidgets('on a phone the strip says what it unfolds', (tester) async {
+    final room = _Room(tester);
+    await room.open();
+    await room.showChat();
+    expect(find.text('成员'), findsOneWidget);
+  });
+
+  testWidgets('in a desktop window the strip keeps to its arrow', (
+    tester,
+  ) async {
+    final room = _Room(tester);
+    await room.open();
+    await room.showChat();
+    expect(find.text('成员'), findsNothing);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
   testWidgets('the members of a room of 30 unfold over the strip in a panel '
       'that scrolls without overflowing, someone on two devices listed once, '
       'and a push up folds it back', (tester) async {

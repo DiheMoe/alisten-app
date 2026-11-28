@@ -8,6 +8,8 @@ import 'package:alisten/domain/room/room.dart';
 import 'package:alisten/features/lobby/presentation/join_room_sheet.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/features/update/index.dart';
+import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
 import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
@@ -571,6 +573,55 @@ void main() {
     expect(find.text('暂时连不上房间'), findsOneWidget);
     expect(backdrop, findsOneWidget);
     unawaited(transport.stop());
+  });
+
+  group('while a room is being connected the way back', () {
+    Future<FakeRoomTransportFactory> wait(WidgetTester tester) async {
+      final rooms = FakeRoomTransportFactory();
+      await pumpAlistenApp(
+        tester,
+        api: FakeAlistenApi()
+          ..rooms = [roomListing(id: _roomId, slug: 'listen')],
+        credentials: FakeCredentialStore()..tickets[_roomId] = 'saved-ticket',
+        rooms: rooms,
+      );
+      appContainer(tester).read(routerProvider).go('/r/listen');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('正在连接房间'), findsOneWidget);
+      return rooms;
+    }
+
+    final arrow = find.byIcon(AlistenIcons.arrowLeft);
+    final pill = find.widgetWithText(PillButton, '返回');
+
+    testWidgets('on a phone is the arrow in the top bar from the start, and '
+        'no second button joins it', (tester) async {
+      final rooms = await wait(tester);
+      expect(arrow, findsOneWidget);
+      expect(tester.widget<Icon>(arrow).size, AlistenSizes.icon);
+
+      await tester.pump(const Duration(seconds: 3));
+      expect(pill, findsNothing);
+      unawaited(rooms.last.stop());
+    });
+
+    testWidgets(
+      'in a desktop window is a button under the words, shown only once the '
+      'wait has lasted',
+      (tester) async {
+        final rooms = await wait(tester);
+        expect(arrow, findsNothing);
+        expect(pill, findsNothing);
+
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pump(const Duration(seconds: 1));
+        expect(pill, findsOneWidget);
+        expect(arrow, findsNothing);
+        unawaited(rooms.last.stop());
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
   });
 
   testWidgets('a room whose first connection fails says so, counts down to '

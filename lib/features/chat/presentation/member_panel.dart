@@ -9,6 +9,7 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/motion.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:alisten/shared/ui/glyph_cascade.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
@@ -781,6 +782,15 @@ class _Trail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
+    final caret = Transform.rotate(
+      angle: turns * 2 * math.pi,
+      child: Icon(
+        AlistenIcons.caretDown,
+        size: AlistenSizes.iconSm,
+        color: colors.onGlassMuted,
+      ),
+    );
+    if (isDesktopPlatform) return caret;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -790,14 +800,7 @@ class _Trail extends StatelessWidget {
             color: colors.onGlassMuted,
           ),
         ),
-        Transform.rotate(
-          angle: turns * 2 * math.pi,
-          child: Icon(
-            AlistenIcons.caretDown,
-            size: AlistenSizes.iconSm,
-            color: colors.onGlassMuted,
-          ),
-        ),
+        caret,
       ],
     );
   }

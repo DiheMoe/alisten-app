@@ -15,6 +15,7 @@ import 'package:alisten/shared/ui/cover_flight.dart';
 import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
+import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/keyed_sliver_list.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
@@ -82,6 +83,7 @@ class QueueView extends ConsumerWidget {
     required this.onResult,
     required this.onCopyTitle,
     this.onSaveToPlaylist,
+    this.pickActions,
     super.key,
   });
 
@@ -91,6 +93,10 @@ class QueueView extends ConsumerWidget {
   /// 歌单功能依赖队列，这里反过来依赖它会形成循环，所以由 app 层传入。传入的
   /// context 是这一行的，从它打开的面板沿用房间的配色。
   final SaveTrackCallback? onSaveToPlaylist;
+
+  /// 点歌的入口，放在“等待中”的右边，没有歌时放在空状态里。手机上点歌在底栏
+  /// （平板在顶栏），这里不放。
+  final Widget? pickActions;
 
   _EntryMenu _menu(
     QueueEntry entry, {
@@ -275,6 +281,7 @@ class QueueView extends ConsumerWidget {
                         child: EmptyState(
                           icon: AlistenIcons.queue,
                           title: _noSongs,
+                          action: pickActions,
                         ),
                       ),
                     ),
@@ -285,7 +292,15 @@ class QueueView extends ConsumerWidget {
               _faded(
                 SectionHeader(
                   '等待中 ${waiting.length} 首',
-                  padding: _headerPadding,
+                  padding: pickActions == null
+                      ? _headerPadding
+                      : const EdgeInsets.fromLTRB(
+                          AlistenSpacing.page,
+                          AlistenSpacing.lg,
+                          AlistenSpacing.page,
+                          AlistenSpacing.xs,
+                        ),
+                  trailing: pickActions,
                 ),
               ),
               if (waiting.isEmpty)
@@ -343,7 +358,6 @@ class QueueView extends ConsumerWidget {
   }
 }
 
-// 点歌的入口只有底栏（平板在顶栏）那一个，这里不再放按钮。
 const _noSongs = '还没有歌，点一首吧';
 
 // 字体较大时选项换到标签下方，选项文字才不会被截断。
@@ -541,10 +555,7 @@ class _EntryRow extends StatelessWidget {
       longPressHint: copyTitleHint,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
-        children: [
-          ?trailing,
-          if (menu != null) pointed ? _ShownWhenPointed(child: menu) : menu,
-        ],
+        children: [?trailing, ?menu],
       ),
       padding: _rowPadding,
     );
@@ -585,6 +596,7 @@ class _PointedState extends State<_Pointed> {
   Widget build(BuildContext context) {
     return MouseRegion(
       opaque: false,
+      hitTestBehavior: HitTestBehavior.translucent,
       onEnter: (_) {
         _hovered = true;
         _sync();
@@ -610,11 +622,19 @@ class _PointedScope extends InheritedNotifier<ValueNotifier<bool>> {
   const _PointedScope({required super.notifier, required super.child});
 }
 
-// 位置一直留着，显示和隐藏时行里的字不会挪动。
-class _ShownWhenPointed extends StatelessWidget {
-  const _ShownWhenPointed({required this.child});
+// 位置一直留着，显示和隐藏时行里的字不会挪动；只淡化按钮本身，不能包在
+// ActionMenuButton/Popover 外面，否则 opacity 归零会跳过绘制
+// CompositedTransformTarget，导致展开中的菜单断开链接而消失。
+class _PointedMenuTrigger extends StatelessWidget {
+  const _PointedMenuTrigger({
+    required this.open,
+    required this.label,
+    required this.onPressed,
+  });
 
-  final Widget child;
+  final bool open;
+  final String label;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -623,11 +643,18 @@ class _ShownWhenPointed extends StatelessWidget {
         .notifier!
         .value;
     return AnimatedOpacity(
-      opacity: pointed ? 1 : 0,
+      opacity: open || pointed ? 1 : 0,
       duration: AlistenDurations.of(context, AlistenDurations.short),
       // 看不见时读屏仍要读得到它。
       alwaysIncludeSemantics: true,
-      child: child,
+      child: IconCircleButton(
+        icon: AlistenIcons.dotsThreeBold,
+        semanticLabel: label,
+        style: IconCircleButtonStyle.plain,
+        iconSize: AlistenSizes.iconSm,
+        expanded: open,
+        onPressed: onPressed,
+      ),
     );
   }
 }
@@ -678,10 +705,16 @@ class _EntryMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final label = '《${entry.meta.title}》的更多操作';
     return ActionMenuButton(
-      semanticLabel: '《${entry.meta.title}》的更多操作',
+      semanticLabel: label,
       iconSize: AlistenSizes.iconSm,
       entries: entries(context),
+      // 桌面窗口里这个按钮只在鼠标指着这一行时显示，见 [_Pointed]。
+      trigger: isDesktopPlatform
+          ? (open, toggle) =>
+                _PointedMenuTrigger(open: open, label: label, onPressed: toggle)
+          : null,
     );
   }
 }

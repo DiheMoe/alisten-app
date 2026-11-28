@@ -538,7 +538,9 @@ void main() {
         tester,
         size: _wideDesktop,
       );
-      await tester.tap(find.bySemanticsLabel('退出房间'));
+      await tester.tap(find.bySemanticsLabel(RegExp('^一起听，.*房间操作\$')));
+      await settle();
+      await tester.tap(find.text('退出房间'));
       await settle();
       expect(find.text('退出这个房间？'), findsOneWidget);
 
@@ -589,23 +591,46 @@ void main() {
   );
 
   testWidgets(
-    'the room grows out of the mini player, and the buttons for adding songs '
-    'and for the room sit at the far end of its top bar',
+    'the room grows out of the mini player, keeps its top bar clear while the '
+    'panel holds pick, and falls back to the top bar when the panel collapses',
     (tester) async {
       final (:settle, :router, rooms: _) = await enterRoom(
         tester,
         size: _wideDesktop,
       );
       final stage = find.byType(DesktopRoomStage);
+      final panel = find.byType(DesktopRoomPanel);
       final whole = tester.getRect(stage);
       expect(
-        tester.getRect(find.bySemanticsLabel('搜歌')).left,
-        greaterThan(whole.center.dx),
+        find.descendant(of: panel, matching: find.bySemanticsLabel('搜歌')),
+        findsOneWidget,
       );
       expect(
-        tester.getRect(find.bySemanticsLabel('退出房间')).right,
-        greaterThan(whole.right - 80),
+        find.descendant(of: panel, matching: find.bySemanticsLabel('从歌单点歌')),
+        findsOneWidget,
       );
+      expect(
+        find.descendant(of: stage, matching: find.bySemanticsLabel('搜歌')),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsLabel(RegExp(r'^一起听，\d+ / 16 人在线，房间操作$')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('desktop-panel-toggle')));
+      await settle();
+      expect(
+        find.descendant(of: stage, matching: find.bySemanticsLabel('搜歌')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: stage, matching: find.bySemanticsLabel('从歌单点歌')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('desktop-panel-toggle')));
+      await settle();
 
       router.go('/');
       await settle();
@@ -625,6 +650,36 @@ void main() {
       expect(tester.getRect(stage), whole);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  testWidgets(
+    'switching between the pages for adding songs from the panel leaves the '
+    'room one step back',
+    (tester) async {
+      final (:settle, :router, rooms: _) = await enterRoom(
+        tester,
+        size: _wideDesktop,
+      );
+      final panel = find.byType(DesktopRoomPanel);
+      Future<void> open(String label) async {
+        await tester.tap(
+          find.descendant(of: panel, matching: find.bySemanticsLabel(label)),
+        );
+        await settle();
+        await settle();
+      }
+
+      await open('搜歌');
+      await open('从歌单点歌');
+      await open('搜歌');
+      expect(find.byType(SearchScreen), findsOneWidget);
+
+      router.pop();
+      await settle();
+      await settle();
+      expect(find.byType(SearchScreen, skipOffstage: false), findsNothing);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.linux),
   );
 
   testWidgets(
@@ -885,6 +940,59 @@ void main() {
     expect(MediaQuery.textScalerOf(lyrics).scale(10), greaterThan(11));
   }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 
+  testWidgets(
+    'maximized window centers cover, widened lyrics, and transport together; '
+    'compact window stays overflow-free',
+    (tester) async {
+      final (:settle, router: _, rooms: _) = await enterRoom(
+        tester,
+        size: const Size(2560, 1400),
+        overrides: [
+          lyricsProvider.overrideWithValue(const [
+            LyricLine(timeMs: 0, text: '还没为你把红豆 熬成缠绵的伤口'),
+            LyricLine(timeMs: 5000, text: '然后一起分享 会更明白 相思的哀愁'),
+          ]),
+        ],
+      );
+      final stage = find.byType(DesktopRoomStage);
+      final stageRect = tester.getRect(stage);
+      final coverRect = tester.getRect(
+        find.descendant(of: stage, matching: find.byType(CoverArt)),
+      );
+      final lineRect = tester.getRect(find.byType(LyricLineRow).first);
+      final volumeRect = tester.getRect(find.bySemanticsLabel('本机音量'));
+
+      // 封面和歌词作为一个整体居中。
+      expect(coverRect.left, greaterThan(300));
+      expect(lineRect.left - coverRect.right, inInclusiveRange(120, 200));
+      // 歌词字号放大，行宽跟着放宽。
+      expect(lineRect.width, greaterThan(640));
+      // 音量跟播放控制一起收在内容的宽度里。
+      expect(stageRect.right - volumeRect.right, greaterThan(300));
+
+      // 放不下封面和歌词时不显示封面。
+      tester.view.physicalSize =
+          const Size(1200, 1200) * tester.view.devicePixelRatio;
+      await settle();
+      expect(tester.takeException(), isNull);
+      expect(
+        find.descendant(of: stage, matching: find.byType(CoverArt)),
+        findsNothing,
+      );
+
+      // 更窄的窗口带右侧面板时同样不溢出。
+      tester.view.physicalSize =
+          const Size(760, 620) * tester.view.devicePixelRatio;
+      await settle();
+      expect(tester.takeException(), isNull);
+      expect(
+        find.descendant(of: stage, matching: find.byType(CoverArt)),
+        findsNothing,
+      );
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
   testWidgets('when the song changes the title fades to the next one', (
     tester,
   ) async {
@@ -1051,6 +1159,22 @@ void main() {
         );
         await settle();
         expect(find.text('复制歌名'), findsOneWidget);
+        await tester.tapAt(const Offset(10, 10));
+        await settle();
+
+        // 菜单的遮罩让指针离开了这一行，“⋯”展开的菜单仍要留着、能点。
+        final triggerPos = tester.getCenter(more.first);
+        await mouse.moveTo(triggerPos);
+        await settle();
+        await tester.tap(more.first);
+        await settle();
+        expect(find.text('复制歌名'), findsOneWidget);
+        final menuItemPos = tester.getCenter(find.text('复制歌名'));
+        expect((menuItemPos - triggerPos).distance, lessThan(200));
+        await tester.tap(find.text('复制歌名'));
+        await settle();
+        expect(find.text('复制歌名'), findsNothing);
+        expect(find.text('已复制歌名'), findsOneWidget);
       },
       variant: TargetPlatformVariant.only(TargetPlatform.linux),
     );
@@ -1190,10 +1314,10 @@ void main() {
       await mouse.addPointer(location: const Offset(800, 450));
       addTearDown(mouse.removePointer);
 
-      await mouse.moveTo(tester.getCenter(find.bySemanticsLabel('搜歌')));
+      await mouse.moveTo(tester.getCenter(find.bySemanticsLabel('收起房间')));
       await tester.pump();
       await tester.pump(const Duration(seconds: 2));
-      expect(find.text('搜歌'), findsNothing);
+      expect(find.text('收起房间'), findsNothing);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.linux),
   );

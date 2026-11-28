@@ -177,6 +177,9 @@ class _DesktopRoomShellState extends ConsumerState<DesktopRoomShell>
         ref.read(roomControllerProvider.notifier).names(routeRoom);
     // 房间的主页面；点歌等页面叠在它上面。
     final onStage = !(segments.length > 2 && _subPages.contains(segments[2]));
+    final onSearch = segments.length > 2 && segments[2] == 'search';
+    final onFromPlaylists =
+        segments.length > 2 && segments[2] == 'from-playlists';
     final media = MediaQuery.of(context);
     return DesktopRoomScope(
       leave: () => unawaited(_leave()),
@@ -208,6 +211,14 @@ class _DesktopRoomShellState extends ConsumerState<DesktopRoomShell>
                       onQueueFractionChanged: ref
                           .read(desktopRoomPanelProvider.notifier)
                           .setQueue,
+                      // 面板在点歌的页面旁边也一直在。用 go 让这两页互相替换，
+                      // 而不是一层层叠上去。
+                      onPickSongs: !onSearch && routeRoom != null
+                          ? () => context.go('/r/$routeRoom/search')
+                          : null,
+                      onPickFromPlaylists: !onFromPlaylists && routeRoom != null
+                          ? () => context.go('/r/$routeRoom/from-playlists')
+                          : null,
                     );
                     return AnimatedBuilder(
                       animation: _panelController,
@@ -249,6 +260,8 @@ class _DesktopRoomShellState extends ConsumerState<DesktopRoomShell>
                                     child: ClipRect(
                                       child: SettledStageWidth(
                                         width: settledStageWidth,
+                                        panelVisible:
+                                            canShowPanel && panelExpanded,
                                         // 房间的主页面自带播放控制，点歌等页面
                                         // 下方悬着迷你播放条。
                                         child: MiniPlayerHost(

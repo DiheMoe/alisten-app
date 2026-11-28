@@ -12,6 +12,7 @@ import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
 import 'package:alisten/shared/ui/busy_indicator.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/empty_state.dart';
 import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
@@ -145,6 +146,8 @@ final class _RoomRouteGateState extends ConsumerState<RoomRouteGate> {
       RoomJoinFailed(room: final refused) => refused,
       null => null,
     };
+    // 手机上返回一直在顶栏里。
+    final back = isDesktopPlatform ? () => _back(context) : null;
     final Widget body;
     if (!current) {
       // 重新进入期间仍显示上一次的原因，只有按钮转圈。
@@ -174,7 +177,7 @@ final class _RoomRouteGateState extends ConsumerState<RoomRouteGate> {
           alive: true,
           onLeaving: _freeze,
         ),
-        AsyncValue() => const _Busy(label: '正在进入房间'),
+        AsyncValue() => _Busy(label: '正在进入房间', onBack: back),
       };
     } else if (failure != null) {
       body = _Refusal(
@@ -190,23 +193,47 @@ final class _RoomRouteGateState extends ConsumerState<RoomRouteGate> {
       // 由状态胶囊区分两者。
       body = room.status == RoomConnectionStatus.reconnecting
           ? _WaitingToReconnect(room: room)
-          : const _Busy(label: '正在连接房间');
+          : _Busy(label: '正在连接房间', onBack: back);
     } else {
       _shown = null;
       return widget.child;
     }
-    // 与房间页同一片暗色极光，进入房间时不会闪过一页空白。
+    final content = isDesktopPlatform
+        ? Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AlistenSizes.contentMaxWidth,
+              ),
+              child: body,
+            ),
+          )
+        : body;
+    // 与房间页同一片背景，进入房间时不会闪过一页空白。
     return _shown = AlistenScaffold(
-      background: const FlowingCoverBackdrop(url: null),
-      topBar: AlistenTopBar(
-        leading: IconCircleButton(
-          icon: AlistenIcons.arrowLeft,
-          semanticLabel: '返回',
-          style: IconCircleButtonStyle.plain,
-          onPressed: () => _back(context),
-        ),
-      ),
-      body: Semantics(liveRegion: true, child: body),
+      contentMaxWidth: isDesktopPlatform
+          ? double.infinity
+          : AlistenSizes.contentMaxWidth,
+      background: OverBackdrop.of(context)
+          ? null
+          : const FlowingCoverBackdrop(url: null),
+      // 桌面窗口里等待的那一页自己给出返回的按钮，见 [_Busy]。
+      topBar: isDesktopPlatform && body is _Busy
+          ? null
+          : AlistenTopBar(
+              leading: IconCircleButton(
+                icon: AlistenIcons.arrowLeft,
+                semanticLabel: '返回',
+                style: IconCircleButtonStyle.plain,
+                diameter: isDesktopPlatform
+                    ? AlistenSizes.rowAction
+                    : AlistenSizes.iconButton,
+                iconSize: isDesktopPlatform
+                    ? AlistenSizes.iconSm
+                    : AlistenSizes.icon,
+                onPressed: () => _back(context),
+              ),
+            ),
+      body: Semantics(liveRegion: true, child: content),
     );
   }
 
@@ -221,14 +248,45 @@ void _back(BuildContext context) {
   }
 }
 
-final class _Busy extends StatelessWidget {
-  const _Busy({required this.label});
+final class _Busy extends StatefulWidget {
+  const _Busy({required this.label, this.onBack});
 
   final String label;
+
+  /// 给出时在文字下面放一个返回的按钮。
+  final VoidCallback? onBack;
+
+  @override
+  State<_Busy> createState() => _BusyState();
+}
+
+final class _BusyState extends State<_Busy> {
+  // 进入房间通常一闪而过，等久了才值得让人退出去。
+  static const _backDelay = Duration(seconds: 2);
+
+  Timer? _timer;
+  bool _offersBack = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.onBack == null) return;
+    _timer = Timer(_backDelay, () {
+      if (mounted) setState(() => _offersBack = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = AlistenColors.of(context);
+    final onBack = widget.onBack;
+    final showBack = _offersBack && (ModalRoute.of(context)?.isCurrent ?? true);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AlistenSpacing.page),
@@ -238,12 +296,36 @@ final class _Busy extends StatelessWidget {
             const BusyIndicator(size: AlistenSizes.iconLg),
             const SizedBox(height: AlistenSpacing.md),
             Text(
-              label,
+              widget.label,
               textAlign: TextAlign.center,
               style: AlistenTypography.bodyStrong.copyWith(
                 color: colors.onGlass,
               ),
             ),
+            if (onBack != null) ...[
+              const SizedBox(height: AlistenSpacing.md),
+              // 按钮出现前就占着位置，文字不会被它顶上去。
+              SizedBox(
+                height: AlistenSizes.minTouchTarget,
+                child: showBack
+                    ? TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 1),
+                        duration: AlistenDurations.of(
+                          context,
+                          AlistenDurations.medium,
+                        ),
+                        curve: AlistenCurves.standard,
+                        builder: (context, opacity, child) =>
+                            Opacity(opacity: opacity, child: child),
+                        child: PillButton(
+                          label: '返回',
+                          style: PillButtonStyle.ghost,
+                          onPressed: onBack,
+                        ),
+                      )
+                    : null,
+              ),
+            ],
           ],
         ),
       ),

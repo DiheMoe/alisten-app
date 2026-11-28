@@ -8,6 +8,8 @@ import 'package:alisten/features/playback/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
+import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/edge_fade.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -229,6 +231,24 @@ void main() {
     await tester.drag(find.byType(SingleChildScrollView), const Offset(0, 75));
     await tester.pump();
     expectFadedByRow(tester, find.byType(LyricsView), top: true, bottom: true);
+  });
+
+  testWidgets('on a phone the fade at the edges is as tall as it has been', (
+    tester,
+  ) async {
+    await _pumpLyrics(
+      tester,
+      track: _track(lyric: _lrc(40)),
+      playback: _playingAt(20),
+    );
+    await _settle(tester);
+    final fade = tester.widget<EdgeFade>(
+      find.descendant(
+        of: find.byType(LyricsView),
+        matching: find.byType(EdgeFade),
+      ),
+    );
+    expect((fade.top, fade.bottom), (AlistenSpacing.xxxl, AlistenSpacing.xxxl));
   });
 
   testWidgets('the current line is focused and the others know how far away '

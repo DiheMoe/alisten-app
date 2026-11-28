@@ -14,11 +14,14 @@ import 'package:alisten/features/queue/index.dart';
 import 'package:alisten/features/room/index.dart';
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/action_menu.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/cover_art.dart';
 import 'package:alisten/shared/ui/cover_flight.dart';
+import 'package:alisten/shared/ui/glass_action_group.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
+import 'package:alisten/shared/ui/pressable.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -100,13 +103,25 @@ class _Stage extends ConsumerWidget {
 
   final String roomRef;
 
-  static const _barHeight = 64.0;
+  static const _barHeight = 48.0;
+  static const _coverOfHeight = 0.40;
   static const _minCover = 180.0;
   static const _maxCover = 420.0;
 
-  // 封面超过这么大时，歌词的字也跟着放大。
-  static const _plainCover = 300.0;
+  // 封面超过这么大时，歌词与歌名按比例放大。
+  static const _plainCover = 260.0;
+  static const _maxLyricScale = 1.30;
+  static const _maxMetaScale = 1.22;
+
+  // 歌词每行自带 AlistenSpacing.page 的内边距，看到的间距比这里多这么多。
+  static const _minGap = 36.0;
+  static const _maxGap = 140.0;
+  static const _maxContentWidth =
+      _maxCover + _maxGap + LyricsView.baseMaxWidth * _maxLyricScale;
   static const _minLyricsWidth = 280.0;
+  static const _minStartEdge = 48.0;
+  static const _minEndEdge = 24.0;
+  static const _minCenteredContentWidth = 912.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -131,113 +146,211 @@ class _Stage extends ConsumerWidget {
       }),
     );
     if (room == null) return const SizedBox.shrink();
-    final settled = SettledStageWidth.maybeOf(context);
+    final stageScope = SettledStageWidth.maybeOf(context);
+    final settled = stageScope?.width;
+    final panelVisible = stageScope?.panelVisible ?? true;
+    final bar = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AlistenSpacing.sm),
+      child: Row(
+        children: [
+          _Action(
+            icon: AlistenIcons.caretDown,
+            label: '收起房间',
+            onPressed: () => context.go('/'),
+          ),
+          const SizedBox(width: AlistenSpacing.xxs),
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: ActionMenuButton(
+                    semanticLabel: '房间操作',
+                    below: true,
+                    entries: [
+                      ActionMenuEntry(
+                        icon: AlistenIcons.userPlus,
+                        label: '复制邀请链接',
+                        onSelected: () =>
+                            copyInviteLink(ref, id: room.id, slug: room.slug),
+                      ),
+                      ActionMenuEntry(
+                        icon: AlistenIcons.signOut,
+                        label: '退出房间',
+                        danger: true,
+                        onSelected: DesktopRoomScope.of(context).leave,
+                      ),
+                    ],
+                    trigger: (open, toggle) => Pressable(
+                      onPressed: toggle,
+                      semanticLabel:
+                          '${room.name}，${room.online} / ${room.capacity} 人在线，'
+                          '房间操作',
+                      expanded: open,
+                      focusRadius: BorderRadius.circular(AlistenRadii.sm),
+                      touchTarget: const BoxConstraints(minHeight: 32),
+                      child: ExcludeSemantics(
+                        child: AnimatedContainer(
+                          duration: AlistenDurations.of(
+                            context,
+                            AlistenDurations.short,
+                          ),
+                          curve: AlistenCurves.standard,
+                          decoration: BoxDecoration(
+                            color: open
+                                ? colors.onGlass.withValues(alpha: 0.08)
+                                : colors.onGlass.withValues(alpha: 0),
+                            borderRadius: BorderRadius.circular(
+                              AlistenRadii.sm,
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AlistenSpacing.xs,
+                            vertical: AlistenSpacing.xxs + 1,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  room.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AlistenTypography.bodyStrong.copyWith(
+                                    color: colors.onGlass,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: AlistenSpacing.xs),
+                              Text(
+                                '${room.online} / ${room.capacity}',
+                                style: AlistenTypography.caption.copyWith(
+                                  color: colors.success,
+                                ),
+                              ),
+                              const SizedBox(width: AlistenSpacing.xxs),
+                              AnimatedRotation(
+                                turns: open ? 0.5 : 0,
+                                duration: AlistenDurations.of(
+                                  context,
+                                  const Duration(milliseconds: 260),
+                                ),
+                                curve: Curves.easeOutBack,
+                                child: Icon(
+                                  AlistenIcons.caretDown,
+                                  size: 12,
+                                  color: colors.onGlassMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AlistenSpacing.sm),
+                ConnectionPill(
+                  status: room.status,
+                  nextRetryAt: room.nextRetryAt,
+                  onRetryNow: room.mayReconnectNow
+                      ? () => unawaited(
+                          ref
+                              .read(roomControllerProvider.notifier)
+                              .checkConnection(),
+                        )
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          // 这两个入口平时在右侧面板里。
+          if (!panelVisible) ...[
+            const SizedBox(width: AlistenSpacing.sm),
+            _PickActions(
+              onSearch: () =>
+                  unawaited(context.push<void>('/r/$roomRef/search')),
+              onFromPlaylists: () =>
+                  unawaited(context.push<void>('/r/$roomRef/from-playlists')),
+            ),
+          ],
+        ],
+      ),
+    );
     return Material(
       type: MaterialType.transparency,
       child: Column(
         children: [
-          SizedBox(
-            height: _barHeight,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AlistenSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  _Action(
-                    icon: AlistenIcons.caretDown,
-                    label: '收起房间',
-                    style: IconCircleButtonStyle.plain,
-                    onPressed: () => context.go('/'),
-                  ),
-                  const SizedBox(width: AlistenSpacing.xxs),
-                  // 这一组占满剩下的宽度，按钮才靠到右边；窗口窄时房间名先省略。
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            room.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AlistenTypography.bodyStrong.copyWith(
-                              color: colors.onGlass,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AlistenSpacing.sm),
-                        Text(
-                          '${room.online} / ${room.capacity}',
-                          style: AlistenTypography.caption.copyWith(
-                            color: colors.success,
-                          ),
-                        ),
-                        const SizedBox(width: AlistenSpacing.sm),
-                        ConnectionPill(
-                          status: room.status,
-                          nextRetryAt: room.nextRetryAt,
-                          onRetryNow: room.mayReconnectNow
-                              ? () => unawaited(
-                                  ref
-                                      .read(roomControllerProvider.notifier)
-                                      .checkConnection(),
-                                )
-                              : null,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: AlistenSpacing.md),
-                  // 点歌的两个入口一组，房间的两个操作一组。
-                  _Action(
-                    icon: AlistenIcons.magnifyingGlass,
-                    label: '搜歌',
-                    onPressed: () =>
-                        unawaited(context.push<void>('/r/$roomRef/search')),
-                  ),
-                  const SizedBox(width: AlistenSpacing.sm),
-                  _Action(
-                    icon: AlistenIcons.playlist,
-                    label: '从歌单点歌',
-                    onPressed: () => unawaited(
-                      context.push<void>('/r/$roomRef/from-playlists'),
-                    ),
-                  ),
-                  const SizedBox(width: AlistenSpacing.xl),
-                  _Action(
-                    icon: AlistenIcons.userPlus,
-                    label: '复制邀请链接',
-                    onPressed: () =>
-                        copyInviteLink(ref, id: room.id, slug: room.slug),
-                  ),
-                  const SizedBox(width: AlistenSpacing.sm),
-                  _Action(
-                    icon: AlistenIcons.signOut,
-                    label: '退出房间',
-                    onPressed: DesktopRoomScope.of(context).leave,
-                  ),
-                ],
-              ),
-            ),
-          ),
+          SizedBox(height: _barHeight, child: bar),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                // 封面只随高度变，要不要显示按停稳后的宽度定：右侧面板滑动的途中
-                // 两者都不变，歌词不会来回挪。
+                // 封面只随高度变，放不下封面和歌词时不显示封面；右侧面板滑动的途中按
+                // 停稳后的宽度排版，歌词不会来回挪。
                 final width = math.min(
                   constraints.maxWidth,
                   settled ?? constraints.maxWidth,
                 );
-                final cover = (constraints.maxHeight * 0.5).clamp(
+                final cover = (constraints.maxHeight * _coverOfHeight).clamp(
                   _minCover,
                   _maxCover,
                 );
-                const edge = AlistenSpacing.xxl;
-                const gap = AlistenSpacing.xxl;
-                final showCover = width >= edge + cover + gap + _minLyricsWidth;
+                final sizeT = ((cover - _minCover) / (_maxCover - _minCover))
+                    .clamp(0.0, 1.0);
+                final scaleT =
+                    ((cover - _plainCover) / (_maxCover - _plainCover)).clamp(
+                      0.0,
+                      1.0,
+                    );
+                final fullLyricScale = 1 + scaleT * (_maxLyricScale - 1);
+                final metaScale = 1 + scaleT * (_maxMetaScale - 1);
+                final gap = _minGap + (_maxGap - _minGap) * sizeT * sizeT;
+                final minLyricsWidth = _minLyricsWidth * fullLyricScale;
+                final showCover =
+                    width >=
+                    _minStartEdge + cover + gap + minLyricsWidth + _minEndEdge;
+                final lyricScale = showCover
+                    ? fullLyricScale
+                    : math.min(
+                        fullLyricScale,
+                        (width / LyricsView.baseMaxWidth).clamp(
+                          1.0,
+                          _maxLyricScale,
+                        ),
+                      );
+                final maxLyricWidth = LyricsView.baseMaxWidth * lyricScale;
+                final contentWidth = math.max(
+                  _minCenteredContentWidth,
+                  cover + gap + maxLyricWidth,
+                );
+                final startEdge = showCover
+                    ? math.max(
+                        _minStartEdge,
+                        (constraints.maxWidth - contentWidth) / 2,
+                      )
+                    : 0.0;
+                final endEdge = showCover
+                    ? math.max(
+                        _minEndEdge,
+                        (constraints.maxWidth - contentWidth) / 2,
+                      )
+                    : 0.0;
+                final settledStartEdge = showCover
+                    ? math.max(_minStartEdge, (width - contentWidth) / 2)
+                    : 0.0;
+                final settledEndEdge = showCover
+                    ? math.max(_minEndEdge, (width - contentWidth) / 2)
+                    : 0.0;
+                final lyricColumnWidth = showCover
+                    ? math.max(
+                        0.0,
+                        width - settledStartEdge - settledEndEdge - cover - gap,
+                      )
+                    : width;
                 return Padding(
-                  padding: const EdgeInsetsDirectional.only(start: edge),
+                  padding: EdgeInsetsDirectional.only(
+                    start: startEdge,
+                    end: endEdge,
+                  ),
                   child: Row(
                     children: [
                       if (showCover) ...[
@@ -246,6 +359,7 @@ class _Stage extends ConsumerWidget {
                           child: _NowPlaying(
                             nowPlaying: room.nowPlaying,
                             coverSize: cover,
+                            metaScale: metaScale,
                             save: switch (room.nowPlaying?.entry) {
                               final entry? => SaveToPlaylistButton(
                                 track: entry.track,
@@ -260,19 +374,22 @@ class _Stage extends ConsumerWidget {
                             },
                           ),
                         ),
-                        const SizedBox(width: gap),
+                        SizedBox(width: gap),
                       ],
                       Expanded(
                         child: MediaQuery(
                           data: MediaQuery.of(context).copyWith(
                             textScaler: TextScaler.linear(
                               MediaQuery.textScalerOf(context)
-                                  .scale(math.max(1, cover / _plainCover)),
+                                  .scale(lyricScale),
                             ),
                           ),
                           child: LyricsView(
-                            columnWidth:
-                                width - edge - (showCover ? cover + gap : 0),
+                            columnWidth: lyricColumnWidth,
+                            maxWidth: maxLyricWidth,
+                            alignment: showCover
+                                ? AlignmentDirectional.topStart
+                                : Alignment.topCenter,
                           ),
                         ),
                       ),
@@ -282,7 +399,7 @@ class _Stage extends ConsumerWidget {
               },
             ),
           ),
-          const DesktopRoomTransport(),
+          const DesktopRoomTransport(maxWidth: _maxContentWidth),
         ],
       ),
     );
@@ -293,11 +410,13 @@ class _NowPlaying extends StatelessWidget {
   const _NowPlaying({
     required this.nowPlaying,
     required this.coverSize,
+    required this.metaScale,
     required this.save,
   });
 
   final NowPlaying? nowPlaying;
   final double coverSize;
+  final double metaScale;
   final Widget? save;
 
   @override
@@ -312,6 +431,14 @@ class _NowPlaying extends StatelessWidget {
             final member? => '${member.name} 点歌',
             null => null,
           };
+    final titleStyle = AlistenTypography.title.copyWith(
+      color: colors.onGlass,
+      fontSize: AlistenTypography.title.fontSize! * metaScale,
+    );
+    final subtitleStyle = AlistenTypography.secondary.copyWith(
+      color: colors.onGlassMuted,
+      fontSize: AlistenTypography.secondary.fontSize! * metaScale,
+    );
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,9 +451,9 @@ class _NowPlaying extends StatelessWidget {
           // 和迷你播放条的封面是同一个：进出房间时它在两处之间飞过去。
           heroTag: entry == null ? null : 'cover-${entry.id}',
         ),
-        const SizedBox(height: AlistenSpacing.lg),
+        SizedBox(height: AlistenSpacing.md + (metaScale - 1) * 28),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: AnimatedSwitcher(
@@ -343,9 +470,7 @@ class _NowPlaying extends StatelessWidget {
                       entry?.meta.title ?? '房间暂时没有播放',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: AlistenTypography.title.copyWith(
-                        color: colors.onGlass,
-                      ),
+                      style: titleStyle,
                     ),
                     if (entry != null) ...[
                       const SizedBox(height: AlistenSpacing.xxs),
@@ -356,9 +481,7 @@ class _NowPlaying extends StatelessWidget {
                         ].where((part) => part.isNotEmpty).join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: AlistenTypography.secondary.copyWith(
-                          color: colors.onGlassMuted,
-                        ),
+                        style: subtitleStyle,
                       ),
                     ],
                   ],
@@ -382,42 +505,72 @@ class _Action extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
-    this.style = IconCircleButtonStyle.glass,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
-  final IconCircleButtonStyle style;
 
   @override
   Widget build(BuildContext context) {
     return IconCircleButton(
       icon: icon,
       semanticLabel: label,
-      style: style,
+      style: IconCircleButtonStyle.plain,
+      diameter: AlistenSizes.rowAction,
+      iconSize: AlistenSizes.iconSm,
       onPressed: onPressed,
     );
   }
 }
 
-/// 中间区域停稳时的宽度。右侧面板展开或收起的途中它不变，歌词照它排一次版，
-/// 不必跟着逐帧重排。
+// 已经在其中一页上时，那一页的入口不给。
+class _PickActions extends StatelessWidget {
+  const _PickActions({required this.onSearch, required this.onFromPlaylists});
+
+  final VoidCallback? onSearch;
+  final VoidCallback? onFromPlaylists;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassActionGroup(
+      actions: [
+        if (onSearch case final search?)
+          GlassAction(
+            icon: AlistenIcons.magnifyingGlass,
+            semanticLabel: '搜歌',
+            onPressed: search,
+          ),
+        if (onFromPlaylists case final playlists?)
+          GlassAction(
+            icon: AlistenIcons.playlist,
+            semanticLabel: '从歌单点歌',
+            onPressed: playlists,
+          ),
+      ],
+    );
+  }
+}
+
+/// 中间区域停稳时的宽度与右侧面板可见性。右侧面板展开或收起的途中宽度不变，
+/// 歌词照它排一次版，不必跟着逐帧重排。
 class SettledStageWidth extends InheritedWidget {
   const SettledStageWidth({
     required this.width,
     required super.child,
+    this.panelVisible = true,
     super.key,
   });
 
   final double width;
+  final bool panelVisible;
 
-  static double? maybeOf(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<SettledStageWidth>()?.width;
+  static SettledStageWidth? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SettledStageWidth>();
 
   @override
   bool updateShouldNotify(SettledStageWidth oldWidget) =>
-      width != oldWidget.width;
+      width != oldWidget.width || panelVisible != oldWidget.panelVisible;
 }
 
 /// 所在房间的队列和聊天，同时显示且可拖动分隔条调整各自高度。离开房间页面时
@@ -426,11 +579,15 @@ class DesktopRoomPanel extends StatelessWidget {
   const DesktopRoomPanel({
     required this.queueFraction,
     required this.onQueueFractionChanged,
+    this.onPickSongs,
+    this.onPickFromPlaylists,
     super.key,
   });
 
   final double queueFraction;
   final ValueChanged<double> onQueueFractionChanged;
+  final VoidCallback? onPickSongs;
+  final VoidCallback? onPickFromPlaylists;
 
   static const defaultQueueFraction = 5 / 9;
   static const splitterHeight = 14.0;
@@ -442,6 +599,8 @@ class DesktopRoomPanel extends StatelessWidget {
     child: _Panel(
       queueFraction: queueFraction,
       onQueueFractionChanged: onQueueFractionChanged,
+      onPickSongs: onPickSongs,
+      onPickFromPlaylists: onPickFromPlaylists,
     ),
   );
 }
@@ -450,10 +609,14 @@ class _Panel extends ConsumerStatefulWidget {
   const _Panel({
     required this.queueFraction,
     required this.onQueueFractionChanged,
+    this.onPickSongs,
+    this.onPickFromPlaylists,
   });
 
   final double queueFraction;
   final ValueChanged<double> onQueueFractionChanged;
+  final VoidCallback? onPickSongs;
+  final VoidCallback? onPickFromPlaylists;
 
   @override
   ConsumerState<_Panel> createState() => _PanelState();
@@ -502,6 +665,10 @@ class _PanelState extends ConsumerState<_Panel> {
                     child: FlightMark(
                       tag: queueFlightArea,
                       child: QueueView(
+                        pickActions: _PickActions(
+                          onSearch: widget.onPickSongs,
+                          onFromPlaylists: widget.onPickFromPlaylists,
+                        ),
                         onResult: (result, success) => reportMutation(
                           toasts,
                           result,
