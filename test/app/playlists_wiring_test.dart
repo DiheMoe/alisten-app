@@ -432,4 +432,34 @@ void main() {
       expect(find.text('为你推荐'), findsNothing);
     });
   });
+
+  testWidgets(
+    'under the merged title bar on Windows the bar for editing a playlist '
+    'stays clear of the window buttons',
+    (tester) async {
+      tester.view
+        ..devicePixelRatio = 1
+        ..physicalSize = const Size(1100, 700);
+      addTearDown(tester.view.reset);
+      final server = FakePlaylistApi()
+        ..playlists.addAll([favoritesPlaylist, playlist('pl-1', name: '夜跑')])
+        ..contents['pl-1'] = [song('a'), song('b')];
+      await pumpAlistenApp(
+        tester,
+        api: FakeAlistenApi()..account = testAccount,
+        credentials: FakeCredentialStore()..memberToken = accountToken,
+        playlists: server,
+      );
+      appContainer(tester).read(routerProvider).go('/playlists/pl-1');
+      await settle(tester);
+      await tester.tap(find.bySemanticsLabel('编辑'));
+      await settle(tester);
+
+      final buttons = tester.getRect(
+        find.byKey(const ValueKey('window-minimize')),
+      );
+      expect(tester.getRect(find.text('全选')).right, lessThan(buttons.left));
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
 }

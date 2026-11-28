@@ -5,6 +5,7 @@
 #include "app_links/app_links_plugin_c_api.h"
 #include "flutter_window.h"
 #include "utils.h"
+#include "window_state.h"
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
@@ -32,8 +33,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
   FlutterWindow window(project);
+  const WindowState window_state = LoadWindowState();
   Win32Window::Point origin(10, 10);
-  Win32Window::Size size(1280, 840);
+  Win32Window::Size size(static_cast<unsigned int>(window_state.width),
+                         static_cast<unsigned int>(window_state.height));
+  window.SetStartMaximized(window_state.maximized);
   if (!window.Create(L"Alisten", origin, size)) {
     return EXIT_FAILURE;
   }

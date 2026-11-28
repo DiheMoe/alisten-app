@@ -41,6 +41,7 @@ import 'package:alisten/shared/ui/select_menu.dart';
 import 'package:alisten/shared/ui/shared_text.dart';
 import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:alisten/shared/ui/toast.dart';
+import 'package:alisten/shared/ui/window_chrome.dart';
 import 'package:flutter/material.dart' hide SearchController;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -392,6 +393,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     const SizedBox(width: AlistenSpacing.xxs),
                     Expanded(child: field),
                     picked,
+                    const WindowButtonsGap(),
                   ],
                 ),
               )

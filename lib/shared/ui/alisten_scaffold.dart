@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
+import 'package:alisten/shared/ui/window_chrome.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -55,6 +57,7 @@ class AlistenScaffold extends StatelessWidget {
     final keyboard = media.viewInsets.bottom - page.viewInsets.bottom;
     final topBar = this.topBar;
     final bottomBar = this.bottomBar;
+    final chrome = WindowChrome.of(context);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: (dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
           .copyWith(
@@ -71,57 +74,62 @@ class AlistenScaffold extends StatelessWidget {
                 (OverBackdrop.of(context)
                     ? const SizedBox.shrink()
                     : ColoredBox(color: theme.colorScheme.surface)),
+            if (isWindowsDesktop) const WindowDragStrip(),
             LayoutBuilder(
               builder: (context, constraints) {
                 final width = math.min(constraints.maxWidth, contentMaxWidth);
-                final content = _clearOfMargins(
-                  page,
-                  (constraints.maxWidth - width) / 2,
-                );
+                final margin = (constraints.maxWidth - width) / 2;
+                final content = _clearOfMargins(page, margin);
                 return Center(
                   child: SizedBox(
                     width: width,
-                    child: MediaQuery(
-                      data: content,
-                      child: CustomMultiChildLayout(
-                        delegate: _PageLayout(keyboard: keyboard),
-                        children: [
-                          if (topBar != null)
-                            LayoutId(id: _Part.topBar, child: topBar),
-                          LayoutId(
-                            id: _Part.body,
-                            child: MediaQuery(
-                              data: content.removePadding(
-                                removeTop: topBar != null,
-                                removeBottom: bottomBar != null,
-                              ),
-                              child: DefaultTextStyle.merge(
-                                style: TextStyle(
-                                  color: AlistenColors.of(context).onGlass,
+                    child: WindowChromeInset(
+                      rightInset: math.max(0.0, chrome.rightInset - margin),
+                      child: MediaQuery(
+                        data: content,
+                        child: CustomMultiChildLayout(
+                          delegate: _PageLayout(keyboard: keyboard),
+                          children: [
+                            if (topBar != null)
+                              LayoutId(id: _Part.topBar, child: topBar),
+                            LayoutId(
+                              id: _Part.body,
+                              child: MediaQuery(
+                                data: content.removePadding(
+                                  removeTop: topBar != null,
+                                  removeBottom: bottomBar != null,
                                 ),
-                                child: body,
+                                child: DefaultTextStyle.merge(
+                                  style: TextStyle(
+                                    color: AlistenColors.of(context).onGlass,
+                                  ),
+                                  child: body,
+                                ),
                               ),
                             ),
-                          ),
-                          if (bottomBar != null)
-                            LayoutId(
-                              id: _Part.bottomBar,
-                              child: _UnderKeyboard(
-                                keyboard: keyboard,
-                                // 键盘升起时 `padding` 和去掉键盘后的
-                                // `viewPadding` 都会扣掉被盖住的部分，
-                                // 底栏会变矮下移，所以底部安全区取原始值。
-                                child: MediaQuery(
-                                  data: content.copyWith(
-                                    padding: content.padding.copyWith(
-                                      bottom: media.viewPadding.bottom,
+                            if (bottomBar != null)
+                              LayoutId(
+                                id: _Part.bottomBar,
+                                child: _UnderKeyboard(
+                                  keyboard: keyboard,
+                                  // 键盘升起时 `padding` 和去掉键盘后的
+                                  // `viewPadding` 都会扣掉被盖住的部分，
+                                  // 底栏会变矮下移，所以底部安全区取原始值。
+                                  child: MediaQuery(
+                                    data: content.copyWith(
+                                      padding: content.padding.copyWith(
+                                        bottom: media.viewPadding.bottom,
+                                      ),
+                                    ),
+                                    child: SafeArea(
+                                      top: false,
+                                      child: bottomBar,
                                     ),
                                   ),
-                                  child: SafeArea(top: false, child: bottomBar),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),

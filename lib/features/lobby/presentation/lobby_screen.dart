@@ -24,6 +24,7 @@ import 'package:alisten/shared/ui/pull_refresh.dart';
 import 'package:alisten/shared/ui/section_header.dart';
 import 'package:alisten/shared/ui/tap_origin.dart';
 import 'package:alisten/shared/ui/toast.dart';
+import 'package:alisten/shared/ui/window_chrome.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -205,7 +206,17 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                       title: brand,
                       topInset: MediaQuery.paddingOf(context).top,
                       scaler: MediaQuery.textScalerOf(context),
-                      barExtent: PillButton.heightOf(context),
+                      // 桌面窗口的栏里没有按钮，只要装得下小标题和标题栏。
+                      barExtent: isDesktopPlatform
+                          ? math.max(
+                              AlistenTypography.lineHeight(
+                                AlistenTypography.bodyStrong,
+                                MediaQuery.textScalerOf(context),
+                              ),
+                              WindowChrome.of(context).titleBarHeight -
+                                  2 * AlistenSpacing.xxs,
+                            )
+                          : PillButton.heightOf(context),
                       // 桌面窗口的侧栏里已有这三个入口。
                       actions: isDesktopPlatform
                           ? const []
@@ -512,8 +523,8 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
 const _desktopContentWidth = 1120.0;
 const _roomCardMinWidth = 300.0;
 
-// 吸顶头部的高度须预先算出并随系统字号变化：操作栏按胶囊按钮的高度算（栏内
-// 小标题与它同字号），大标题区按字号算。
+// 吸顶头部的高度须预先算出并随系统字号变化：操作栏的高度由上层按栏里的内容
+// 给出，大标题区按字号算。
 final class _LobbyHeader extends SliverPersistentHeaderDelegate {
   _LobbyHeader({
     required this.title,
@@ -563,6 +574,37 @@ final class _LobbyHeader extends SliverPersistentHeaderDelegate {
       AlistenTypography.bodyStrong,
       FontWeight.w700,
     ).copyWith(color: colors.onGlass);
+    final barRow = Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AlistenSpacing.xs,
+        vertical: AlistenSpacing.xxs,
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: AlistenSpacing.sm),
+          Expanded(
+            child: small == 0
+                ? const SizedBox.shrink()
+                : ExcludeSemantics(
+                    child: Opacity(
+                      opacity: small,
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: barTitle,
+                      ),
+                    ),
+                  ),
+          ),
+          for (final (index, action) in actions.indexed) ...[
+            if (index > 0) const SizedBox(width: AlistenSpacing.xxs),
+            action,
+          ],
+          const WindowButtonsGap(),
+        ],
+      ),
+    );
     return ToastClearance(
       child: SizedBox.expand(
         child: DecoratedBox(
@@ -581,37 +623,7 @@ final class _LobbyHeader extends SliverPersistentHeaderDelegate {
               SizedBox(height: topInset),
               SizedBox(
                 height: barExtent,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AlistenSpacing.xs,
-                    vertical: AlistenSpacing.xxs,
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: AlistenSpacing.sm),
-                      Expanded(
-                        child: small == 0
-                            ? const SizedBox.shrink()
-                            : ExcludeSemantics(
-                                child: Opacity(
-                                  opacity: small,
-                                  child: Text(
-                                    title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: barTitle,
-                                  ),
-                                ),
-                              ),
-                      ),
-                      for (final (index, action) in actions.indexed) ...[
-                        if (index > 0)
-                          const SizedBox(width: AlistenSpacing.xxs),
-                        action,
-                      ],
-                    ],
-                  ),
-                ),
+                child: WindowDragBar(child: barRow),
               ),
               Expanded(
                 child: ClipRect(

@@ -12,8 +12,10 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/flowing_cover_backdrop.dart';
 import 'package:alisten/shared/ui/pressable.dart';
+import 'package:alisten/shared/ui/window_chrome.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -181,6 +183,7 @@ class _DesktopRoomShellState extends ConsumerState<DesktopRoomShell>
     final onFromPlaylists =
         segments.length > 2 && segments[2] == 'from-playlists';
     final media = MediaQuery.of(context);
+    final chrome = WindowChrome.of(context);
     return DesktopRoomScope(
       leave: () => unawaited(_leave()),
       window: ModalRoute.of(context),
@@ -194,6 +197,7 @@ class _DesktopRoomShellState extends ConsumerState<DesktopRoomShell>
               fit: StackFit.expand,
               children: [
                 FlowingCoverBackdrop(url: inRoom ? cover : null),
+                if (isWindowsDesktop) const WindowDragStrip(),
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final panelWidth = (constraints.maxWidth * 0.27).clamp(
@@ -250,27 +254,33 @@ class _DesktopRoomShellState extends ConsumerState<DesktopRoomShell>
                               children: [
                                 Expanded(
                                   // 页面按自己这一块的大小排版，而不是整个窗口。
-                                  child: MediaQuery(
-                                    data: media.copyWith(
-                                      size: Size(
-                                        stageWidth,
-                                        constraints.maxHeight,
-                                      ),
+                                  child: WindowChromeInset(
+                                    rightInset: math.max(
+                                      0.0,
+                                      chrome.rightInset - shownWidth,
                                     ),
-                                    child: ClipRect(
-                                      child: SettledStageWidth(
-                                        width: settledStageWidth,
-                                        panelVisible:
-                                            canShowPanel && panelExpanded,
-                                        // 房间的主页面自带播放控制，点歌等页面
-                                        // 下方悬着迷你播放条。
-                                        child: MiniPlayerHost(
-                                          location: location,
-                                          show: !onStage,
-                                          insideRoom: true,
-                                          child: OverBackdrop(
-                                            active: true,
-                                            child: child,
+                                    child: MediaQuery(
+                                      data: media.copyWith(
+                                        size: Size(
+                                          stageWidth,
+                                          constraints.maxHeight,
+                                        ),
+                                      ),
+                                      child: ClipRect(
+                                        child: SettledStageWidth(
+                                          width: settledStageWidth,
+                                          panelVisible:
+                                              canShowPanel && panelExpanded,
+                                          // 房间的主页面自带播放控制，点歌等页面
+                                          // 下方悬着迷你播放条。
+                                          child: MiniPlayerHost(
+                                            location: location,
+                                            show: !onStage,
+                                            insideRoom: true,
+                                            child: OverBackdrop(
+                                              active: true,
+                                              child: child,
+                                            ),
                                           ),
                                         ),
                                       ),

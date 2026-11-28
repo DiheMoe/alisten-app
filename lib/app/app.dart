@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:alisten/app/app_theme.dart';
 import 'package:alisten/app/deep_link_controller.dart';
+import 'package:alisten/app/desktop/desktop_window_control.dart';
+import 'package:alisten/app/desktop/desktop_window_frame.dart';
 import 'package:alisten/app/feedback.dart';
 import 'package:alisten/app/invite_confirm_sheet.dart';
 import 'package:alisten/app/router.dart';
@@ -304,8 +306,14 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
                 supportedLocales: const [_locale],
                 localizationsDelegates: GlobalMaterialLocalizations.delegates,
                 routerConfig: router,
-                builder: (context, child) =>
-                    ToastHost(controller: toasts, child: child!),
+                builder: (context, child) {
+                  final page = ToastHost(controller: toasts, child: child!);
+                  if (!isWindowsDesktop) return page;
+                  return DesktopWindowFrame(
+                    control: ref.watch(desktopWindowControlProvider),
+                    child: page,
+                  );
+                },
               ),
             ),
           ),

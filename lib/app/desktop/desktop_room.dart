@@ -22,6 +22,7 @@ import 'package:alisten/shared/ui/glass_action_group.dart';
 import 'package:alisten/shared/ui/glass_panel.dart';
 import 'package:alisten/shared/ui/icon_circle_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
+import 'package:alisten/shared/ui/window_chrome.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -273,6 +274,7 @@ class _Stage extends ConsumerWidget {
                   unawaited(context.push<void>('/r/$roomRef/from-playlists')),
             ),
           ],
+          const WindowButtonsGap(),
         ],
       ),
     );
@@ -280,7 +282,10 @@ class _Stage extends ConsumerWidget {
       type: MaterialType.transparency,
       child: Column(
         children: [
-          SizedBox(height: _barHeight, child: bar),
+          SizedBox(
+            height: _barHeight,
+            child: WindowDragBar(child: bar),
+          ),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -631,10 +636,14 @@ class _PanelState extends ConsumerState<_Panel> {
     final toasts = ref.read(toastControllerProvider);
     final router = GoRouter.of(context);
     void openAccount() => router.go('/settings/account');
+    final chrome = WindowChrome.of(context);
+    final top = chrome.active
+        ? chrome.titleBarHeight + AlistenSpacing.xxs
+        : AlistenSpacing.sm;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         0,
-        AlistenSpacing.sm,
+        top,
         AlistenSpacing.sm,
         AlistenSpacing.sm,
       ),

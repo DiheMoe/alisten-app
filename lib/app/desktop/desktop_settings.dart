@@ -1,5 +1,6 @@
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
+import 'package:alisten/shared/ui/window_chrome.dart';
 import 'package:flutter/widgets.dart';
 
 /// 桌面窗口里的设置：左边一直是分类，右边是打开的那一类。
@@ -27,11 +28,14 @@ class DesktopSettings extends StatelessWidget {
       children: [
         SizedBox(
           width: _categoriesWidth,
-          child: MediaQuery(
-            data: media.copyWith(
-              size: Size(_categoriesWidth, media.size.height),
+          child: WindowChromeInset(
+            rightInset: 0,
+            child: MediaQuery(
+              data: media.copyWith(
+                size: Size(_categoriesWidth, media.size.height),
+              ),
+              child: SidebarPage(active: true, child: categories),
             ),
-            child: SidebarPage(active: true, child: categories),
           ),
         ),
         const SizedBox(width: AlistenSpacing.xs),

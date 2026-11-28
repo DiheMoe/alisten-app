@@ -1,7 +1,10 @@
 #include "win32_window.h"
 
+#include <commctrl.h>
 #include <dwmapi.h>
 #include <flutter_windows.h>
+#include <shellapi.h>
+#include <windowsx.h>
 
 #include "resource.h"
 
@@ -30,11 +33,101 @@ constexpr const wchar_t kGetPreferredBrightnessRegValue[] = L"AppsUseLightTheme"
 static int g_active_window_count = 0;
 
 using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
+using GetSystemMetricsForDpiFn = int __stdcall(int index, UINT dpi);
+
+constexpr UINT_PTR kChildHitTestSubclassId = 1;
+constexpr int kTopResizeBorderDip = 5;
+constexpr int kCornerResizeWidthDip = 8;
 
 // Scale helper to convert logical scaler values to physical using passed in
 // scale factor
 int Scale(int source, double scale_factor) {
   return static_cast<int>(source * scale_factor);
+}
+
+UINT GetWindowDpi(HWND hwnd) {
+  HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+  UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
+  return dpi == 0 ? 96 : dpi;
+}
+
+int GetSystemMetricsForDpiSafe(int index, UINT dpi) {
+  static auto* fn = reinterpret_cast<GetSystemMetricsForDpiFn*>(
+      GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetSystemMetricsForDpi"));
+  if (fn != nullptr) {
+    return fn(index, dpi);
+  }
+  return GetSystemMetrics(index);
+}
+
+// Only the top resize edge is claimed at Win32 hit-test time so unified top-bar
+// buttons remain clickable; empty top-bar dragging is initiated from Flutter.
+LRESULT HitTestCustomChrome(HWND hwnd, POINT screen_pt) {
+  if (::IsZoomed(hwnd) != 0) {
+    return HTCLIENT;
+  }
+  POINT pt = screen_pt;
+  ::ScreenToClient(hwnd, &pt);
+  RECT client{};
+  ::GetClientRect(hwnd, &client);
+
+  const double scale = GetWindowDpi(hwnd) / 96.0;
+  const int top_resize = Scale(kTopResizeBorderDip, scale);
+  const int corner_width = Scale(kCornerResizeWidthDip, scale);
+
+  if (pt.y >= 0 && pt.y < top_resize) {
+    if (pt.x < corner_width) return HTTOPLEFT;
+    if (pt.x >= client.right - corner_width) return HTTOPRIGHT;
+    return HTTOP;
+  }
+  return HTCLIENT;
+}
+
+// Windows treats a window whose client area covers a whole monitor as full
+// screen and stops an auto-hide taskbar from sliding in over it. A maximized
+// window without a system title bar is exactly that, so one pixel is given up
+// on the edge the taskbar hides at.
+void LeaveRoomForAutoHideTaskbar(HWND hwnd, RECT* client) {
+  MONITORINFO monitor_info{};
+  monitor_info.cbSize = sizeof(monitor_info);
+  if (!GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST),
+                      &monitor_info)) {
+    return;
+  }
+  const auto hides_at = [&monitor_info](UINT edge) {
+    APPBARDATA data{};
+    data.cbSize = sizeof(data);
+    data.uEdge = edge;
+    data.rc = monitor_info.rcMonitor;
+    return ::SHAppBarMessage(ABM_GETAUTOHIDEBAREX, &data) != 0;
+  };
+  if (hides_at(ABE_BOTTOM)) {
+    client->bottom -= 1;
+  } else if (hides_at(ABE_TOP)) {
+    client->top += 1;
+  } else if (hides_at(ABE_LEFT)) {
+    client->left += 1;
+  } else if (hides_at(ABE_RIGHT)) {
+    client->right -= 1;
+  }
+}
+
+LRESULT CALLBACK ChildHitTestSubclassProc(HWND hwnd, UINT message,
+                                          WPARAM wparam, LPARAM lparam,
+                                          UINT_PTR subclass_id,
+                                          DWORD_PTR /*ref_data*/) {
+  if (message == WM_NCHITTEST) {
+    HWND parent = ::GetParent(hwnd);
+    if (parent != nullptr) {
+      POINT pt = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+      if (HitTestCustomChrome(parent, pt) != HTCLIENT) {
+        return HTTRANSPARENT;
+      }
+    }
+  } else if (message == WM_NCDESTROY) {
+    ::RemoveWindowSubclass(hwnd, ChildHitTestSubclassProc, subclass_id);
+  }
+  return ::DefSubclassProc(hwnd, message, wparam, lparam);
 }
 
 // Dynamically loads the |EnableNonClientDpiScaling| from the User32 module.
@@ -161,11 +254,24 @@ bool Win32Window::Create(const std::wstring& title,
 
   UpdateTheme(window);
 
+  // Extending 1px preserves the native DWM shadow and Win11 rounded corners
+  // after WM_NCCALCSIZE removes the system title bar.
+  constexpr MARGINS kShadowMargins = {0, 0, 1, 0};
+  DwmExtendFrameIntoClientArea(window, &kShadowMargins);
+  SetWindowPos(window, nullptr, 0, 0, 0, 0,
+               SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                   SWP_NOOWNERZORDER);
+
   return OnCreate();
 }
 
 bool Win32Window::Show() {
-  return ShowWindow(window_handle_, SW_SHOWNORMAL);
+  return ShowWindow(window_handle_,
+                    start_maximized_ ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL);
+}
+
+void Win32Window::SetStartMaximized(bool maximized) {
+  start_maximized_ = maximized;
 }
 
 // static
@@ -194,6 +300,36 @@ Win32Window::MessageHandler(HWND hwnd,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_NCCALCSIZE:
+      if (wparam == TRUE) {
+        auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+        const UINT dpi = GetWindowDpi(hwnd);
+        const int frame_x =
+            GetSystemMetricsForDpiSafe(SM_CXFRAME, dpi) +
+            GetSystemMetricsForDpiSafe(SM_CXPADDEDBORDER, dpi);
+        const int frame_y =
+            GetSystemMetricsForDpiSafe(SM_CYFRAME, dpi) +
+            GetSystemMetricsForDpiSafe(SM_CXPADDEDBORDER, dpi);
+        params->rgrc[0].left += frame_x;
+        params->rgrc[0].right -= frame_x;
+        params->rgrc[0].bottom -= frame_y;
+        if (::IsZoomed(hwnd) != 0) {
+          params->rgrc[0].top += frame_y;
+          LeaveRoomForAutoHideTaskbar(hwnd, &params->rgrc[0]);
+        }
+        return 0;
+      }
+      break;
+
+    case WM_NCHITTEST: {
+      const LRESULT hit = DefWindowProc(hwnd, message, wparam, lparam);
+      if (hit != HTCLIENT) {
+        return hit;
+      }
+      POINT pt = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+      return HitTestCustomChrome(hwnd, pt);
+    }
+
     case WM_DESTROY:
       window_handle_ = nullptr;
       Destroy();
@@ -277,8 +413,14 @@ Win32Window* Win32Window::GetThisFromHandle(HWND const window) noexcept {
 }
 
 void Win32Window::SetChildContent(HWND content) {
+  if (child_content_ != nullptr) {
+    ::RemoveWindowSubclass(child_content_, ChildHitTestSubclassProc,
+                           kChildHitTestSubclassId);
+  }
   child_content_ = content;
   SetParent(content, window_handle_);
+  ::SetWindowSubclass(content, ChildHitTestSubclassProc,
+                      kChildHitTestSubclassId, 0);
   RECT frame = GetClientArea();
 
   MoveWindow(content, frame.left, frame.top, frame.right - frame.left,

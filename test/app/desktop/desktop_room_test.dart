@@ -653,6 +653,31 @@ void main() {
   );
 
   testWidgets(
+    'under the merged title bar on Windows, with the panel collapsed, the '
+    'search field stays clear of the window buttons',
+    (tester) async {
+      final (:settle, :router, rooms: _) = await enterRoom(
+        tester,
+        size: const Size(1100, 700),
+      );
+      await tester.tap(find.byKey(const ValueKey('desktop-panel-toggle')));
+      await settle();
+      unawaited(router.push<void>('/r/listen/search'));
+      await settle();
+      await settle();
+
+      final buttons = tester.getRect(
+        find.byKey(const ValueKey('window-minimize')),
+      );
+      expect(
+        tester.getRect(find.byType(AlistenTextField)).right,
+        lessThan(buttons.left),
+      );
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  testWidgets(
     'switching between the pages for adding songs from the panel leaves the '
     'room one step back',
     (tester) async {

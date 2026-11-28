@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/alisten_theme.dart';
 import 'package:alisten/shared/ui/alisten_scaffold.dart';
+import 'package:alisten/shared/ui/window_chrome.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -181,4 +182,38 @@ void main() {
     await tester.pumpWidget(_page(keyboard: 100, bar: false, resize: false));
     expect(tester.getRect(find.byKey(_body)).bottom, 600);
   });
+
+  testWidgets('under a merged title bar the page keeps its state as the window '
+      'narrows to the width of the content', (tester) async {
+    tester.view
+      ..devicePixelRatio = 1
+      ..physicalSize = const Size(1280, 720);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAlistenTheme(AlistenColors.brandScheme(Brightness.dark)),
+        home: WindowChrome(
+          data: const WindowChromeData(titleBarHeight: 36, rightInset: 138),
+          child: AlistenScaffold(
+            contentMaxWidth: 1120,
+            body: ListView(
+              children: [
+                for (var i = 0; i < 80; i++)
+                  SizedBox(height: 40, child: Text('row $i')),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    final list = tester.state<ScrollableState>(find.byType(Scrollable));
+    list.position.jumpTo(60);
+    await tester.pump();
+
+    tester.view.physicalSize = const Size(1100, 720);
+    await tester.pump();
+
+    expect(tester.state<ScrollableState>(find.byType(Scrollable)), same(list));
+    expect(list.position.pixels, 60);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
 }

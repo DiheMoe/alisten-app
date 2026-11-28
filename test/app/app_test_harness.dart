@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:alisten/app/app.dart';
 import 'package:alisten/app/assembly.dart';
 import 'package:alisten/app/deep_link_controller.dart';
+import 'package:alisten/app/desktop/desktop_window_control.dart';
 import 'package:alisten/app/router.dart';
 import 'package:alisten/core/api/alisten_api.dart';
 import 'package:alisten/core/api/app_config.dart';
@@ -52,6 +53,42 @@ import '../features/update/update_test_doubles.dart';
 const emptyLobbyText = '还没有可加入的房间';
 
 /// 与 `main` 共用同一份接线，只把外部 I/O 适配器换成假实现。
+final class FakeWindowControl implements DesktopWindowControl {
+  bool maximized = false;
+  int startDraggingCalls = 0;
+  int showSystemMenuCalls = 0;
+  int minimizeCalls = 0;
+  int toggleMaximizeCalls = 0;
+  int closeCalls = 0;
+  ValueChanged<bool>? _listener;
+
+  void emitMaximized(bool value) {
+    maximized = value;
+    _listener?.call(value);
+  }
+
+  @override
+  Future<bool> isMaximized() async => maximized;
+
+  @override
+  Future<void> startDragging() async => startDraggingCalls++;
+
+  @override
+  Future<void> showSystemMenu() async => showSystemMenuCalls++;
+
+  @override
+  Future<void> minimize() async => minimizeCalls++;
+
+  @override
+  Future<void> toggleMaximize() async => toggleMaximizeCalls++;
+
+  @override
+  Future<void> close() async => closeCalls++;
+
+  @override
+  void listenMaximized(ValueChanged<bool>? onChanged) => _listener = onChanged;
+}
+
 Future<List<Override>> alistenAppOverrides({
   FakeAlistenApi? api,
   FakeCredentialStore? credentials,
@@ -115,6 +152,7 @@ Future<List<Override>> alistenAppOverrides({
     systemSettingsProvider.overrideWithValue(
       systemSettings ?? FakeSystemSettings(),
     ),
+    desktopWindowControlProvider.overrideWithValue(FakeWindowControl()),
     linkResolverProvider.overrideWithValue(
       DioLinkResolver(Dio()..httpClientAdapter = FakeUrlHttpAdapter()),
     ),

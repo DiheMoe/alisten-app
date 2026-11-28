@@ -201,6 +201,40 @@ void main() {
     variant: largeText,
   );
 
+  testWidgets(
+    'in a desktop window with large text the collapsed header is tall enough '
+    'for its title',
+    (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await _Lobby.open(
+        tester,
+        api: FakeAlistenApi()
+          ..rooms = [
+            for (var index = 0; index < 30; index++)
+              roomListing(id: 'room-$index', name: '房间 $index'),
+          ],
+      );
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -400));
+      await tester.pump();
+
+      final style = AlistenTypography.bodyStrong;
+      final title = find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            widget.data == 'Alisten' &&
+            widget.style?.fontSize == style.fontSize,
+      );
+      expect(
+        tester.getSize(title).height,
+        greaterThanOrEqualTo(
+          AlistenTypography.lineHeight(style, const TextScaler.linear(1.5)),
+        ),
+      );
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.linux),
+  );
+
   testWidgets('the filter shows what was typed when the lobby opens again', (
     tester,
   ) async {

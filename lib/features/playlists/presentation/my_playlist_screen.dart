@@ -33,6 +33,7 @@ import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/pressable.dart';
 import 'package:alisten/shared/ui/toast.dart';
 import 'package:alisten/shared/ui/track_row.dart';
+import 'package:alisten/shared/ui/window_chrome.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -807,6 +808,7 @@ class _SelectingBar extends StatelessWidget {
                   style: PillButtonStyle.ghost,
                   onPressed: onToggleAll,
                 ),
+                const WindowButtonsGap(),
               ],
             ),
           ),

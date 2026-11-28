@@ -8,9 +8,11 @@ import 'package:alisten/shared/theme/alisten_colors.dart';
 import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_top_bar.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/hover_glow.dart';
 import 'package:alisten/shared/ui/member_avatar.dart';
 import 'package:alisten/shared/ui/pressable.dart';
+import 'package:alisten/shared/ui/window_chrome.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -135,29 +137,35 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
       location: location,
       child: Material(
         color: Theme.of(context).colorScheme.surface,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            SizedBox(
-              width: DesktopShell._sidebarWidth,
-              child: _Sidebar(location: location),
-            ),
-            Expanded(
-              child: LayoutBuilder(
-                // 页面按自己这一块的大小排版，而不是整个窗口。
-                builder: (context, constraints) => MediaQuery(
-                  data: media.copyWith(size: constraints.biggest),
-                  child: ClipRect(
-                    child: SidebarPage(
-                      active: _sidebarPages.contains(location.path),
-                      child: MiniPlayerHost(
-                        location: location,
-                        child: widget.child,
+            if (isWindowsDesktop) const WindowDragStrip(),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  width: DesktopShell._sidebarWidth,
+                  child: _Sidebar(location: location),
+                ),
+                Expanded(
+                  child: LayoutBuilder(
+                    // 页面按自己这一块的大小排版，而不是整个窗口。
+                    builder: (context, constraints) => MediaQuery(
+                      data: media.copyWith(size: constraints.biggest),
+                      child: ClipRect(
+                        child: SidebarPage(
+                          active: _sidebarPages.contains(location.path),
+                          child: MiniPlayerHost(
+                            location: location,
+                            child: widget.child,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
           ],
         ),

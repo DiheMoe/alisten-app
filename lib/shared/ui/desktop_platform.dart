@@ -8,3 +8,6 @@ bool get isDesktopPlatform {
       platform == TargetPlatform.windows ||
       platform == TargetPlatform.macOS;
 }
+
+@pragma('vm:platform-const-if', !kDebugMode)
+bool get isWindowsDesktop => defaultTargetPlatform == TargetPlatform.windows;
