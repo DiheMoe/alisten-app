@@ -15,6 +15,7 @@ import 'package:alisten/shared/theme/tokens.dart';
 import 'package:alisten/shared/ui/alisten_icons.dart';
 import 'package:alisten/shared/ui/alisten_text_field.dart';
 import 'package:alisten/shared/ui/alisten_toggle.dart';
+import 'package:alisten/shared/ui/desktop_platform.dart';
 import 'package:alisten/shared/ui/pill_button.dart';
 import 'package:alisten/shared/ui/select_menu.dart';
 import 'package:alisten/shared/ui/sheet_panel.dart';
@@ -105,6 +106,11 @@ class AppearanceSettingsScreen extends ConsumerWidget {
       settingsControllerProvider.select((state) => state.value.theme),
     );
     final lyrics = ref.watch(lyricDisplayProvider);
+    final minimizeToTray = ref.watch(
+      settingsControllerProvider.select(
+        (state) => state.value.minimizeToTrayOnClose,
+      ),
+    );
     final controller = ref.read(settingsControllerProvider.notifier);
     return SectionPage(
       title: SettingsSection.appearance.title,
@@ -143,6 +149,21 @@ class AppearanceSettingsScreen extends ConsumerWidget {
             ),
           ],
         ),
+        if (isWindowsDesktop)
+          SettingsGroup(
+            title: '窗口',
+            children: [
+              SettingRow(
+                title: '关闭时最小化到托盘',
+                description: '关闭窗口后留在系统托盘继续播放',
+                trailing: AlistenToggle(
+                  value: minimizeToTray,
+                  semanticLabel: '关闭时最小化到托盘',
+                  onChanged: controller.setMinimizeToTrayOnClose,
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }

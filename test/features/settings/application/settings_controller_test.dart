@@ -696,6 +696,20 @@ void main() {
       expect((result as MutationNotSent<void>).message, '缺少身份凭据，请重新进入后再试。');
       expect(identity().recordListens, isTrue);
     });
+
+    test(
+      'minimize-to-tray setting syncs to system settings on load and toggle',
+      () async {
+        final container = await open({'alisten.window.minimize-to-tray': true});
+        expect(stateOf(container).value.minimizeToTrayOnClose, isTrue);
+        await pumpEventQueue();
+        expect(systemSettings.minimizeToTrayOnCloseCalls, [true]);
+
+        await controllerOf(container).setMinimizeToTrayOnClose(false);
+        expect(stateOf(container).value.minimizeToTrayOnClose, isFalse);
+        expect(systemSettings.minimizeToTrayOnCloseCalls, [true, false]);
+      },
+    );
   });
 }
 
@@ -735,6 +749,9 @@ final class _FailingStore implements SettingsStore {
 
   @override
   Future<void> setLyricWords(bool shown) => _fail();
+
+  @override
+  Future<void> setMinimizeToTrayOnClose(bool enabled) => _fail();
 
   Future<void> _fail() async => throw StateError('disk full');
 }

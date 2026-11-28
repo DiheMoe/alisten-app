@@ -30,4 +30,6 @@ abstract interface class SettingsStore {
   Future<void> setLyricTranslation(bool shown);
 
   Future<void> setLyricWords(bool shown);
+
+  Future<void> setMinimizeToTrayOnClose(bool enabled);
 }

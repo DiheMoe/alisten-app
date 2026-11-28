@@ -38,6 +38,7 @@ final class FakeNotificationAccess implements NotificationAccess {
 
 final class FakeSystemSettings implements SystemSettings {
   int notificationSettingsOpened = 0;
+  final List<bool> minimizeToTrayOnCloseCalls = [];
 
   bool opens = true;
 
@@ -45,5 +46,10 @@ final class FakeSystemSettings implements SystemSettings {
   Future<bool> openNotificationSettings() async {
     notificationSettingsOpened++;
     return opens;
+  }
+
+  @override
+  Future<void> setMinimizeToTrayOnClose(bool enabled) async {
+    minimizeToTrayOnCloseCalls.add(enabled);
   }
 }

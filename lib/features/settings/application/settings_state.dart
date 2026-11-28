@@ -19,6 +19,7 @@ final class LocalSettings {
     this.email = '',
     this.lyricTranslation = true,
     this.lyricWords = true,
+    this.minimizeToTrayOnClose = false,
   });
 
   final AppTheme theme;
@@ -38,6 +39,9 @@ final class LocalSettings {
   /// 有逐字时间的歌按字点亮正在唱的部分；关掉后整行高亮。
   final bool lyricWords;
 
+  /// Windows 上点关闭按钮时隐藏到系统托盘而非退出。
+  final bool minimizeToTrayOnClose;
+
   LocalSettings copyWith({
     AppTheme? theme,
     bool? reminders,
@@ -49,6 +53,7 @@ final class LocalSettings {
     String? email,
     bool? lyricTranslation,
     bool? lyricWords,
+    bool? minimizeToTrayOnClose,
   }) {
     return LocalSettings(
       theme: theme ?? this.theme,
@@ -61,6 +66,8 @@ final class LocalSettings {
       email: email ?? this.email,
       lyricTranslation: lyricTranslation ?? this.lyricTranslation,
       lyricWords: lyricWords ?? this.lyricWords,
+      minimizeToTrayOnClose:
+          minimizeToTrayOnClose ?? this.minimizeToTrayOnClose,
     );
   }
 }

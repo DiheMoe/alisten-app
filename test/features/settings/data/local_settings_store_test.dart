@@ -31,6 +31,7 @@ void main() {
       expect(settings.email, '');
       expect(settings.lyricTranslation, isTrue);
       expect(settings.lyricWords, isTrue);
+      expect(settings.minimizeToTrayOnClose, isFalse);
     },
   );
 
@@ -95,6 +96,8 @@ void main() {
       'alisten.email': (store) => store.setEmail('listener@example.com'),
       'alisten.lyrics.translation': (store) => store.setLyricTranslation(false),
       'alisten.lyrics.words': (store) => store.setLyricWords(false),
+      'alisten.window.minimize-to-tray': (store) =>
+          store.setMinimizeToTrayOnClose(true),
     };
 
     for (final MapEntry(:key, :value) in writers.entries) {
@@ -115,6 +118,7 @@ void main() {
     await store.setEmail('listener@example.com');
     await store.setLyricTranslation(false);
     await store.setLyricWords(false);
+    await store.setMinimizeToTrayOnClose(true);
 
     final settings = store.load();
     expect(settings.theme, AppTheme.dark);
@@ -123,6 +127,7 @@ void main() {
     expect(settings.email, 'listener@example.com');
     expect(settings.lyricTranslation, isFalse);
     expect(settings.lyricWords, isFalse);
+    expect(settings.minimizeToTrayOnClose, isTrue);
   });
 
   test('clearing the email leaves the other settings alone', () async {

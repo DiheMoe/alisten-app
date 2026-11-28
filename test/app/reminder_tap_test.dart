@@ -1,10 +1,12 @@
 import 'dart:convert';
 
 import 'package:alisten/app/app.dart';
+import 'package:alisten/app/desktop/desktop_window_control.dart';
 import 'package:alisten/app/router.dart';
 import 'package:alisten/core/api/app_config.dart';
 import 'package:alisten/domain/server/server_profile.dart';
 import 'package:alisten/features/server/data/preferences_server_store.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../features/server/server_test_doubles.dart' show serverB;
@@ -72,6 +74,21 @@ void main() {
     expect(location(), '/r/room-1');
     expect(find.text(_otherServerText), findsNothing);
   });
+
+  testWidgets(
+    'on Windows a reminder brings back the window, which may be in the tray',
+    (tester) async {
+      final (:gateway, location: _) = await _open(tester);
+      final window = appContainer(
+        tester,
+      ).read(desktopWindowControlProvider) as FakeWindowControl;
+
+      await _tap(tester, gateway, '$_defaultId:room-1:entry-1');
+
+      expect(window.showCalls, 1);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
 
   testWidgets('a reminder of another server goes back to the lobby and says '
       'the song is elsewhere', (tester) async {

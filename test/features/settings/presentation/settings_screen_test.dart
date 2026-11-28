@@ -1313,4 +1313,42 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('minimize-to-tray option is hidden on non-Windows platforms', (
+    tester,
+  ) async {
+    await _openSettings(tester, at: SettingsSection.appearance);
+
+    expect(find.text('关闭时最小化到托盘'), findsNothing);
+  });
+
+  testWidgets(
+    'on Windows the appearance settings toggle minimize-to-tray on close',
+    (tester) async {
+      final systemSettings = FakeSystemSettings();
+      tester.view
+        ..physicalSize = const Size(1280, 840)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await pumpAlistenApp(tester, systemSettings: systemSettings);
+      appContainer(tester).read(routerProvider).go('/settings/appearance');
+      await tester.pumpAndSettle();
+
+      expect(find.text('关闭时最小化到托盘'), findsOneWidget);
+      expect(systemSettings.minimizeToTrayOnCloseCalls, [false]);
+
+      await tester.tap(find.bySemanticsLabel('关闭时最小化到托盘'));
+      await tester.pumpAndSettle();
+
+      expect(
+        appContainer(tester)
+            .read(settingsControllerProvider)
+            .value
+            .minimizeToTrayOnClose,
+        isTrue,
+      );
+      expect(systemSettings.minimizeToTrayOnCloseCalls, [false, true]);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
 }

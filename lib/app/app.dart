@@ -162,6 +162,9 @@ final class _AlistenAppState extends ConsumerState<AlistenApp> {
 
   // 旧版本发出的提醒不带服务器，都来自默认服务器。
   void _openReminderRoom(String? serverId, String roomId) {
+    if (isWindowsDesktop) {
+      unawaited(ref.read(desktopWindowControlProvider).show());
+    }
     final defaultId = ref.read(serverDirectoryProvider).defaultId;
     if ((serverId ?? defaultId) == ref.read(currentServerProvider).id) {
       _openRoute('/r/$roomId');

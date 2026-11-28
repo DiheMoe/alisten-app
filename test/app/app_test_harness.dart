@@ -60,6 +60,7 @@ final class FakeWindowControl implements DesktopWindowControl {
   int minimizeCalls = 0;
   int toggleMaximizeCalls = 0;
   int closeCalls = 0;
+  int showCalls = 0;
   ValueChanged<bool>? _listener;
 
   void emitMaximized(bool value) {
@@ -84,6 +85,9 @@ final class FakeWindowControl implements DesktopWindowControl {
 
   @override
   Future<void> close() async => closeCalls++;
+
+  @override
+  Future<void> show() async => showCalls++;
 
   @override
   void listenMaximized(ValueChanged<bool>? onChanged) => _listener = onChanged;

@@ -8,6 +8,9 @@ abstract interface class DesktopWindowControl {
   Future<void> minimize();
   Future<void> toggleMaximize();
   Future<void> close();
+
+  /// 窗口收在托盘里或被最小化时把它显示出来。
+  Future<void> show();
   void listenMaximized(ValueChanged<bool>? onChanged);
 }
 
@@ -38,6 +41,9 @@ final class MethodChannelWindowControl implements DesktopWindowControl {
 
   @override
   Future<void> close() => _channel.invokeMethod('closeWindow');
+
+  @override
+  Future<void> show() => _channel.invokeMethod('showWindow');
 
   @override
   void listenMaximized(ValueChanged<bool>? onChanged) {

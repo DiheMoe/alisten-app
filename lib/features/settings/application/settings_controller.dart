@@ -68,6 +68,11 @@ final class SettingsController extends Notifier<SettingsState> {
     // 偏好设置已在内存中，同步读取可让已存的设置在第一帧之前生效。
     final value = ref.read(settingsStoreProvider).load();
     unawaited(Future.microtask(refreshPermission));
+    unawaited(
+      Future.microtask(
+        () => _syncMinimizeToTrayOnClose(value.minimizeToTrayOnClose),
+      ),
+    );
     return SettingsState(
       value: value,
       permission: NotificationPermission.unknown,
@@ -163,6 +168,23 @@ final class SettingsController extends Notifier<SettingsState> {
       (value) => value.copyWith(lyricWords: shown),
       (store) => store.setLyricWords(shown),
     );
+  }
+
+  Future<void> setMinimizeToTrayOnClose(bool enabled) async {
+    await _change(
+      (value) => value.copyWith(minimizeToTrayOnClose: enabled),
+      (store) => store.setMinimizeToTrayOnClose(enabled),
+    );
+    await _syncMinimizeToTrayOnClose(enabled);
+  }
+
+  Future<void> _syncMinimizeToTrayOnClose(bool enabled) async {
+    if (!ref.mounted) return;
+    try {
+      await ref.read(systemSettingsProvider).setMinimizeToTrayOnClose(enabled);
+    } on Object {
+      AppLog.warn(_logSource, 'window tray setting not applied');
+    }
   }
 
   /// 调小上限会立即截断已存的搜索记录；不在 [searchHistoryLimits] 中的值被

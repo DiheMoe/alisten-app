@@ -18,6 +18,7 @@ final class LocalSettingsStore implements SettingsStore {
   static const _email = 'alisten.email';
   static const _lyricTranslation = 'alisten.lyrics.translation';
   static const _lyricWords = 'alisten.lyrics.words';
+  static const _minimizeToTrayOnClose = 'alisten.window.minimize-to-tray';
 
   final SharedPreferences _preferences;
 
@@ -45,6 +46,10 @@ final class LocalSettingsStore implements SettingsStore {
       email: _read(_email, defaults.email),
       lyricTranslation: _read(_lyricTranslation, defaults.lyricTranslation),
       lyricWords: _read(_lyricWords, defaults.lyricWords),
+      minimizeToTrayOnClose: _read(
+        _minimizeToTrayOnClose,
+        defaults.minimizeToTrayOnClose,
+      ),
     );
   }
 
@@ -108,6 +113,14 @@ final class LocalSettingsStore implements SettingsStore {
   @override
   Future<void> setLyricWords(bool shown) {
     return _check(_lyricWords, _preferences.setBool(_lyricWords, shown));
+  }
+
+  @override
+  Future<void> setMinimizeToTrayOnClose(bool enabled) {
+    return _check(
+      _minimizeToTrayOnClose,
+      _preferences.setBool(_minimizeToTrayOnClose, enabled),
+    );
   }
 
   T _read<T extends Object>(String key, T fallback) {
